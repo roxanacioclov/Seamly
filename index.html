@@ -308,7 +308,7 @@ const SD_OM = [
 let _sampleMode = false;
 let A={
   user:null,family:null,members:[],events:[],notes:[],noteGroups:[],
-  dailyMeds:[],occMeds:[],invProducts:[],
+  dailyMeds:[],invProducts:[],
   page:'home',calView:'month',calDate:new Date(),
   calFType:'all',calFMember:'all',calSearch:'',
   settingsTab:'family',noteFGroup:'all',noteSearch:'',
@@ -443,22 +443,22 @@ async function doSignOut(){
 
 // ── DATA LOADING ──────────────────────────────────────────────────────────────
 async function loadAll(){
-  const[fam,mems,evts,ngrps,nts,dm,om]=await Promise.all([
+  const[fam,mems,evts,ngrps,nts,dm,ip]=await Promise.all([
     sb.from('families').select('*').maybeSingle(),
     sb.from('family_members').select('*').order('created_at'),
     sb.from('events').select('*').order('date'),
     sb.from('note_groups').select('*').order('created_at'),
     sb.from('notes').select('*').order('created_at'),
     sb.from('daily_meds').select('*').order('created_at'),
-    sb.from('occasional_meds').select('*').order('created_at'),
+    sb.from('inventory_products').select('*').order('created_at'),
   ]);
-  if(fam.data){A.family=fam.data;A.invProducts=fam.data.inventory_products||[];}
+  if(fam.data){A.family=fam.data;}
   A.members=mems.data||[];
   A.events=evts.data||[];
   A.noteGroups=ngrps.data||[];
   A.notes=nts.data||[];
   A.dailyMeds=dm.data||[];
-  A.occMeds=om.data||[];
+  A.invProducts=ip.data||[];
 }
 
 
@@ -2460,7 +2460,7 @@ function copyOrderToClipboard() {
 window.copyOrderToClipboard = copyOrderToClipboard;
 
 function renderMeds(){
-  const dm=getDM(),om=getOM(),s=symC();
+  const dm=getDM(),s=symC();
   const daysLeft=med=>{const td=(med.member_ids||[]).length*(med.dose_per_day||1);if(!td)return null;return Math.floor((med.stock_today||0)/td);};
   const lastsUntil=med=>{const d=daysLeft(med);return d===null?'—':fmt(addDays(todayD(),d));};
   const updStock=med=>(med.stock_today||0)+((parseInt(med.new_order_pkgs)||0)*(med.units_per_pkg||0));
@@ -2535,35 +2535,6 @@ function renderMeds(){
         <button class="btn btn-secondary btn-sm" onclick="exportMedsXLSX()">⬇️ Export Excel</button>
         <button class="btn btn-secondary btn-sm" onclick="copyOrderToClipboard()">📋 Copy order</button>
       </div>
-    </div>
-
-    <div style="padding:18px 16px 0">
-      <div style="font-family:'Playfair Display',serif;font-size:17px;color:${T.ink};margin-bottom:10px">Occasional Medications</div>
-      <div style="overflow-x:auto;border-radius:13px;border:1px solid ${T.border};background:${T.surface}">
-        <table class="tbl">
-          <thead><tr>${['Medication','In stock','Last counted','Expiry','Note',''].map(h=>`<th>${h}</th>`).join('')}</tr></thead>
-          <tbody>
-            ${om.map(med=>{
-              const es=med.expiry?expSt(med.expiry):'ok';
-              const ed=med.expiry?expDays(med.expiry):null;
-              return`<tr>
-                <td style="font-weight:700">${med.name}</td>
-                <td><input type="number" value="${med.stock}" onfocus="this.select()" onchange="updateOccStock('${med.id}',this.value)" style="width:60px;padding:4px 6px;border-radius:7px;border:1px solid ${T.border};font-size:13px;text-align:center"></td>
-                <td style="color:${T.muted};font-size:12px">${fmt(med.last_count)}</td>
-                <td style="font-weight:${es!=='ok'?700:400};color:${es==='ok'?T.muted:T.rose}">
-                  ${fmt(med.expiry)}
-                  ${es==='expired'?`<div style="font-size:10px;color:${T.rose}">❌ EXPIRED</div>`:''}
-                  ${es==='critical'?`<div style="font-size:10px;color:${T.rose}">⚠️ ${ed}d left</div>`:''}
-                  ${es==='soon'?`<div style="font-size:10px;color:${T.honey}">⏳ ${ed}d left</div>`:''}
-                </td>
-                <td style="color:${T.muted};font-size:12px">${med.note||''}</td>
-                <td><button onclick="delOM('${med.id}')" style="background:none;border:none;color:${T.muted};cursor:pointer;font-size:14px">🗑</button></td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>
-      <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="openAddOM()">+ Add occasional med</button>
     </div>`;
 }
 
@@ -2599,16 +2570,8 @@ async function confirmOrder(id){
 }
 window.confirmOrder=confirmOrder;
 
-async function updateOccStock(id,val){
-  const{data}=await sb.from('occasional_meds').update({stock:parseInt(val)||0,last_count:new Date().toISOString()}).eq('id',id).select().single();
-  if(data)A.occMeds=A.occMeds.map(m=>m.id===id?data:m);
-}
-window.updateOccStock=updateOccStock;
-
 async function delDM(id){if(!confirm('Remove?'))return;await sb.from('daily_meds').delete().eq('id',id);A.dailyMeds=A.dailyMeds.filter(m=>m.id!==id);toast('Removed.');renderMeds();}
 window.delDM=delDM;
-async function delOM(id){if(!confirm('Remove?'))return;await sb.from('occasional_meds').delete().eq('id',id);A.occMeds=A.occMeds.filter(m=>m.id!==id);toast('Removed.');renderMeds();}
-window.delOM=delOM;
 
 function openAddDM(){
   if(isSampleMode()){toast('Switch to My Family to add real entries.',true);return;}
@@ -2648,36 +2611,6 @@ async function saveDM(){
   A.dailyMeds.push(result);closeModal();toast('Medication added!');renderMeds();
 }
 window.saveDM=saveDM;
-
-function openAddOM(){
-  if(isSampleMode()){toast('Switch to My Family to add real entries.',true);return;}
-  showModal('Add Occasional Medication',`
-    <div class="form-row"><label class="lbl">Medication name</label><input class="inp" id="om-n" placeholder="e.g. Ibuprofen 400mg" autofocus></div>
-    <div class="grid2">
-      <div class="form-row" style="margin:0"><label class="lbl">Units in stock</label><input class="inp" type="number" id="om-s" placeholder="0" onfocus="this.select()"></div>
-      <div class="form-row" style="margin:0"><label class="lbl">Expiry date</label><input class="inp" type="date" id="om-e"></div>
-    </div>
-    <div class="form-row"><label class="lbl">Note</label><input class="inp" id="om-note" placeholder="Optional note"></div>
-    <button class="btn btn-primary btn-full" onclick="saveOM()">Add Medication</button>`);
-}
-window.openAddOM=openAddOM;
-
-async function saveOM(){
-  if(!A.family)return;
-  const name=document.getElementById('om-n')?.value?.trim();
-  if(!name){toast('Please add a name.',true);return;}
-  const data={
-    family_id:A.family.id,name,
-    stock:parseInt(document.getElementById('om-s')?.value)||0,
-    expiry:document.getElementById('om-e')?.value?new Date(document.getElementById('om-e').value).toISOString():null,
-    note:document.getElementById('om-note')?.value||'',
-    last_count:new Date().toISOString(),
-  };
-  const{data:result,error}=await sb.from('occasional_meds').insert(data).select().single();
-  if(error){toast('Error adding.',true);console.error(error);return;}
-  A.occMeds.push(result);closeModal();toast('Medication added!');renderMeds();
-}
-window.saveOM=saveOM;
 
 // ── INSIGHTS ──────────────────────────────────────────────────────────────────
 function renderInsights(){
@@ -3237,29 +3170,30 @@ function openAddProduct(){
 window.openAddProduct=openAddProduct;
 
 async function saveProduct(){
+  if(!A.family){toast('Set up your family first.',true);return;}
   const name=document.getElementById('ap-name')?.value?.trim();
   if(!name){toast('Please enter an item name.',true);return;}
-  const item={
-    id:'inv_'+Date.now(),
+  const data={
+    family_id:A.family.id,
     name,
-    category:document.getElementById('ap-cat')?.value||'',
-    unit:document.getElementById('ap-unit')?.value||'',
+    category:document.getElementById('ap-cat')?.value||null,
+    unit:document.getElementById('ap-unit')?.value||null,
     stock:parseFloat(document.getElementById('ap-stock')?.value)||0,
     cost:parseFloat(document.getElementById('ap-cost')?.value)||null,
-    expiry:document.getElementById('ap-exp')?.value||null,
-    notes:document.getElementById('ap-notes')?.value||'',
+    expiry:document.getElementById('ap-exp')?.value?new Date(document.getElementById('ap-exp').value).toISOString():null,
+    notes:document.getElementById('ap-notes')?.value||null,
   };
-  if(!A.invProducts) A.invProducts=[];
-  A.invProducts.push(item);
-  // Persist in family record as JSON
-  await sb.from('families').update({inventory_products:A.invProducts}).eq('id',A.family.id);
+  const{data:result,error}=await sb.from('inventory_products').insert(data).select().single();
+  if(error){toast('Error saving item: '+error.message,true);console.error(error);return;}
+  A.invProducts.push(result);
   _closeModalDOM();toast('Item added! ✅');renderInventory();
 }
 window.saveProduct=saveProduct;
 
 async function delProduct(id){
-  A.invProducts=(A.invProducts||[]).filter(p=>p.id!==id);
-  await sb.from('families').update({inventory_products:A.invProducts}).eq('id',A.family.id);
+  const{error}=await sb.from('inventory_products').delete().eq('id',id);
+  if(error){toast('Error removing item.',true);console.error(error);return;}
+  A.invProducts=A.invProducts.filter(p=>p.id!==id);
   toast('Item removed.');renderInventory();
 }
 window.delProduct=delProduct;
@@ -3544,7 +3478,6 @@ function getEvents()  { return _sampleMode ? SD_EVENTS : A.events; }
 function getNotes()   { return _sampleMode ? SD_NOTES : A.notes; }
 function getGroups()  { return _sampleMode ? SD_GROUPS : A.noteGroups; }
 function getDM()      { return _sampleMode ? SD_DM : A.dailyMeds; }
-function getOM()      { return _sampleMode ? SD_OM : A.occMeds; }
 function isSampleMode() { return _sampleMode; }
 
 function showAuth(){
