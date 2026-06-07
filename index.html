@@ -335,6 +335,20 @@ function toast(msg,isErr=false){
   setTimeout(()=>t.remove(),2800);
 }
 
+function showSavingToast(){
+  if(document.getElementById('saving-toast'))return;
+  const t=document.createElement('div');
+  t.id='saving-toast';
+  t.className='toast';
+  t.style.cssText='background:#7a7060;animation:none;pointer-events:none';
+  t.innerHTML='<span style="display:inline-block;width:11px;height:11px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:8px"></span>Saving…';
+  document.body.appendChild(t);
+}
+
+function hideSavingToast(){
+  document.getElementById('saving-toast')?.remove();
+}
+
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 function switchAuth(m){
   document.getElementById('auth-login').style.display=m==='login'?'block':'none';
@@ -1178,40 +1192,7 @@ function getAdminRows(containerId) {
   })).filter(r=>r.units);
 }
 
-// ── SYNC ACTIONS TO NOTEBOOK ──────────────────────────────────────────────────
-async function syncActionsToNotebook(eventTitle, actions, eventId, memberId, eventDate) {
-  if (!A.family || !actions?.length) return;
-  let group = A.noteGroups.find(g => g.name === '📅 Calendar Actions');
-  if (!group) {
-    const { data } = await sb.from('note_groups').insert({
-      family_id: A.family.id, name: '📅 Calendar Actions'
-    }).select().single();
-    if (data) { A.noteGroups.push(data); group = data; }
-  }
-  if (!group) return;
-  let note = A.notes.find(n => n.group_id === group.id && n.title === eventTitle);
-  // Find the saved event to get its ID for linking
-  const linkedEvent = A.events.find(e=>e.id===eventId) || A.events.find(e=>e.title===eventTitle);
-  const dateStr = eventDate ? fmt(eventDate) : (linkedEvent ? fmt(linkedEvent.date) : '');
-  const eventRef = dateStr ? `📅 From calendar: ${eventTitle} · ${dateStr}` : `📅 From calendar: ${eventTitle}`;
-  const noteData = {
-    family_id: A.family.id,
-    title: eventTitle,
-    content: eventRef,
-    color: '#f5e4c4',
-    group_id: group.id,
-    member_id: memberId || null,
-    pinned: false,
-    checklist: actions,
-  };
-  if (note) {
-    const { data } = await sb.from('notes').update(noteData).eq('id', note.id).select().single();
-    if (data) A.notes = A.notes.map(n => n.id === note.id ? data : n);
-  } else {
-    const { data } = await sb.from('notes').insert(noteData).select().single();
-    if (data) A.notes.push(data);
-  }
-}
+
 
 // ── WELLNESS PREFILL ──────────────────────────────────────────────────────────
 function getLastWellness(memberId) {
@@ -1477,6 +1458,7 @@ function openEvForm(type, evId, dateTs, duplicateId) {
         <div class="form-row" style="margin:0"><label class="lbl">Time (optional)</label>
           <input class="inp" type="time" id="ef-stime" value="${source?.date&&!source?.all_day?new Date(source.date).toTimeString().slice(0,5):''}"></div>
       </div>
+      ${recurrenceFields(source?.recurrence, source?.recurrence_end_type, source?.recurrence_end_count, source?.recurrence_end_date)}
       <div class="form-row"><label class="lbl">Actions / Subtasks</label>
         <div id="ef-actions"></div>
         <button type="button" onclick="addChecklistRow('ef-actions')" style="font-size:12px;color:${T.sage};background:none;border:1px dashed ${T.sageMid};border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:600;margin-top:4px">+ Add item</button>
@@ -1713,7 +1695,7 @@ window.addTag = addTag;
 // Wraps any Supabase operation with timeout + one automatic retry
 // Fixes silent failures caused by stale HTTP/2 connections
 async function sbWrite(operation) {
-  const TIMEOUT_MS = 10000;
+  const TIMEOUT_MS = 7000;
   const withTimeout = (fn) => Promise.race([
     fn(),
     new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS))
@@ -1760,6 +1742,19 @@ window.localDT = localDT;
 
 async function saveEv(type, evId, dateTs) {
   if (!A.family) { toast('Set up your family first.', true); return; }
+  const _saveBtn = document.querySelector('.modal-body button.btn-primary');
+  if (_saveBtn) {
+    _saveBtn.disabled = true;
+    _saveBtn.dataset.origText = _saveBtn.textContent;
+    _saveBtn.textContent = 'Saving…';
+    _saveBtn.style.opacity = '0.7';
+  }
+  showSavingToast();
+  let _saveOk = false;
+  // For series editing (Change IV):
+  const editSeriesId = A._editSeriesMode || null;
+  delete A._editSeriesMode;
+  let seriesUpdateMsg = null;
   let data = { family_id: A.family.id, type };
   try {
     if (type === 'wellness') {
@@ -1802,6 +1797,19 @@ async function saveEv(type, evId, dateTs) {
       data.actions = getChecklist('ef-actions');
       data.tags = Array.from(document.querySelectorAll('#ef-tags button[data-sel="true"]')).map(b=>b.dataset.tag).filter(Boolean);
       data.description = document.getElementById('ef-desc')?.value || null;
+      // Recurrence (now supported for tasks)
+      data.recurrence = document.getElementById('ef-rec')?.value || 'None';
+      data.recurrence_end_type = document.getElementById('ef-recend-type')?.value || 'count';
+      data.recurrence_end_count = parseInt(document.getElementById('ef-recend-n')?.value) || null;
+      data.recurrence_end_date = document.getElementById('ef-recend-d')?.value || null;
+      if (data.recurrence !== 'None') {
+        if (data.recurrence_end_type === 'count' && !data.recurrence_end_count) {
+          toast('Please enter the number of times this task should repeat.', true); return;
+        }
+        if (data.recurrence_end_type === 'date' && !data.recurrence_end_date) {
+          toast('Please enter the date until which this task should repeat.', true); return;
+        }
+      }
 
     } else if (type === 'social') {
       data.title = document.getElementById('ef-title')?.value || '';
@@ -1910,7 +1918,7 @@ async function saveEv(type, evId, dateTs) {
         'appt_type','member_id','participants','participants_all_family','tags',
         'weight','height','hydration','exercised','activity','activity_mins','mood','energy','sleep',
         'social_type','actions','doctor','specialty','cost','cost_currency',
-        'symptoms','cure','recommended_by','administration','considerations','links'];
+        'symptoms','cure','recommended_by','administration','considerations','links','series_id'];
       const clean = {};
       allowed.forEach(k => { if (obj[k] !== undefined) clean[k] = obj[k]; });
       return clean;
@@ -1929,6 +1937,26 @@ async function saveEv(type, evId, dateTs) {
       }
       A.events = A.events.map(e => e.id===evId ? res.data : e);
       savedFirst = res.data;
+
+      // Series-wide update: if editing all occurrences, update shared fields on sibling events
+      if (editSeriesId) {
+        const SERIES_SHARED_FIELDS = ['title','description','location','social_type','actions','tags',
+          'links','participants','participants_all_family','member_id','appt_type','doctor','specialty',
+          'cost','cost_currency','symptoms','cure','recommended_by','administration','considerations'];
+        const sharedUpdate = {};
+        SERIES_SHARED_FIELDS.forEach(k => { if (cleanedData[k] !== undefined) sharedUpdate[k] = cleanedData[k]; });
+        if (Object.keys(sharedUpdate).length) {
+          const {data: seriesRows} = await sb.from('events').update(sharedUpdate)
+            .eq('series_id', editSeriesId).neq('id', evId).select();
+          if (seriesRows) {
+            A.events = A.events.map(e => e.series_id === editSeriesId && e.id !== evId
+              ? {...e, ...sharedUpdate} : e);
+          }
+          const siblingsCount = A.events.filter(e => e.series_id === editSeriesId && e.id !== evId).length;
+          seriesUpdateMsg = `Series updated! ✅ (${siblingsCount + 1} occurrences)`;
+        }
+      }
+
       // If recurrence was added/changed on edit, generate future instances
       if (cleanedData.recurrence && cleanedData.recurrence !== 'None' && eventsToSave.length > 1) {
         // Insert the additional recurring instances (skip index 0 = the updated event)
@@ -1956,13 +1984,6 @@ async function saveEv(type, evId, dateTs) {
       A.events.push(...res.data); savedFirst = res.data[0];
     }
 
-    // Sync actions/tasks to notebook Calendar Actions group
-    if (savedFirst && (data.actions?.length || data.type === 'task')) {
-      const noteTitle = data.title || ET[data.type]?.label || 'Task';
-      const items = data.actions?.length ? data.actions : [{text: noteTitle, done: false}];
-      await syncActionsToNotebook(noteTitle, items, savedFirst.id, data.member_id||null, savedFirst.date);
-    }
-
     // Sync any new tags to family.tags so they appear in Settings
     if (data.tags?.length && A.family) {
       const existingTags = A.family.tags || [];
@@ -1973,11 +1994,22 @@ async function saveEv(type, evId, dateTs) {
           .then(({data:fd})=>{ if(fd) A.family=fd; });
       }
     }
+    _saveOk = true;
     _closeModalDOM();
-    toast(evId ? 'Entry updated! ✅' : `Entry added!${eventsToSave.length>1?' ('+eventsToSave.length+' occurrences created)':''}`);
+    toast(seriesUpdateMsg || (evId ? 'Entry updated! ✅' : `Entry added!${eventsToSave.length>1?' ('+eventsToSave.length+' occurrences created)':''}`));
     renderCal();
-
-  } catch(e) { console.error('saveEv error', e); }
+    renderHome();
+  } catch(e) {
+    console.error('saveEv error', e);
+    toast('Something went wrong — please try again.', true);
+  } finally {
+    hideSavingToast();
+    if (!_saveOk && _saveBtn) {
+      _saveBtn.disabled = false;
+      _saveBtn.textContent = _saveBtn.dataset.origText || (evId ? 'Save Changes' : 'Add Entry');
+      _saveBtn.style.opacity = '';
+    }
+  }
 }
 window.saveEv = saveEv;
 
@@ -1986,6 +2018,10 @@ function generateRecurrences(data) {
   const events = [data]; // first event is always included
   const rec = data.recurrence;
   if (!rec || rec === 'None') return events;
+
+  // Stamp all occurrences with a shared series_id so they can be managed together
+  const seriesId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2));
+  events[0].series_id = seriesId;
 
   const endType = data.recurrence_end_type || 'none';
   // For 'count': total occurrences INCLUDING the first = recurrence_end_count
@@ -2020,6 +2056,7 @@ function generateRecurrences(data) {
     const recEvent = {...data};
     recEvent.date = next.toISOString();
     if (baseEnd) recEvent.end_date = new Date(next.getTime() + duration).toISOString();
+    recEvent.series_id = seriesId; // link all occurrences to the same series
     delete recEvent.id; // ensure new ID on insert
     events.push(recEvent);
     current = next;
@@ -2036,6 +2073,47 @@ function duplicateEv(id) {
   openEvForm(ev.type, null, null, id);
 }
 window.duplicateEv = duplicateEv;
+
+// ── RECURRENCE EDIT CHOICE ────────────────────────────────────────────────────
+// Shows a modal asking the user whether to edit only this occurrence
+// or all occurrences in the series.
+function showRecurrenceEditChoice(evId) {
+  const ev = A.events.find(e=>e.id===evId);
+  if (!ev) return;
+  const seriesCount = A.events.filter(e=>e.series_id===ev.series_id).length;
+  showModal('Edit recurring event', `
+    <div style="text-align:center;padding:10px 0">
+      <div style="font-size:36px;margin-bottom:12px">🔁</div>
+      <div style="font-weight:700;font-size:16px;margin-bottom:8px">Edit recurring event</div>
+      <div style="font-size:13px;color:${T.muted};margin-bottom:20px">"${ev.title||ET[ev.type].label}" is part of a series with ${seriesCount} occurrence${seriesCount!==1?'s':''}.</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-secondary btn-full" onclick="_closeModalDOM();openEvForm('${ev.type}','${ev.id}',null)">
+          ✏️ Edit this occurrence only
+        </button>
+        <button class="btn btn-primary btn-full" onclick="_closeModalDOM();A._editSeriesMode='${ev.series_id}';openEvForm('${ev.type}','${ev.id}',null)">
+          ✏️ Edit all ${seriesCount} occurrences
+        </button>
+        <button class="btn btn-secondary btn-full" onclick="closeModal()">Cancel</button>
+      </div>
+      <div style="font-size:11px;color:${T.muted};margin-top:12px">Editing all occurrences updates shared fields (title, participants, notes, actions etc.) but keeps each occurrence's individual date/time.</div>
+    </div>`);
+}
+window.showRecurrenceEditChoice = showRecurrenceEditChoice;
+
+// ── DELETE ENTIRE SERIES ──────────────────────────────────────────────────────
+// Deletes all events with the given series_id from the DB and local state.
+async function deleteEntireSeries(seriesId) {
+  const toDelete = A.events.filter(e=>e.series_id===seriesId);
+  if (!toDelete.length) { closeModal(); return; }
+  const {error} = await sb.from('events').delete().eq('series_id', seriesId);
+  if (error) { toast('Error deleting series.', true); console.error(error); return; }
+  A.events = A.events.filter(e=>e.series_id!==seriesId);
+  closeModal();
+  toast(`Series deleted — ${toDelete.length} occurrence${toDelete.length!==1?'s':''} removed.`);
+  renderCal();
+  renderHome();
+}
+window.deleteEntireSeries = deleteEntireSeries;
 
 // ── VIEW EVENT (updated) ──────────────────────────────────────────────────────
 function viewEv(id) {
@@ -2120,8 +2198,17 @@ function viewEv(id) {
   if(isSampleMode()){
     body += `<div style="background:${T.honeyLight};border-radius:9px;padding:10px;text-align:center;font-size:12px;color:${T.honey};font-weight:600;margin-top:8px">📋 Sample mode — read only</div>`;
   } else {
+    // Series badge — shown when this event is part of a recurring series
+    if(ev.series_id){
+      const seriesCount=A.events.filter(e=>e.series_id===ev.series_id).length;
+      body += `<div style="display:inline-flex;align-items:center;gap:6px;background:${T.skyLight};color:${T.sky};border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;margin-bottom:10px">🔁 Part of a recurring series (${seriesCount} occurrences)</div>`;
+    }
+    // Edit button: if series event, show choice; otherwise open form directly
+    const editCall = ev.series_id
+      ? `showRecurrenceEditChoice('${ev.id}')`
+      : `_closeModalDOM();openEvForm('${ev.type}','${ev.id}',null)`;
     body += `<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
-      <button class="btn btn-primary" style="flex:1" onclick="_closeModalDOM();openEvForm('${ev.type}','${ev.id}',null)">✏️ Edit</button>
+      <button class="btn btn-primary" style="flex:1" onclick="${editCall}">✏️ Edit</button>
       <button class="btn btn-secondary" style="flex:1" onclick="duplicateEv('${ev.id}')">⧉ Duplicate</button>
       <button class="btn btn-danger" style="flex:1" onclick="delEv('${ev.id}')">🗑 Delete</button>
     </div>`;
@@ -2134,36 +2221,43 @@ window.viewEv = viewEv;
 function delEv(id) {
   const ev = A.events.find(e=>e.id===id);
   if (!ev) return;
-  // Check if there's an associated note in Calendar Actions
-  const calActGrp = A.noteGroups.find(g=>g.name==='📅 Calendar Actions');
-  const assocNote = calActGrp ? A.notes.find(n=>n.group_id===calActGrp.id&&n.title===(ev.title||ET[ev.type].label)) : null;
-  const noteWarning = assocNote ? `<div style="font-size:12px;background:${T.honeyLight};border-radius:8px;padding:8px 10px;margin-bottom:14px;color:${T.honey};font-weight:600">⚠️ This event has action items in your Notebook. Deleting it will also remove that note.</div>` : '';
+  // If this event is part of a recurring series, offer options
+  if(ev.series_id){
+    const seriesCount=A.events.filter(e=>e.series_id===ev.series_id).length;
+    showModal('Delete Entry',`
+      <div style="text-align:center;padding:10px 0">
+        <div style="font-size:40px;margin-bottom:12px">🗑</div>
+        <div style="font-weight:700;font-size:16px;margin-bottom:8px">Delete recurring event?</div>
+        <div style="font-size:13px;color:${T.muted};margin-bottom:16px">"${ev.title||ET[ev.type].label}" is part of a recurring series (${seriesCount} occurrences).</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <button class="btn btn-secondary btn-full" onclick="confirmDelEv('${id}')">Delete this occurrence only</button>
+          <button class="btn btn-danger btn-full" onclick="deleteEntireSeries('${ev.series_id}')">Delete all ${seriesCount} occurrences</button>
+          <button class="btn btn-secondary btn-full" onclick="closeModal()">Cancel</button>
+        </div>
+      </div>\`);
+    return;
+  }
   showModal('Delete Entry', `
     <div style="text-align:center;padding:10px 0">
       <div style="font-size:40px;margin-bottom:12px">🗑</div>
       <div style="font-weight:700;font-size:16px;margin-bottom:8px">Delete this entry?</div>
       <div style="font-size:13px;color:${T.muted};margin-bottom:6px">"${ev.title||ET[ev.type].label}"</div>
       <div style="font-size:12px;color:${T.muted};margin-bottom:12px">📅 ${fmt(ev.date)}${ev.all_day||ev.type==='wellness'?'':' · '+(()=>{const x=new Date(ev.date);return x.getHours().toString().padStart(2,'0')+':'+x.getMinutes().toString().padStart(2,'0')})()} will be permanently removed.</div>
-      ${noteWarning}
       <div style="display:flex;gap:10px">
         <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">Cancel</button>
-        <button class="btn btn-danger" style="flex:1" onclick="confirmDelEv('${id}','${assocNote?.id||''}')">Delete</button>
+        <button class="btn btn-danger" style="flex:1" onclick="confirmDelEv('${id}')">Delete</button>
       </div>
     </div>`);
 }
 window.delEv = delEv;
 
-async function confirmDelEv(id, noteId) {
+async function confirmDelEv(id) {
   const {error} = await sb.from('events').delete().eq('id', id);
   if (error) { toast('Error deleting.', true); return; }
   A.events = A.events.filter(e=>e.id!==id);
-  // Delete associated notebook note if exists
-  if (noteId) {
-    await sb.from('notes').delete().eq('id', noteId);
-    A.notes = A.notes.filter(n=>n.id!==noteId);
-  }
   closeModal(); toast('Entry deleted.');
   renderCal();
+  renderHome();
   if(A.calSearch || A.calFType!=='all' || A.calFMember!=='all') setTimeout(renderCalResults, 50);
 }
 window.confirmDelEv = confirmDelEv;
@@ -2365,15 +2459,6 @@ async function saveNote(noteId){
   const savedNote = res.data;
   if(noteId)A.notes=A.notes.map(n=>n.id===noteId?savedNote:n);
   else A.notes.push(savedNote);
-  // If this is a Calendar Actions note, sync checklist back to the matching event
-  const calActGroup=A.noteGroups.find(g=>g.name==='📅 Calendar Actions');
-  if(calActGroup&&savedNote.group_id===calActGroup.id&&savedNote.checklist?.length){
-    const matchEv=A.events.find(e=>e.title===savedNote.title&&e.actions?.length);
-    if(matchEv){
-      await sb.from('events').update({actions:savedNote.checklist}).eq('id',matchEv.id);
-      A.events=A.events.map(e=>e.id===matchEv.id?{...e,actions:savedNote.checklist}:e);
-    }
-  }
   closeModal();toast(noteId?'Note updated!':'Note saved!');renderNB();
 }
 window.saveNote=saveNote;
@@ -2849,21 +2934,71 @@ function genInsights(wLogs,hEvs){
 
 // ── HOME PAGE ──────────────────────────────────────────────────────────────────
 function renderHome(){
+  const now=new Date(); // device clock — reference for past/future timed events
   const today=todayD();
   const fmtT=d=>{if(!d)return'';const x=new Date(d);return x.getHours().toString().padStart(2,'0')+':'+x.getMinutes().toString().padStart(2,'0');};
-  const todayEvs=getEvents().filter(e=>isSameDay(e.date,today)&&e.type!=='wellness')
-    .sort((a,b)=>new Date(a.date)-new Date(b.date));
+
+  // ── TODAY SECTION ──────────────────────────────────────────────────────────
+  // Include: events starting today + multi-day events spanning through today
+  // Exclude: wellness logs, timed events whose start time has already passed
+  const todayEvs=getEvents().filter(e=>{
+    if(e.type==='wellness') return false;
+    const evStart=new Date(e.date);
+    const evStartDay=new Date(evStart); evStartDay.setHours(0,0,0,0);
+
+    // Case A: event starts today
+    if(isSameDay(evStart,today)){
+      if(e.all_day) return true; // all-day events always show
+      return evStart>=now;       // timed: only if not yet past
+    }
+
+    // Case B: multi-day event that started before today but spans through today
+    if(e.end_date){
+      const evEndDay=new Date(e.end_date); evEndDay.setHours(23,59,59,999);
+      return evStartDay<today && evEndDay>=today;
+    }
+    return false;
+  });
+
+  // Sort: all-day first, then chronologically by start time
+  todayEvs.sort((a,b)=>{
+    const aAllDay=a.all_day||(new Date(a.date)<today);
+    const bAllDay=b.all_day||(new Date(b.date)<today);
+    if(aAllDay&&!bAllDay) return -1;
+    if(!aAllDay&&bAllDay) return 1;
+    return new Date(a.date)-new Date(b.date);
+  });
+
+  // ── COMING UP SECTION ──────────────────────────────────────────────────────
+  // Determine if today is Sunday (Mon=0 ... Sun=6)
+  const isSunday=((today.getDay()+6)%7)===6;
+
+  let weekStart, weekEnd, upcomingLabel;
+  if(isSunday){
+    // Show NEXT week (Mon–Sun)
+    weekStart=addDays(today,1);       // next Monday
+    weekEnd=addDays(today,7);         // next Sunday
+    upcomingLabel='Coming up next week';
+  } else {
+    // Show remainder of THIS calendar week (tomorrow → this Sunday)
+    weekStart=addDays(today,1);       // tomorrow
+    // Find this Sunday: days until Sunday = 6 - current weekday (Mon=0)
+    const daysUntilSunday=6-((today.getDay()+6)%7);
+    weekEnd=addDays(today,daysUntilSunday);
+    upcomingLabel='Coming up this week';
+  }
+  weekEnd.setHours(23,59,59,999);
+
   const upcomingEvs=getEvents().filter(e=>{
-    const d=new Date(e.date);d.setHours(0,0,0,0);
-    const diff=(d-today)/(86400000);
-    return diff>0&&diff<=7&&e.type!=='wellness';
-  }).sort((a,b)=>new Date(a.date)-new Date(b.date)).slice(0,5);
+    if(e.type==='wellness') return false;
+    const evStart=new Date(e.date); evStart.setHours(0,0,0,0);
+    return evStart>=weekStart && evStart<=weekEnd;
+  }).sort((a,b)=>new Date(a.date)-new Date(b.date));
 
-  // Action items due (tasks with today's date or past due)
+  // ── ACTION ITEMS ──────────────────────────────────────────────────────────
   const dueActions=getEvents().filter(e=>e.type==='task'&&e.actions?.some(a=>!a.done)&&new Date(e.date)<=new Date());
-  // Notebook checklist items
-  const nbActions=getNotes().filter(n=>n.checklist?.some(c=>!c.done)&&n.group_id===getGroups().find(g=>g.name==='📅 Calendar Actions')?.id);
 
+  // ── MEMBER COLOR HELPER ────────────────────────────────────────────────────
   const memColor=e=>{
     if(e.participants_all_family||(!e.member_id&&!(e.participants?.length))||(e.participants?.length>1))return '#9e9488';
     const mid=e.member_id||(e.participants?.[0]);
@@ -2871,13 +3006,30 @@ function renderHome(){
     return m?m.color:'#9e9488';
   };
 
-  const evCard=e=>`<div onclick="viewEv('${e.id}')" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:10px;background:#fff;border-left:3px solid ${memColor(e)};margin-bottom:6px;cursor:pointer">
-    <span style="font-size:16px">${ET[e.type].icon}</span>
-    <div style="flex:1;min-width:0">
-      <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.title||ET[e.type].label}</div>
-      <div style="font-size:11px;color:${T.muted}">${e.all_day?'All day':fmtT(e.date)}${e.location?' · '+e.location:''}</div>
-    </div>
-  </div>`;
+  // ── EVENT CARD ─────────────────────────────────────────────────────────────
+  // showDate: when true, prefix subtitle with compact "Mon 4/6 · " date label
+  const evCard=(e,showDate=false)=>{
+    const evStart=new Date(e.date);
+    const isSpanning=e.end_date&&!isSameDay(e.date,e.end_date)&&evStart<today;
+    const timeStr=e.all_day||isSpanning?'All day':fmtT(e.date);
+    let subtitle='';
+    if(showDate){
+      const dn=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+      const dayLabel=dn[(evStart.getDay()+6)%7];
+      const dateLabel=`${evStart.getDate()}/${evStart.getMonth()+1}`;
+      subtitle=`${dayLabel} ${dateLabel} · ${timeStr}`;
+    } else {
+      subtitle=timeStr;
+    }
+    if(e.location) subtitle+=' · '+e.location;
+    return `<div onclick="viewEv('${e.id}')" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:10px;background:#fff;border-left:3px solid ${memColor(e)};margin-bottom:6px;cursor:pointer">
+      <span style="font-size:16px">${ET[e.type].icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.title||ET[e.type].label}</div>
+        <div style="font-size:11px;color:${T.muted}">${subtitle}</div>
+      </div>
+    </div>`;
+  };
 
   document.getElementById('page-home').innerHTML=`
     <div class="page-header">
@@ -2892,27 +3044,21 @@ function renderHome(){
       </div>
 
       <div style="font-weight:800;font-size:14px;color:${T.ink};margin-bottom:8px">Today — ${fmt(today)}</div>
-      ${todayEvs.length?todayEvs.map(evCard).join(''):`<div style="font-size:13px;color:${T.muted};padding:10px 0;font-style:italic">No events today. Enjoy the day!</div>`}
+      ${todayEvs.length?todayEvs.map(e=>evCard(e,false)).join(''):`<div style="font-size:13px;color:${T.muted};padding:10px 0;font-style:italic">No upcoming events today. Enjoy the rest of the day!</div>`}
 
       ${upcomingEvs.length?`
-      <div style="font-weight:800;font-size:14px;color:${T.ink};margin:14px 0 8px">Coming up this week</div>
-      ${upcomingEvs.map(e=>evCard(e)).join('')}`:''}
+      <div style="font-weight:800;font-size:14px;color:${T.ink};margin:14px 0 8px">${upcomingLabel}</div>
+      ${upcomingEvs.map(e=>evCard(e,true)).join('')}`:''}
 
-      ${dueActions.length||nbActions.length?`
+      ${dueActions.length?`
       <div style="font-weight:800;font-size:14px;color:${T.ink};margin:14px 0 8px">Action items</div>
-      ${[...dueActions.flatMap(e=>(e.actions||[]).filter(a=>!a.done).slice(0,3).map(a=>`
+      ${dueActions.flatMap(e=>(e.actions||[]).filter(a=>!a.done).slice(0,3).map(a=>`
         <div style="display:flex;align-items:center;gap:8px;padding:8px 11px;border-radius:10px;background:#fff;margin-bottom:5px">
           <span style="font-size:14px">✅</span>
           <div style="flex:1;font-size:13px;font-weight:600">${a.text}</div>
           <div style="font-size:11px;color:${T.muted}">${e.title}</div>
-        </div>`)),
-        ...nbActions.flatMap(n=>(n.checklist||[]).filter(c=>!c.done).slice(0,2).map(c=>`
-        <div style="display:flex;align-items:center;gap:8px;padding:8px 11px;border-radius:10px;background:#fff;margin-bottom:5px">
-          <span style="font-size:14px">📋</span>
-          <div style="flex:1;font-size:13px;font-weight:600">${c.text}</div>
-          <div style="font-size:11px;color:${T.muted}">${n.title}</div>
-        </div>`))
-      ].join('')}`:''}
+        </div>`)).join('')}`:''
+      }
 
     </div>`;
 }
@@ -3468,7 +3614,7 @@ function toggleSampleMode() {
 window.toggleSampleMode = toggleSampleMode;
 
 function renderPage() {
-  const pages = {calendar:renderCal,notebook:renderNB,meds:renderMeds,insights:renderInsights,settings:renderSettings};
+  const pages = {home:renderHome,calendar:renderCal,notebook:renderNB,meds:renderMeds,inventory:renderInventory,meals:renderMeals,insights:renderInsights,settings:renderSettings};
   pages[A.page]?.();
 }
 
