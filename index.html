@@ -100,7 +100,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div class="auth-card">
     <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">🌿 Kinship</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v2.1 — Apr 13</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v6 — Jun 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -308,11 +308,11 @@ const SD_OM = [
 let _sampleMode = false;
 let A={
   user:null,family:null,members:[],events:[],notes:[],noteGroups:[],
-  dailyMeds:[],invProducts:[],
+  dailyMeds:[],invProducts:[],shoppingLists:[],mealPlan:null,
   page:'home',calView:'month',calDate:new Date(),
   calFType:'all',calFMember:'all',calSearch:'',
   settingsTab:'family',noteFGroup:'all',noteSearch:'',
-  mealsTab:'shopping',invTab:'treatments',
+  mealsTab:'shopping',invTab:'treatments',noteRibbonOpen:true,
   showOB:false,obStep:0,obFlow:null,
 };
 
@@ -457,7 +457,7 @@ async function doSignOut(){
 
 // ── DATA LOADING ──────────────────────────────────────────────────────────────
 async function loadAll(){
-  const[fam,mems,evts,ngrps,nts,dm,ip]=await Promise.all([
+  const[fam,mems,evts,ngrps,nts,dm,ip,sl,mp]=await Promise.all([
     sb.from('families').select('*').maybeSingle(),
     sb.from('family_members').select('*').order('created_at'),
     sb.from('events').select('*').order('date'),
@@ -465,6 +465,8 @@ async function loadAll(){
     sb.from('notes').select('*').order('created_at'),
     sb.from('daily_meds').select('*').order('created_at'),
     sb.from('inventory_products').select('*').order('created_at'),
+    sb.from('shopping_lists').select('*').order('created_at'),
+    sb.from('meal_plans').select('*').maybeSingle(),
   ]);
   if(fam.data){A.family=fam.data;}
   A.members=mems.data||[];
@@ -473,6 +475,8 @@ async function loadAll(){
   A.notes=nts.data||[];
   A.dailyMeds=dm.data||[];
   A.invProducts=ip.data||[];
+  A.shoppingLists=sl.data||[];
+  A.mealPlan=mp.data||null;
 }
 
 
@@ -495,6 +499,25 @@ async function seedMedicalGroup(){
   const{data:newNotes}=await sb.from('notes').insert(toInsert).select();
   if(newNotes)A.notes.push(...newNotes);
 }
+
+// ── ONE-TIME CLEANUP: remove old Meals-generated Notebook groups (v6) ─────────
+// Pre-v6, the Meals page auto-created Notebook groups/notes for shopping lists
+// and meal ideas. v6 moves Meals to its own tables, so these are deleted once
+// per family. Runs silently — no user action needed.
+async function cleanupOldMealsGroups(){
+  if(!A.family)return;
+  const OLD_GROUP_NAMES=['🛒 Shopping','📅 Weekly Menu','🌅 Breakfast','☀️ Lunch','🌙 Dinner','🍎 Snacks'];
+  const toRemove=A.noteGroups.filter(g=>OLD_GROUP_NAMES.includes(g.name));
+  if(!toRemove.length)return;
+  const groupIds=toRemove.map(g=>g.id);
+  // Delete notes inside these groups (group_id is ON DELETE SET NULL, so notes
+  // would otherwise survive — we want them gone, they're Meals-only data)
+  await sb.from('notes').delete().in('group_id',groupIds);
+  await sb.from('note_groups').delete().in('id',groupIds);
+  A.notes=A.notes.filter(n=>!groupIds.includes(n.group_id));
+  A.noteGroups=A.noteGroups.filter(g=>!groupIds.includes(g.id));
+}
+
 async function initApp(user){
   A.user=user;
   document.getElementById('loading-screen').style.display='none';
@@ -503,6 +526,12 @@ async function initApp(user){
   // Seed Medical group if family exists and group doesn't yet
   if(A.family && !A.noteGroups.find(g=>g.name==='🏥 Medical Reference')){
     try { await seedMedicalGroup(); } catch(e){ console.warn('Medical group seed error',e); }
+  }
+
+  // One-time cleanup: remove old Meals-generated Notebook groups (v6)
+  if(A.family && !localStorage.getItem('ks_meals_cleanup_v6_'+A.family.id)){
+    try { await cleanupOldMealsGroups(); } catch(e){ console.warn('Meals cleanup error',e); }
+    try { localStorage.setItem('ks_meals_cleanup_v6_'+A.family.id,'1'); } catch(_) {}
   }
 
   // ALWAYS check for unlinked family_members rows matching this user's email
@@ -731,13 +760,13 @@ function renderCal(){
             ${spanCont.slice(0,2).map(e=>{
               const pc=pillC(e);
               const isLast=isLastDay(e);
-              return`<div onclick="event.stopPropagation();calClick(${d})" style="background:${pc};margin:0 -3px 0 -3px;padding:1px 3px;font-size:9px;font-weight:700;color:#fff;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:${isLast?'0 3px 3px 0':'0'};cursor:pointer;display:block">${isLast?shortT(e):' '}</div>`;
+              return`<div onclick="event.stopPropagation();viewEv('${e.id}')" style="background:${pc};margin:0 -3px 0 -3px;padding:1px 3px;font-size:9px;font-weight:700;color:#fff;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:${isLast?'0 3px 3px 0':'0'};cursor:pointer;display:block">${isLast?shortT(e):' '}</div>`;
             }).join('')}
             ${dayEvents.slice(0,Math.max(0,3-spanCont.length)).map(e=>{
               const pc=pillC(e);
               const ms=isMultiStart(e);
               // Multi-day start: solid colour pill extending right; single-day: left-border pill
-              return`<div style="background:${ms?pc:pc+'22'};border-left:2px solid ${pc};border-radius:${ms?'4px 0 0 4px':'0 3px 3px 0'};margin:${ms?'0 -2px 0 0':'0'};padding:1px 2px;font-size:9px;font-weight:700;color:${ms?'#fff':pc};line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis" title="${e.title||ET[e.type].label}">${ET[e.type].icon} ${shortT(e)}</div>`;
+              return`<div onclick="event.stopPropagation();viewEv('${e.id}')" style="background:${ms?pc:pc+'22'};border-left:2px solid ${pc};border-radius:${ms?'4px 0 0 4px':'0 3px 3px 0'};margin:${ms?'0 -2px 0 0':'0'};padding:1px 2px;font-size:9px;font-weight:700;color:${ms?'#fff':pc};line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer" title="${e.title||ET[e.type].label}">${ET[e.type].icon} ${shortT(e)}</div>`;
             }).join('')}
             ${dayEvents.length+spanCont.length>3?`<div style="font-size:8px;color:${T.muted};font-weight:700;text-align:center;padding-top:1px">+${dayEvents.length+spanCont.length-3} more</div>`:''}
           </div>
@@ -824,8 +853,8 @@ function renderCal(){
       <div style="position:relative">
         <input class="inp" id="cal-search-inp" placeholder="🔍  Search entries…" value="${A.calSearch}"
           style="padding-right:${A.calSearch?'36px':'12px'}"
-          oninput="A.calSearch=this.value;clearTimeout(A._sT);A._sT=setTimeout(()=>renderCalResults(),350);document.getElementById('cal-search-x').style.display=this.value?'flex':'none'"
-          onkeydown="if(event.key==='Enter'){clearTimeout(A._sT);renderCalResults();this.blur();}">
+          oninput="A.calSearch=this.value;clearTimeout(A._sT);A._sT=setTimeout(()=>{renderCal();setTimeout(renderCalResults,50);const si=document.getElementById('cal-search-inp');if(si){si.focus();si.setSelectionRange(si.value.length,si.value.length);}},350);document.getElementById('cal-search-x').style.display=this.value?'flex':'none'"
+          onkeydown="if(event.key==='Enter'){clearTimeout(A._sT);renderCal();setTimeout(renderCalResults,50);this.blur();}">
         <button id="cal-search-x" onclick="A.calSearch='';document.getElementById('cal-search-inp').value='';renderCal();setTimeout(renderCalResults,50);this.style.display='none'"
           style="display:${A.calSearch?'flex':'none'};position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:${T.muted};font-size:16px;cursor:pointer;width:24px;height:24px;align-items:center;justify-content:center;border-radius:50%">×</button>
       </div>
@@ -1335,7 +1364,7 @@ function openEvForm(type, evId, dateTs, duplicateId) {
         <div class="form-row" style="margin:0"><label class="lbl">Mins</label><input class="inp" type="number" id="ef-actm" value="${source?.activity_mins||''}"></div>
       </div>
       <div class="form-row"><label class="lbl">Mood</label>
-        <select class="sel" id="ef-mood">${MOODS.map(m=>`<option${source?.mood===m?' selected':''}>${m}</option>`).join('')}</select></div>
+        <select class="sel" id="ef-mood"><option value="">No mood recorded</option>${MOODS.map(m=>`<option${source?.mood===m?' selected':''}>${m}</option>`).join('')}</select></div>
       <div class="grid2">
         <div class="form-row" style="margin:0"><label class="lbl">Energy (%)</label><input class="inp" type="number" min="0" max="100" id="ef-en" placeholder="75" value="${source?.energy||''}"></div>
         <div class="form-row" style="margin:0"><label class="lbl">Sleep (hrs)</label><input class="inp" type="number" step="0.5" id="ef-sl" placeholder="7.5" value="${source?.sleep||''}"></div>
@@ -1594,6 +1623,20 @@ function updateRecurrenceEndType(val) {
 window.updateRecurrenceEndType = updateRecurrenceEndType;
 
 function prefillWellness(memberId) {
+  // Always clear all wellness fields first — prevents stale data from a previously
+  // selected member remaining visible when switching to a member with no logs.
+  const clearEl = id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = '';
+    el.style.background = '';
+    el.style.borderColor = '';
+  };
+  clearEl('ef-wt'); clearEl('ef-ht'); clearEl('ef-hyd'); clearEl('ef-en'); clearEl('ef-sl');
+  const moodSel = document.getElementById('ef-mood');
+  if (moodSel) { moodSel.value = ''; moodSel.style.background = ''; moodSel.style.borderColor = ''; }
+  // Remove any existing prefill note so it is recreated fresh if new data is found
+  document.getElementById('prefill-note')?.remove();
   const last = getLastWellness(memberId);
   if (!last) return;
   // Mark prefilled fields with a subtle tint so user knows these are from last log
@@ -2146,6 +2189,10 @@ function viewEv(id) {
       ${ev.location?`<span>📍 ${ev.location}</span>`:''}
       ${ev.recurrence&&ev.recurrence!=='None'?`<span>🔁 ${ev.recurrence}${ev.recurrence_end_type==='count'?` · ${ev.recurrence_end_count}x`:ev.recurrence_end_type==='date'?` until ${fmt(ev.recurrence_end_date)}`:''}</span>`:''}
     </div>`;
+  // Completion banner — updated in-place by toggleEvAction / markEvComplete
+  body += `<div id="ev-completion-banner">${ev.completed_at
+    ? `<div style="display:inline-flex;align-items:center;gap:6px;background:${T.sageLight};color:${T.sage};border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;margin-bottom:10px">✅ Completed ${fmt(ev.completed_at)} at ${evFmtTime(ev.completed_at)}</div>`
+    : ''}</div>`;
 
   if (ev.type === 'wellness') {
     body += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px">
@@ -2179,8 +2226,18 @@ function viewEv(id) {
 
   if (ev.actions?.length) {
     body += `<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:${T.muted};margin-bottom:5px">ACTIONS</div>`;
-    ev.actions.forEach(a => {
-      body += `<div style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:4px"><span>${a.done?'✅':'⬜'}</span><span style="text-decoration:${a.done?'line-through':'none'};color:${a.done?T.muted:T.ink}">${a.text}</span></div>`;
+    ev.actions.forEach((a, idx) => {
+      body += `<div style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:6px">
+        <input type="checkbox" id="ev-action-cb-${idx}"
+          ${a.done ? 'checked' : ''}
+          ${isSampleMode() ? 'disabled' : ''}
+          onchange="toggleEvAction('${ev.id}',${idx},this.checked)"
+          style="width:16px;height:16px;flex-shrink:0;cursor:pointer;accent-color:${T.sage}">
+        <span id="ev-action-lbl-${idx}"
+          style="text-decoration:${a.done?'line-through':'none'};color:${a.done?T.muted:T.ink}">
+          ${a.text}
+        </span>
+      </div>`;
     });
     body += '</div>';
   }
@@ -2202,6 +2259,14 @@ function viewEv(id) {
     if(ev.series_id){
       const seriesCount=A.events.filter(e=>e.series_id===ev.series_id).length;
       body += `<div style="display:inline-flex;align-items:center;gap:6px;background:${T.skyLight};color:${T.sky};border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;margin-bottom:10px">🔁 Part of a recurring series (${seriesCount} occurrences)</div>`;
+    }
+    // Mark as complete — only for Tasks that have no action items defined.
+    // Tasks WITH actions complete automatically when all actions are ticked.
+    if (ev.type === 'task' && (!ev.actions || ev.actions.length === 0)) {
+      const isComplete = !!ev.completed_at;
+      body += `<button class="btn btn-full" style="margin-bottom:10px;background:${isComplete?T.parchment:T.sageLight};color:${isComplete?T.muted:T.sage};border:1.5px solid ${isComplete?T.border:T.sageMid};font-size:13px;font-weight:700" onclick="markEvComplete('${ev.id}')">
+        ${isComplete ? '↩ Mark as incomplete' : '✅ Mark as complete'}
+      </button>`;
     }
     // Edit button: if series event, show choice; otherwise open form directly
     const editCall = ev.series_id
@@ -2266,18 +2331,42 @@ window.confirmDelEv = confirmDelEv;
 
 // ── NOTEBOOK ──────────────────────────────────────────────────────────────────
 function renderNB(){
-  const notes=getNotes(),groups=getGroups();
+  // Ensure ribbon state is set (defaults to open)
+  if(A.noteRibbonOpen===undefined) A.noteRibbonOpen=true;
+  const notes=getNotes(), groups=getGroups();
+  const ribbonOpen=A.noteRibbonOpen;
+
+  // "Uncategorized" section is only meaningful when:
+  //   (a) the user has created at least one group, AND
+  //   (b) at least one note exists without a group assigned.
+  // If all notes are ungrouped, "Uncategorized" = "All Notes" — redundant, so hide it.
+  const hasUngroupedNotes=notes.some(n=>!n.group_id);
+  const showUncategorized=groups.length>0 && hasUngroupedNotes;
+  // If user was viewing Uncategorized but it is now hidden, reset to All
+  if(A.noteFGroup==='none' && !showUncategorized) A.noteFGroup='all';
+
+  // Filter notes by selected group and search query
   const filtered=notes.filter(n=>{
-    if(A.noteFGroup==='none'&&n.group_id)return false;
-    if(A.noteFGroup!=='all'&&A.noteFGroup!=='none'&&n.group_id!==A.noteFGroup)return false;
-    if(A.noteSearch){const q=A.noteSearch.toLowerCase();if(![n.title,n.content,...(n.tags||[]),...(n.checklist||[]).map(c=>c.text)].join(' ').toLowerCase().includes(q))return false;}
+    if(A.noteFGroup==='none' && n.group_id) return false;
+    if(A.noteFGroup!=='all' && A.noteFGroup!=='none' && n.group_id!==A.noteFGroup) return false;
+    if(A.noteSearch){
+      const q=A.noteSearch.toLowerCase();
+      if(![n.title,n.content,...(n.tags||[]),...(n.checklist||[]).map(c=>c.text)]
+        .join(' ').toLowerCase().includes(q)) return false;
+    }
     return true;
   });
-  const pinned=filtered.filter(n=>n.pinned),rest=filtered.filter(n=>!n.pinned);
+
+  // Pinned notes always appear first within any filtered view
+  const pinned=filtered.filter(n=>n.pinned);
+  const rest  =filtered.filter(n=>!n.pinned);
+
+  // ── NOTE CARD (identical to v5) ──────────────────────────────────────────
   const nCard=n=>{
     const mem=getMem(n.member_id);
     const grp=groups.find(g=>g.id===n.group_id);
-    const done=(n.checklist||[]).filter(c=>c.done).length,total=(n.checklist||[]).length;
+    const done=(n.checklist||[]).filter(c=>c.done).length;
+    const total=(n.checklist||[]).length;
     return`<div class="note-card" style="background:${n.color}" onclick="openNote('${n.id}')">
       ${n.pinned?'<div style="font-size:10px;margin-bottom:3px">📌</div>':''}
       <div style="font-weight:800;font-size:13px;color:${T.ink};margin-bottom:5px;line-height:1.3">${n.title||'Untitled'}</div>
@@ -2290,25 +2379,84 @@ function renderNB(){
     </div>`;
   };
 
+  // ── RIBBON BUILDER ───────────────────────────────────────────────────────
+  const rW=ribbonOpen?'115px':'32px';
+
+  // Renders one ribbon section button.
+  // Expanded: tap selects the group.
+  // Collapsed: tap expands the ribbon (stopPropagation so outer div doesn't double-fire).
+  const rSection=(id,name,color)=>{
+    const isActive=A.noteFGroup===id;
+    const gc=color||T.muted;
+    const clickAction=ribbonOpen
+      ? `A.noteFGroup='${id}';renderNB()`
+      : `event.stopPropagation();A.noteRibbonOpen=true;renderNB()`;
+    return`<button onclick="${clickAction}" title="${name}"
+      style="display:flex;align-items:center;padding:${ribbonOpen?'10px 8px 10px 0':'10px 0'};border:none;border-bottom:1px solid ${T.border}33;border-left:3px solid ${gc};background:${isActive?gc+'20':'transparent'};color:${isActive?gc:T.ink};font-size:11px;font-weight:${isActive?'800':'600'};cursor:pointer;text-align:left;width:100%;-webkit-tap-highlight-color:transparent">
+      ${ribbonOpen?`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:9px;line-height:1.4">${name}</span>`:''}
+    </button>`;
+  };
+
+  // Section order: user groups first, then a divider, then All Notes + Uncategorized at bottom
+  const userGroupSections=groups.map(g=>rSection(g.id,g.name,g.color||T.sage)).join('');
+  // Divider only rendered when user has at least one group (separates user groups from defaults)
+  const dividerEl=groups.length>0
+    ? `<div style="height:1px;background:${T.border};margin:${ribbonOpen?'3px 8px 3px 12px':'3px 0'};opacity:.5"></div>`
+    : '';
+  const allSection =rSection('all','All Notes',T.sage);
+  const uncatSection=showUncategorized?rSection('none','Uncategorized',T.muted):'';
+
+  // "+ New Group" only visible when ribbon is expanded (no room when collapsed)
+  const addGroupBtn=ribbonOpen&&!isSampleMode()
+    ? `<button onclick="openAddGroup()"
+        style="display:flex;align-items:center;gap:7px;padding:9px 8px 9px 12px;border:none;border-top:1px dashed ${T.border};background:transparent;color:${T.muted};font-size:11px;font-weight:700;cursor:pointer;width:100%;-webkit-tap-highlight-color:transparent">
+        <span>+</span><span style="white-space:nowrap">New Group</span>
+      </button>`
+    : '';
+
+  // ── PAGE RENDER ──────────────────────────────────────────────────────────
   document.getElementById('page-notebook').innerHTML=`
     <div class="page-header">
       <div class="family-label">${getFamily()?.name||''}</div>
       <div class="page-title">Notebook <button class="btn btn-primary btn-sm" onclick="openNote(null)">+ Note</button></div>
     </div>
-    <div style="padding:10px 16px 0">
+    <!-- Search bar — full width above the split layout -->
+    <div style="padding:8px 16px 6px">
       <input class="inp" id="nb-search-inp" placeholder="🔍  Search notes…" value="${A.noteSearch}"
         oninput="A.noteSearch=this.value;clearTimeout(A._nT);A._nT=setTimeout(()=>renderNB(),350)"
-        onkeydown="if(event.key==='Enter'){clearTimeout(A._nT);renderNB();}" style="margin-bottom:10px">
-      <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px">
-        ${[{id:'all',name:'All'},{id:'none',name:'Uncategorized'},...groups].map(g=>`<button onclick="A.noteFGroup='${g.id}';renderNB()" style="padding:4px 12px;border-radius:99px;border:1.5px solid ${A.noteFGroup===g.id?T.sage:T.border};background:${A.noteFGroup===g.id?T.sage:'#fff'};color:${A.noteFGroup===g.id?'#fff':T.muted};font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0">${g.name}</button>`).join('')}
-        <button onclick="openAddGroup()" style="padding:4px 12px;border-radius:99px;border:1.5px dashed ${T.border};background:${T.parchment};color:${T.muted};font-weight:700;font-size:12px;cursor:pointer;flex-shrink:0">+ Group</button>
-      </div>
+        onkeydown="if(event.key==='Enter'){clearTimeout(A._nT);renderNB();}">
     </div>
-    <div style="padding:10px 16px 0">
-      ${pinned.length?`<div style="font-size:11px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">📌 Pinned</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">${pinned.map(nCard).join('')}</div>`:''}
-      ${rest.length?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${rest.map(nCard).join('')}</div>`:''}
-      ${filtered.length===0?`<div style="text-align:center;color:${T.muted};padding:48px 0;font-size:14px">No notes yet ✍️</div>`:''}
+    <!-- Body: ribbon (left) + notes grid (right) -->
+    <div style="display:flex;align-items:flex-start">
+      <!-- Left Ribbon
+           position:sticky keeps the ribbon in view as the notes column scrolls.
+           When collapsed, a click anywhere on the ribbon expands it. -->
+      <div style="width:${rW};min-width:${rW};flex-shrink:0;background:${T.parchment};border-right:1px solid ${T.border};display:flex;flex-direction:column;position:sticky;top:0;align-self:flex-start;${!ribbonOpen?'cursor:pointer;':''}"
+        ${!ribbonOpen?`onclick="A.noteRibbonOpen=true;renderNB()" title="Tap to expand sections"`:''}> 
+        <!-- Ribbon header: "Sections" label + collapse / expand toggle -->
+        <div style="display:flex;align-items:center;justify-content:${ribbonOpen?'space-between':'center'};padding:7px ${ribbonOpen?'8px':'6px'};border-bottom:1px solid ${T.border};flex-shrink:0">
+          ${ribbonOpen?`<span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:${T.muted}">Sections</span>`:''}
+          <button onclick="event.stopPropagation();A.noteRibbonOpen=!A.noteRibbonOpen;renderNB()"
+            style="background:none;border:none;color:${T.muted};cursor:pointer;font-size:13px;padding:2px;line-height:1;-webkit-tap-highlight-color:transparent"
+            title="${ribbonOpen?'Collapse sections':'Expand sections'}">
+            ${ribbonOpen?'◀':'▶'}
+          </button>
+        </div>
+        <!-- Section buttons: user groups first, then All Notes + Uncategorized -->
+        ${userGroupSections}
+        ${dividerEl}
+        ${allSection}
+        ${uncatSection}
+        ${addGroupBtn}
+      </div>
+      <!-- Notes grid -->
+      <div style="flex:1;min-width:0;padding:10px 10px 16px 10px">
+        ${pinned.length?`
+          <div style="font-size:11px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">📌 Pinned</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">${pinned.map(nCard).join('')}</div>`:''}
+        ${rest.length?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${rest.map(nCard).join('')}</div>`:''}
+        ${filtered.length===0?`<div style="text-align:center;color:${T.muted};padding:48px 0;font-size:14px">No notes yet ✍️</div>`:''}
+      </div>
     </div>`;
 }
 
@@ -2336,11 +2484,18 @@ function openNote(noteId){
   const note=noteId?A.notes.find(n=>n.id===noteId):null;
   const groups=A.noteGroups;
   const cl=note?.checklist||[];
+  // Pre-compute the completion banner string for existing completed notes
+  const _noteBanner = note?.completed_at ? (() => {
+    const x = new Date(note.completed_at);
+    const t = x.getHours().toString().padStart(2,'0') + ':' + x.getMinutes().toString().padStart(2,'0');
+    return `<div style="background:${T.sageLight};border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;color:${T.sage};margin:0 0 10px">✅ All done — completed ${fmt(x)} at ${t}</div>`;
+  })() : '';
   showModal(noteId?'Edit Note':'New Note',`
     <input id="ne-t" class="inp" value="${note?.title||''}" placeholder="Title…" style="font-size:16px;font-weight:700;margin-bottom:8px" autofocus>
     <textarea id="ne-c" class="inp" rows="3" placeholder="Write your note…" style="resize:none;margin-bottom:10px">${note?.content||''}</textarea>
-    <div id="ne-cl" style="margin-bottom:6px"></div>
+    <div id="ne-cl" data-note-id="${noteId||''}" style="margin-bottom:6px"></div>
     <button onclick="addCLItem()" style="font-size:12px;color:${T.sage};background:none;border:1px dashed ${T.sageMid};border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:600;margin-bottom:14px">+ Checklist item</button>
+    <div id="note-completion-banner">${_noteBanner}</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
       ${NOTE_COLORS.map(c=>`<div onclick="document.querySelectorAll('.ncs').forEach(s=>s.style.outline='none');this.style.outline='3px solid ${T.sage}';document.getElementById('ne-col').value='${c}'" class="ncs" style="width:22px;height:22px;border-radius:50%;background:${c};cursor:pointer;outline:${(note?.color||NOTE_COLORS[0])===c?'3px solid '+T.sage:'none'};outline-offset:2px"></div>`).join('')}
       <input type="hidden" id="ne-col" value="${note?.color||NOTE_COLORS[0]}">
@@ -2416,8 +2571,19 @@ function addCLItem(text='', done=false){
   const div=document.createElement('div');
   div.draggable=true;
   div.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:6px';
-  div.innerHTML=`<span class="drag-handle" style="cursor:grab;color:#c8bfb0;font-size:14px;flex-shrink:0;user-select:none;touch-action:none">⠿</span><input type="checkbox" id="nc-${i}" ${done?'checked':''}><input class="inp" id="nt-${i}" value="${text}" style="flex:1;font-size:13px;padding:6px 10px" placeholder="Item…"><button onclick="this.parentElement.remove()" style="background:none;border:none;color:${T.muted};font-size:16px;cursor:pointer;padding:4px">×</button>`;
+  div.innerHTML=`<span class="drag-handle" style="cursor:grab;color:#c8bfb0;font-size:14px;flex-shrink:0;user-select:none;touch-action:none">⠿</span><input type="checkbox" id="nc-${i}" ${done?'checked':''}><input class="inp" id="nt-${i}" value="${text}" style="flex:1;font-size:13px;padding:6px 10px${done?';text-decoration:line-through;opacity:0.6':''}" placeholder="Item…"><button onclick="this.parentElement.remove()" style="background:none;border:none;color:${T.muted};font-size:16px;cursor:pointer;padding:4px">×</button>`;
   const inp=div.querySelector('input:not([type="checkbox"])');
+  const cb=div.querySelector('input[type="checkbox"]');
+  // Instant-save: update strikethrough visually and persist to DB on each toggle
+  cb.addEventListener('change',()=>{
+    inp.style.textDecoration = cb.checked ? 'line-through' : 'none';
+    inp.style.opacity = cb.checked ? '0.6' : '1';
+    const nId = document.getElementById('ne-cl')?.dataset?.noteId || '';
+    if (nId) {
+      const idx = Array.from(cont.children).indexOf(div);
+      toggleNoteItem(nId, idx, cb.checked);
+    }
+  });
   inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addCLItem();setTimeout(()=>{const rows=cont.querySelectorAll('input:not([type="checkbox"])');rows[rows.length-1]?.focus();},50);}});
   // Drag mouse
   div.addEventListener('dragstart',e=>{e.dataTransfer.effectAllowed='move';div.style.opacity='0.4';cont._dragging=div;});
@@ -2476,20 +2642,22 @@ function exportMedsXLSX() {
   // Export as HTML that Excel can open natively - no library needed
   const dm = getDM(), s = symC();
   const daysLeft = med => { const td=(med.member_ids||[]).length*(med.dose_per_day||1); if(!td)return null; return Math.floor((med.stock_today||0)/td); };
-  const lastsUntil = med => { const d=daysLeft(med); if(d===null)return '—'; const r=new Date(); r.setDate(r.getDate()+d); return fmt(r); };
+  const stockBase = med => med.stock_date ? new Date(med.stock_date+'T00:00:00') : new Date();
+  const lastsUntil = med => { const d=daysLeft(med); if(d===null)return '—'; const r=new Date(stockBase(med)); r.setDate(r.getDate()+d); return fmt(r); };
   const totalOrder = dm.reduce((sum,m)=>sum+(parseInt(m.new_order_pkgs)||0)*(m.price_per_pkg||0),0);
   const grand = (totalOrder+(parseFloat(getFamily()?.transport_cost)||0)).toFixed(2);
   const memNames = med => getDM() && getMembers().filter(m=>(med.member_ids||[]).includes(m.id)).map(m=>m.name).join(', ');
   const rows = dm.map(med => [
     med.name, memNames(med), med.dose_per_day, med.units_per_pkg,
     `${s}${(med.price_per_pkg||0).toFixed(2)}`, med.stock_today,
+    med.stock_date?fmt(med.stock_date+'T00:00:00'):'—',
     lastsUntil(med), med.new_order_pkgs||0,
     med.new_order_pkgs?`${s}${((parseInt(med.new_order_pkgs)||0)*(med.price_per_pkg||0)).toFixed(2)}`:'—',
     med.last_ordered?fmt(med.last_ordered):'Never'
   ]);
   const headers = ['Medication','Members','Dose/day','Units/pkg',`Price/pkg (${s})`,
-    'In stock','Lasts until','New order (pkgs)',`Order cost (${s})`,'Last ordered'];
-  const tableRows = [headers, ...rows, ['GRAND TOTAL','','','','','','','',`${s}${grand}`,'']];
+    'In stock','Stock confirmed','Lasts until','New order (pkgs)',`Order cost (${s})`,'Last ordered'];
+  const tableRows = [headers, ...rows, ['GRAND TOTAL','','','','','','','','',`${s}${grand}`,'']];
   const html = `<html><head><meta charset="UTF-8"></head><body>
     <h2>${getFamily()?.name||''} — Medication Order — ${new Date().toLocaleDateString('en-GB')}</h2>
     <table border="1" cellpadding="5" cellspacing="0">
@@ -2505,18 +2673,19 @@ function exportMedsXLSX() {
 function exportMedsCSV() {
   const dm = A.dailyMeds, s = symC();
   const daysLeft = med => { const td=(med.member_ids||[]).length*(med.dose_per_day||1); if(!td)return null; return Math.floor((med.stock_today||0)/td); };
-  const lastsUntil = med => { const d=daysLeft(med); if(d===null)return '—'; const r=new Date(); r.setDate(r.getDate()+d); return fmt(r); };
-  const header = ['Medication','Members','Dose/day','Units/pkg','Price/pkg','In stock','Lasts until','New order (pkgs)','Order cost','Updated until'];
+  const stockBase = med => med.stock_date ? new Date(med.stock_date+'T00:00:00') : new Date();
+  const lastsUntil = med => { const d=daysLeft(med); if(d===null)return '—'; const r=new Date(stockBase(med)); r.setDate(r.getDate()+d); return fmt(r); };
+  const header = ['Medication','Members','Dose/day','Units/pkg','Price/pkg','In stock','Stock confirmed','Lasts until','New order (pkgs)','Order cost','Updated until'];
   const rows = dm.map(med => {
     const memNames = A.members.filter(m=>(med.member_ids||[]).includes(m.id)).map(m=>m.name).join('+');
     const orderCost = med.new_order_pkgs ? `${s}${((parseInt(med.new_order_pkgs)||0)*med.price_per_pkg).toFixed(2)}` : '—';
     const updStock = (med.stock_today||0)+((parseInt(med.new_order_pkgs)||0)*(med.units_per_pkg||0));
-    const updUntil = med.new_order_pkgs ? (() => { const td=(med.member_ids||[]).length*(med.dose_per_day||1); if(!td)return'—'; const r=new Date(); r.setDate(r.getDate()+Math.floor(updStock/td)); return fmt(r); })() : '—';
-    return [med.name, memNames, med.dose_per_day, med.units_per_pkg, `${s}${(med.price_per_pkg||0).toFixed(2)}`, med.stock_today, lastsUntil(med), med.new_order_pkgs||'', orderCost, updUntil];
+    const updUntil = med.new_order_pkgs ? (() => { const td=(med.member_ids||[]).length*(med.dose_per_day||1); if(!td)return'—'; const r=new Date(stockBase(med)); r.setDate(r.getDate()+Math.floor(updStock/td)); return fmt(r); })() : '—';
+    return [med.name, memNames, med.dose_per_day, med.units_per_pkg, `${s}${(med.price_per_pkg||0).toFixed(2)}`, med.stock_today, med.stock_date?fmt(med.stock_date+'T00:00:00'):'—', lastsUntil(med), med.new_order_pkgs||'', orderCost, updUntil];
   });
   const totalOrder = dm.reduce((sum,m)=>sum+(parseInt(m.new_order_pkgs)||0)*(m.price_per_pkg||0),0);
   const grand = (totalOrder+(parseFloat(A.family?.transport_cost)||0)).toFixed(2);
-  rows.push(['GRAND TOTAL','','','','','','','',`${s}${grand}`,'']);
+  rows.push(['GRAND TOTAL','','','','','','','','','',`${s}${grand}`,'']);
   const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], {type:'text/csv'});
   const url = URL.createObjectURL(blob);
@@ -2535,7 +2704,8 @@ function copyOrderToClipboard() {
   const lines = ['📦 MEDICATION ORDER — ' + (A.family?.name||'') + '\n' + new Date().toLocaleDateString('en-GB'), ''];
   dm.forEach(m => {
     const memNames = A.members.filter(mem=>(m.member_ids||[]).includes(mem.id)).map(mem=>mem.name).join(', ');
-    lines.push(`• ${m.name} × ${m.new_order_pkgs} pkg — ${s}${((parseInt(m.new_order_pkgs)||0)*(m.price_per_pkg||0)).toFixed(2)}${memNames?' ('+memNames+')':''}`);
+    const stockInfo = `stock: ${m.stock_today||0}${m.stock_date?' as of '+fmt(m.stock_date+'T00:00:00'):''}`;
+    lines.push(`• ${m.name} × ${m.new_order_pkgs} pkg — ${s}${((parseInt(m.new_order_pkgs)||0)*(m.price_per_pkg||0)).toFixed(2)}${memNames?' ('+memNames+')':''} [${stockInfo}]`);
   });
   lines.push('');
   if (A.family?.transport_cost) lines.push(`Transport: ${s}${parseFloat(A.family.transport_cost).toFixed(2)}`);
@@ -2547,9 +2717,12 @@ window.copyOrderToClipboard = copyOrderToClipboard;
 function renderMeds(){
   const dm=getDM(),s=symC();
   const daysLeft=med=>{const td=(med.member_ids||[]).length*(med.dose_per_day||1);if(!td)return null;return Math.floor((med.stock_today||0)/td);};
-  const lastsUntil=med=>{const d=daysLeft(med);return d===null?'—':fmt(addDays(todayD(),d));};
+  // "Lasts until" now counts forward from the date stock was last confirmed,
+  // not always from today. Falls back to today if no date is set yet.
+  const stockBase=med=>med.stock_date?new Date(med.stock_date+'T00:00:00'):todayD();
+  const lastsUntil=med=>{const d=daysLeft(med);return d===null?'—':fmt(addDays(stockBase(med),d));};
   const updStock=med=>(med.stock_today||0)+((parseInt(med.new_order_pkgs)||0)*(med.units_per_pkg||0));
-  const updUntil=med=>{const td=(med.member_ids||[]).length*(med.dose_per_day||1);if(!td||!med.new_order_pkgs)return'—';return fmt(addDays(todayD(),Math.floor(updStock(med)/td)));};
+  const updUntil=med=>{const td=(med.member_ids||[]).length*(med.dose_per_day||1);if(!td||!med.new_order_pkgs)return'—';return fmt(addDays(stockBase(med),Math.floor(updStock(med)/td)));};
   const orderPrice=med=>((parseInt(med.new_order_pkgs)||0)*(med.price_per_pkg||0)).toFixed(2);
   const expDays=d=>Math.floor((new Date(d)-new Date())/(1000*60*60*24));
   const expSt=d=>{const n=expDays(d);if(n<0)return'expired';if(n<30)return'critical';if(n<90)return'soon';return'ok';};
@@ -2569,11 +2742,11 @@ function renderMeds(){
     </div>
 
     <div style="padding:14px 16px 0">
-      <div style="font-family:'Playfair Display',serif;font-size:17px;color:${T.ink};margin-bottom:10px">Daily Medications</div>
-      ${dm.length===0?`<div style="color:${T.muted};font-size:13px;margin-bottom:10px;font-style:italic">No daily medications added yet.</div>`:''}
+      <div style="font-family:'Playfair Display',serif;font-size:17px;color:${T.ink};margin-bottom:10px">Frequent Medications</div>
+      ${dm.length===0?`<div style="color:${T.muted};font-size:13px;margin-bottom:10px;font-style:italic">No medications added yet.</div>`:''}
       <div style="overflow-x:auto;border-radius:13px;border:1px solid ${T.border};background:${T.surface}">
         <table class="tbl">
-          <thead><tr>${['Medication','Members','Dose/day','Pkg units','Pkg price','In stock','Lasts until','New order','Order cost','Updated until','Last ordered',''].map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+          <thead><tr>${['Medication','Members','Dose/day','Pkg units','Pkg price','In stock','Stock confirmed','Lasts until','New order','Order cost','Updated until','Last ordered',''].map(h=>`<th>${h}</th>`).join('')}</tr></thead>
           <tbody>
             ${dm.map((med,idx)=>{
               const dl=daysLeft(med);
@@ -2590,6 +2763,7 @@ function renderMeds(){
                   ${st==='critical'?`<div style="font-size:10px;color:${T.rose}">⚠️ Low!</div>`:''}
                   ${st==='low'?`<div style="font-size:10px;color:${T.honey}">Soon</div>`:''}
                 </td>
+                <td style="font-size:11px;color:${T.muted}">${med.stock_date?fmt(med.stock_date+'T00:00:00'):'—'}</td>
                 <td style="color:${st==='critical'?T.rose:st==='low'?T.honey:T.muted}">${lastsUntil(med)}</td>
                 <td><input type="number" min="0" value="${med.new_order_pkgs||''}" placeholder="0" onfocus="if(this.value==='0')this.value=''" onchange="updateMedOrder('${med.id}',this.value)" style="width:55px;padding:4px 6px;border-radius:7px;border:1px solid ${T.border};font-size:13px;text-align:center"></td>
                 <td style="font-weight:600;color:${T.sage}">${med.new_order_pkgs&&med.new_order_pkgs!=='0'?`${s}${orderPrice(med)}`:'—'}</td>
@@ -2597,12 +2771,13 @@ function renderMeds(){
                 <td style="font-size:11px;color:${T.muted}">${med.last_ordered?fmt(med.last_ordered):'—'}</td>
                 <td>
                   ${med.new_order_pkgs&&med.new_order_pkgs!=='0'?`<button onclick="confirmOrder('${med.id}')" style="background:${T.sageLight};border:1px solid ${T.sageMid};border-radius:7px;padding:3px 8px;font-size:11px;font-weight:700;color:${T.sage};cursor:pointer;white-space:nowrap">✓ Got it</button>`:''}
+                  <button onclick="openEditDM('${med.id}')" style="background:${T.parchment};border:1px solid ${T.border};border-radius:7px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;color:${T.muted};margin-left:4px">✏️</button>
                   <button onclick="delDM('${med.id}')" style="background:none;border:none;color:${T.muted};cursor:pointer;font-size:14px;margin-left:4px">🗑</button>
                 </td>
               </tr>`;
             }).join('')}
             <tr style="background:${T.parchment}">
-              <td colspan="7" style="font-weight:800;color:${T.ink}">
+              <td colspan="8" style="font-weight:800;color:${T.ink}">
                 Grand Total
                 <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
                   <span style="font-size:11px;color:${T.muted};font-weight:600">+ Transport:</span>
@@ -2648,6 +2823,7 @@ async function confirmOrder(id){
   const ns=(med.stock_today||0)+((parseInt(med.new_order_pkgs)||0)*(med.units_per_pkg||0));
   const{data}=await sb.from('daily_meds').update({
     stock_today:ns,
+    stock_date:toISOLocal(new Date()), // new stock counted today
     new_order_pkgs:0,
     last_ordered:new Date().toISOString()
   }).eq('id',id).select().single();
@@ -2655,12 +2831,33 @@ async function confirmOrder(id){
 }
 window.confirmOrder=confirmOrder;
 
-async function delDM(id){if(!confirm('Remove?'))return;await sb.from('daily_meds').delete().eq('id',id);A.dailyMeds=A.dailyMeds.filter(m=>m.id!==id);toast('Removed.');renderMeds();}
+function delDM(id){
+  const med=A.dailyMeds.find(m=>m.id===id);
+  if(!med)return;
+  showModal('Delete Medication',`
+    <div style="text-align:center;padding:10px 0">
+      <div style="font-size:40px;margin-bottom:12px">🗑</div>
+      <div style="font-weight:700;font-size:16px;margin-bottom:8px">Remove this medication?</div>
+      <div style="font-size:13px;color:${T.muted};margin-bottom:16px">"${med.name}" will be permanently removed from your Frequent meds list.</div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-danger" style="flex:1" onclick="confirmDelDM('${id}')">Delete</button>
+      </div>
+    </div>`);
+}
 window.delDM=delDM;
+
+async function confirmDelDM(id){
+  const{error}=await sb.from('daily_meds').delete().eq('id',id);
+  if(error){toast('Error removing.',true);return;}
+  A.dailyMeds=A.dailyMeds.filter(m=>m.id!==id);
+  closeModal();toast('Medication removed.');renderMeds();
+}
+window.confirmDelDM=confirmDelDM;
 
 function openAddDM(){
   if(isSampleMode()){toast('Switch to My Family to add real entries.',true);return;}
-  showModal('Add Daily Medication',`
+  showModal('Add Medication',`
     <div class="form-row"><label class="lbl">Medication name</label><input class="inp" id="dm-n" placeholder="e.g. Vitamin D 1000IU" autofocus></div>
     <div class="form-row"><label class="lbl">Members</label>
       <div style="display:flex;gap:7px;flex-wrap:wrap" id="dm-mems">
@@ -2672,6 +2869,7 @@ function openAddDM(){
       <div class="form-row" style="margin:0"><label class="lbl">Price/pkg</label><input class="inp" type="number" id="dm-p" placeholder="0.00" step="0.01" onfocus="this.select()"></div>
       <div class="form-row" style="margin:0"><label class="lbl">Stock today</label><input class="inp" type="number" id="dm-s" placeholder="0" onfocus="this.select()"></div>
     </div>
+    <div class="form-row"><label class="lbl">Stock counted on</label><input class="inp" type="date" id="dm-sd" value="${toISOLocal(new Date())}"></div>
     <div class="form-row"><label class="lbl">Note</label><input class="inp" id="dm-note" placeholder="e.g. Take with food"></div>
     <button class="btn btn-primary btn-full" onclick="saveDM()">Add Medication</button>`);
 }
@@ -2688,6 +2886,7 @@ async function saveDM(){
     units_per_pkg:parseInt(document.getElementById('dm-u')?.value)||30,
     price_per_pkg:parseFloat(document.getElementById('dm-p')?.value)||0,
     stock_today:parseInt(document.getElementById('dm-s')?.value)||0,
+    stock_date:document.getElementById('dm-sd')?.value||toISOLocal(new Date()),
     shared:memberIds.length>1,
     note:document.getElementById('dm-note')?.value||'',
   };
@@ -2696,6 +2895,51 @@ async function saveDM(){
   A.dailyMeds.push(result);closeModal();toast('Medication added!');renderMeds();
 }
 window.saveDM=saveDM;
+
+// ── EDIT MEDICATION ───────────────────────────────────────────────────────────
+function openEditDM(id){
+  if(isSampleMode()){toast('Switch to My Family to edit entries.',true);return;}
+  const med=A.dailyMeds.find(m=>m.id===id);
+  if(!med)return;
+  showModal('Edit Medication',`
+    <div class="form-row"><label class="lbl">Medication name</label><input class="inp" id="dm-n" value="${med.name||''}" autofocus></div>
+    <div class="form-row"><label class="lbl">Members</label>
+      <div style="display:flex;gap:7px;flex-wrap:wrap" id="dm-mems">
+        ${A.members.map(m=>{const sel=(med.member_ids||[]).includes(m.id);return`<button type="button" data-mid="${m.id}" data-sel="${sel}" onclick="togPart(this,'${m.id}')" style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;border:1.5px solid ${sel?m.color:T.border};background:${sel?m.color+'22':'#fff'};cursor:pointer;font-size:12px;font-weight:600;color:${sel?m.color:T.muted}">${av(m,18)} ${m.name}</button>`;}).join('')}
+      </div></div>
+    <div class="grid2">
+      <div class="form-row" style="margin:0"><label class="lbl">Dose/day</label><input class="inp" type="number" id="dm-d" value="${med.dose_per_day||1}" onfocus="this.select()"></div>
+      <div class="form-row" style="margin:0"><label class="lbl">Units/pkg</label><input class="inp" type="number" id="dm-u" value="${med.units_per_pkg||30}" onfocus="this.select()"></div>
+      <div class="form-row" style="margin:0"><label class="lbl">Price/pkg</label><input class="inp" type="number" id="dm-p" value="${med.price_per_pkg||0}" step="0.01" onfocus="this.select()"></div>
+      <div class="form-row" style="margin:0"><label class="lbl">Stock today</label><input class="inp" type="number" id="dm-s" value="${med.stock_today||0}" onfocus="this.select()"></div>
+    </div>
+    <div class="form-row"><label class="lbl">Stock counted on</label><input class="inp" type="date" id="dm-sd" value="${med.stock_date||toISOLocal(new Date())}"></div>
+    <div class="form-row"><label class="lbl">Note</label><input class="inp" id="dm-note" value="${med.note||''}" placeholder="e.g. Take with food"></div>
+    <button class="btn btn-primary btn-full" onclick="saveEditDM('${id}')">Save Changes</button>`);
+}
+window.openEditDM=openEditDM;
+
+async function saveEditDM(id){
+  if(!A.family)return;
+  const memberIds=Array.from(document.querySelectorAll('#dm-mems button[data-sel="true"]')).map(b=>b.dataset.mid).filter(Boolean);
+  const name=document.getElementById('dm-n')?.value?.trim();
+  if(!name){toast('Please add a name.',true);return;}
+  const data={
+    name,member_ids:memberIds,
+    dose_per_day:parseFloat(document.getElementById('dm-d')?.value)||1,
+    units_per_pkg:parseInt(document.getElementById('dm-u')?.value)||30,
+    price_per_pkg:parseFloat(document.getElementById('dm-p')?.value)||0,
+    stock_today:parseInt(document.getElementById('dm-s')?.value)||0,
+    stock_date:document.getElementById('dm-sd')?.value||toISOLocal(new Date()),
+    shared:memberIds.length>1,
+    note:document.getElementById('dm-note')?.value||'',
+  };
+  const{data:result,error}=await sb.from('daily_meds').update(data).eq('id',id).select().single();
+  if(error){toast('Error saving medication.',true);console.error(error);return;}
+  A.dailyMeds=A.dailyMeds.map(m=>m.id===id?result:m);
+  closeModal();toast('Medication updated! ✅');renderMeds();
+}
+window.saveEditDM=saveEditDM;
 
 // ── INSIGHTS ──────────────────────────────────────────────────────────────────
 function renderInsights(){
@@ -2995,8 +3239,20 @@ function renderHome(){
     return evStart>=weekStart && evStart<=weekEnd;
   }).sort((a,b)=>new Date(a.date)-new Date(b.date));
 
-  // ── ACTION ITEMS ──────────────────────────────────────────────────────────
-  const dueActions=getEvents().filter(e=>e.type==='task'&&e.actions?.some(a=>!a.done)&&new Date(e.date)<=new Date());
+  // ── SUMMARY TO DO ─────────────────────────────────────────────────────────
+  // Scope: overdue, today, and up to 7 days ahead
+  const weekAhead = addDays(today, 7); weekAhead.setHours(23,59,59,999);
+  // Calendar items: Tasks + non-task events with open actions — merged, sorted by date
+  const todoCalendar = [
+    // All incomplete Task events within scope (with or without action items)
+    ...getEvents().filter(e => e.type === 'task' && !e.completed_at && new Date(e.date) <= weekAhead),
+    // Non-task calendar events with at least one open action item, within scope
+    ...getEvents().filter(e => e.type !== 'task' && e.actions?.length > 0 && e.actions.some(a => !a.done) && new Date(e.date) <= weekAhead),
+  ].sort((a,b) => new Date(a.date) - new Date(b.date));
+  // Notebook notes with open checklist items (no date — sorted after calendar items)
+  const todoNotes = getNotes()
+    .filter(n => n.checklist?.length > 0 && n.checklist.some(c => !c.done));
+  const hasToDo = todoCalendar.length > 0 || todoNotes.length > 0;
 
   // ── MEMBER COLOR HELPER ────────────────────────────────────────────────────
   const memColor=e=>{
@@ -3050,15 +3306,42 @@ function renderHome(){
       <div style="font-weight:800;font-size:14px;color:${T.ink};margin:14px 0 8px">${upcomingLabel}</div>
       ${upcomingEvs.map(e=>evCard(e,true)).join('')}`:''}
 
-      ${dueActions.length?`
-      <div style="font-weight:800;font-size:14px;color:${T.ink};margin:14px 0 8px">Action items</div>
-      ${dueActions.flatMap(e=>(e.actions||[]).filter(a=>!a.done).slice(0,3).map(a=>`
-        <div style="display:flex;align-items:center;gap:8px;padding:8px 11px;border-radius:10px;background:#fff;margin-bottom:5px">
-          <span style="font-size:14px">✅</span>
-          <div style="flex:1;font-size:13px;font-weight:600">${a.text}</div>
-          <div style="font-size:11px;color:${T.muted}">${e.title}</div>
-        </div>`)).join('')}`:''
-      }
+      ${hasToDo ? `
+      <div style="font-weight:800;font-size:14px;color:${T.ink};margin:14px 0 8px">Summary To Do</div>
+      ${todoCalendar.map(e => {
+        const isTask = e.type === 'task';
+        const isOverdue = new Date(e.date) < today;
+        const openCount = (e.actions||[]).filter(a=>!a.done).length;
+        const mem = e.member_id ? getMem(e.member_id) : null;
+        const icon = isTask ? '✅' : ET[e.type].icon;
+        const subtitle = isTask
+          ? `${isOverdue?'⚠️ Overdue · ':''}Due: ${fmt(e.date)}${mem?' · '+mem.name:''}${openCount>0?' · '+openCount+' open item'+(openCount!==1?'s':''):''}`
+          : `${fmt(e.date)} · ${openCount} open item${openCount!==1?'s':''}`;
+        return `<div onclick="viewEv('${e.id}')" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:10px;background:#fff;border-left:3px solid ${T.sky};margin-bottom:6px;cursor:pointer">
+          <span style="font-size:16px">${icon}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.title||(isTask?'Untitled Task':ET[e.type].label)}</div>
+            <div style="font-size:11px;color:${isTask&&isOverdue?T.rose:T.muted}">${subtitle}</div>
+          </div>
+        </div>`;
+      }).join('')}
+      ${todoNotes.map(n => {
+        const grp = getGroups().find(g=>g.id===n.group_id);
+        const openCount = n.checklist.filter(c=>!c.done).length;
+        return `<div onclick="openNote('${n.id}')" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:10px;background:#fff;border-left:3px solid ${T.sage};margin-bottom:6px;cursor:pointer">
+          <span style="font-size:16px">📓</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${n.title||'Untitled Note'}</div>
+            <div style="font-size:11px;color:${T.muted}">${grp?grp.name+' · ':''}${openCount} open item${openCount!==1?'s':''}</div>
+          </div>
+        </div>`;
+      }).join('')}
+      <div style="margin-top:16px;padding-top:10px;border-top:1px solid ${T.border};display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:10px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.04em">Color guide</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:${T.muted}"><span style="width:10px;height:10px;border-radius:2px;background:${T.sky};flex-shrink:0;display:inline-block"></span>Calendar item</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:${T.muted}"><span style="width:10px;height:10px;border-radius:2px;background:${T.sage};flex-shrink:0;display:inline-block"></span>Notebook note</span>
+      </div>
+      ` : ''}
 
     </div>`;
 }
@@ -3066,70 +3349,18 @@ window.renderHome=renderHome;
 
 
 // ── MEALS PAGE ─────────────────────────────────────────────────────────────────
+const MEAL_PLAN_DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const MEAL_PLAN_ROWS=['Breakfast','Lunch','Snack','Dinner'];
+
 function renderMeals(){
-  if(!A.mealsTab) A.mealsTab='shopping';
-  const TABS=[{id:'shopping',label:'🛒 Shopping'},{id:'planner',label:'📅 Meal Planner'},{id:'ideas',label:'💡 Ideas'}];
-
-  // Shopping lists from Notebook (notes tagged as shopping or in Shopping group)
-  const shopGroup=getGroups().find(g=>g.name==='🛒 Shopping');
-  const shopLists=shopGroup?getNotes().filter(n=>n.group_id===shopGroup.id):[];
-
-  // Weekly menu note
-  const menuGroup=getGroups().find(g=>g.name==='📅 Weekly Menu');
-  const menuNote=menuGroup?getNotes().filter(n=>n.group_id===menuGroup.id)[0]:null;
-
+  if(!A.mealsTab||A.mealsTab==='ideas') A.mealsTab='shopping';
+  const TABS=[{id:'shopping',label:'🛒 Shopping'},{id:'planner',label:'📅 Meal Planner'}];
   let tc='';
   if(A.mealsTab==='shopping'){
-    tc=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div style="font-weight:700;font-size:14px">Shopping Lists</div>
-      <button class="btn btn-primary btn-sm" onclick="addShoppingList()">+ New List</button>
-    </div>
-    ${shopLists.length?shopLists.map(n=>`<div onclick="openNote('${n.id}')" class="card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer">
-      <div style="font-weight:700;font-size:13px;margin-bottom:4px">${n.title}</div>
-      <div style="font-size:11px;color:${T.muted}">${(n.checklist||[]).filter(c=>!c.done).length} items remaining · ${(n.checklist||[]).filter(c=>c.done).length} checked off</div>
-    </div>`).join(''):
-    `<div style="text-align:center;padding:20px;color:${T.muted}">
-      <div style="font-size:32px;margin-bottom:8px">🛒</div>
-      <div style="font-weight:700;margin-bottom:6px">No shopping lists yet</div>
-      <button class="btn btn-primary" onclick="addShoppingList()">Create your first list</button>
-    </div>`}`;
-  } else if(A.mealsTab==='planner'){
-    // Meal idea lists
-    const mealGroups=['🌅 Breakfast','☀️ Lunch','🌙 Dinner','🍎 Snacks'].map(name=>{
-      const grp=getGroups().find(g=>g.name===name);
-      const note=grp?getNotes().filter(n=>n.group_id===grp.id)[0]:null;
-      return{name,note};
-    });
-    tc=`<div style="margin-bottom:12px">
-      <div style="font-weight:700;font-size:14px;margin-bottom:4px">Weekly Menu</div>
-      <div onclick="${menuNote?`openNote('${menuNote.id}')`:'createWeeklyMenu()'}" class="card" style="padding:12px 14px;cursor:pointer;border:1.5px dashed ${T.sageMid};background:${T.sageLight}">
-        ${menuNote?`<div style="font-size:13px;font-weight:600;color:${T.sage}">📅 View & edit this week's menu</div>`:
-        `<div style="text-align:center;color:${T.sage};font-weight:700">+ Set up weekly menu</div>`}
-      </div>
-    </div>
-    <div style="font-weight:700;font-size:14px;margin-bottom:8px">Meal Ideas</div>
-    ${mealGroups.map(({name,note})=>`<div onclick="${note?`openNote('${note.id}')`:`createMealIdeas('${name}')`}" class="card" style="padding:10px 14px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:10px">
-      <span style="font-size:20px">${name.split(' ')[0]}</span>
-      <div><div style="font-weight:700;font-size:13px">${name.split(' ').slice(1).join(' ')}</div>
-      <div style="font-size:11px;color:${T.muted}">${note?(note.checklist||[]).length+' ideas':'Tap to set up'}</div></div>
-    </div>`).join('')}`;
+    tc=renderShoppingTab();
   } else {
-    // AI chat for meal ideas
-    tc=`<div style="display:flex;flex-direction:column;height:calc(100vh - 260px)">
-      <div id="meal-chat" style="flex:1;overflow-y:auto;padding-bottom:8px">
-        <div style="background:${T.sageLight};border-radius:12px;padding:12px;margin-bottom:10px">
-          <div style="font-weight:700;font-size:13px;color:${T.sage};margin-bottom:4px">🍽 Meal Assistant</div>
-          <div style="font-size:13px;color:${T.ink}">Ask me for meal ideas, recipes, what to cook with what you have, or dietary suggestions for your family!</div>
-        </div>
-        <div id="meal-chat-messages"></div>
-      </div>
-      <div style="display:flex;gap:8px;padding-top:8px;border-top:1px solid ${T.border}">
-        <input class="inp" id="meal-chat-inp" placeholder="Ask for meal ideas…" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();sendMealChat();}">
-        <button class="btn btn-primary" onclick="sendMealChat()">Send</button>
-      </div>
-    </div>`;
+    tc=renderPlannerTab();
   }
-
   document.getElementById('page-meals').innerHTML=`
     <div class="page-header">
       <div class="family-label">${getFamily()?.name||''}</div>
@@ -3137,113 +3368,312 @@ function renderMeals(){
     </div>
     <div class="tabs">${TABS.map(t=>`<button class="tab ${A.mealsTab===t.id?'active':''}" onclick="A.mealsTab='${t.id}';renderMeals()">${t.label}</button>`).join('')}</div>
     <div style="padding:14px 16px">${tc}</div>`;
+  // Planner grid is filled with saved values once the table exists in the DOM
+  if(A.mealsTab==='planner') setTimeout(populateMealPlanGrid,50);
 }
 window.renderMeals=renderMeals;
 
-async function addShoppingList(){
+// ── SHOPPING TAB ──────────────────────────────────────────────────────────────
+function renderShoppingTab(){
+  if(isSampleMode()){
+    return `<div style="text-align:center;padding:24px;color:${T.muted}">
+      <div style="font-size:36px;margin-bottom:10px">🛒</div>
+      <div style="font-weight:700;margin-bottom:6px">Sample Mode</div>
+      <div style="font-size:13px">Switch to My Family to create shopping lists.</div>
+    </div>`;
+  }
+  const lists=A.shoppingLists||[];
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div style="font-weight:700;font-size:14px">Shopping Lists</div>
+    <button class="btn btn-primary btn-sm" onclick="createShoppingList()">+ New List</button>
+  </div>
+  ${lists.length?lists.map(l=>{
+    const items=l.items||[];
+    const left=items.filter(i=>!i.done).length;
+    const done=items.length-left;
+    return`<div onclick="openShoppingList('${l.id}')" class="card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:10px">
+      <span style="font-size:22px">🛒</span>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:13px">${l.name}</div>
+        <div style="font-size:11px;color:${T.muted}">${left} item${left!==1?'s':''} left${done?' · '+done+' checked':''}</div>
+      </div>
+      <button onclick="event.stopPropagation();deleteShoppingList('${l.id}')" style="background:none;border:none;color:${T.muted};font-size:16px;cursor:pointer;padding:4px">🗑</button>
+    </div>`;
+  }).join(''):
+  `<div style="text-align:center;padding:20px;color:${T.muted}">
+    <div style="font-size:32px;margin-bottom:8px">🛒</div>
+    <div style="font-weight:700;margin-bottom:6px">No shopping lists yet</div>
+    <button class="btn btn-primary" onclick="createShoppingList()">Create your first list</button>
+  </div>`}`;
+}
+window.renderShoppingTab=renderShoppingTab;
+
+async function createShoppingList(){
   if(isSampleMode()){toast('Switch to My Family to create lists.',true);return;}
-  let grp=A.noteGroups.find(g=>g.name==='🛒 Shopping');
-  if(!grp){
-    const{data}=await sb.from('note_groups').insert({family_id:A.family.id,name:'🛒 Shopping'}).select().single();
-    if(data){A.noteGroups.push(data);grp=data;}
-  }
-  if(!grp)return;
-  // Pre-fill with a standard shopping list
-  const defaultItems=[
-    {text:'🥛 Milk',done:false},{text:'🥚 Eggs',done:false},{text:'🍞 Bread',done:false},
-    {text:'🧀 Cheese',done:false},{text:'🐔 Chicken',done:false},{text:'🥦 Broccoli',done:false},
-    {text:'🍎 Apples',done:false},{text:'🍌 Bananas',done:false},{text:'🍅 Tomatoes',done:false},
-    {text:'🧅 Onions',done:false},{text:'🥕 Carrots',done:false},{text:'🫒 Olive oil',done:false},
-    {text:'🍝 Pasta',done:false},{text:'🍚 Rice',done:false},{text:'🥫 Tinned tomatoes',done:false},
-  ];
-  const listCount=A.notes.filter(n=>n.group_id===grp.id).length;
-  const title=listCount===0?'Shopping List':'Shopping List '+(listCount+1);
-  const{data}=await sb.from('notes').insert({
-    family_id:A.family.id,title,group_id:grp.id,
-    checklist:defaultItems,color:'#d4e8d6',pinned:false
+  if(!A.family){toast('Set up your family first.',true);return;}
+  const listCount=A.shoppingLists.length;
+  const name=listCount===0?'Shopping List':'Shopping List '+(listCount+1);
+  const{data,error}=await sb.from('shopping_lists').insert({
+    family_id:A.family.id,name,items:[]
   }).select().single();
-  if(data){A.notes.push(data);openNote(data.id);}
+  if(error){toast('Error creating list: '+(error.message||'unknown'),true);console.error(error);return;}
+  A.shoppingLists.push(data);
+  renderMeals();
+  openShoppingList(data.id);
 }
-window.addShoppingList=addShoppingList;
+window.createShoppingList=createShoppingList;
 
-async function createWeeklyMenu(){
-  if(isSampleMode()){toast('Switch to My Family first.',true);return;}
-  let grp=A.noteGroups.find(g=>g.name==='📅 Weekly Menu');
-  if(!grp){
-    const{data}=await sb.from('note_groups').insert({family_id:A.family.id,name:'📅 Weekly Menu'}).select().single();
-    if(data){A.noteGroups.push(data);grp=data;}
-  }
-  if(!grp)return;
-  const menuContent=`Mon: Pasta bolognese | Greek salad
-Tue: Grilled chicken & veg | Soup
-Wed: Fish tacos | Quinoa salad
-Thu: Lentil curry & rice | Omelette
-Fri: Pizza night | Leftovers
-Sat: BBQ / eat out | Pancakes
-Sun: Roast chicken | French toast`;
-  const{data}=await sb.from('notes').insert({
-    family_id:A.family.id,title:'This Week\'s Menu',group_id:grp.id,
-    content:menuContent,color:'#f5e4c4',pinned:true
-  }).select().single();
-  if(data){A.notes.push(data);openNote(data.id);}
+async function deleteShoppingList(id){
+  if(!confirm('Delete this shopping list?'))return;
+  const{error}=await sb.from('shopping_lists').delete().eq('id',id);
+  if(error){toast('Error deleting list.',true);console.error(error);return;}
+  A.shoppingLists=A.shoppingLists.filter(l=>l.id!==id);
+  toast('List deleted.');
+  renderMeals();
 }
-window.createWeeklyMenu=createWeeklyMenu;
+window.deleteShoppingList=deleteShoppingList;
 
-async function createMealIdeas(groupName){
-  if(isSampleMode()){toast('Switch to My Family first.',true);return;}
-  let grp=A.noteGroups.find(g=>g.name===groupName);
-  if(!grp){
-    const{data}=await sb.from('note_groups').insert({family_id:A.family.id,name:groupName}).select().single();
-    if(data){A.noteGroups.push(data);grp=data;}
-  }
-  if(!grp)return;
-  const ideas={
-    '🌅 Breakfast':[{text:'Overnight oats with berries',done:false},{text:'Avocado toast & eggs',done:false},{text:'Greek yogurt with honey & granola',done:false},{text:'Smoothie bowl',done:false},{text:'Banana pancakes',done:false}],
-    '☀️ Lunch':[{text:'Grilled chicken salad',done:false},{text:'Vegetable soup & bread',done:false},{text:'Tuna wraps',done:false},{text:'Quinoa buddha bowl',done:false},{text:'Tomato & mozzarella',done:false}],
-    '🌙 Dinner':[{text:'Salmon & roasted vegetables',done:false},{text:'Pasta bolognese',done:false},{text:'Chicken stir fry & rice',done:false},{text:'Lentil dahl & naan',done:false},{text:'Turkey meatballs & zucchini noodles',done:false}],
-    '🍎 Snacks':[{text:'Apple & almond butter',done:false},{text:'Hummus & carrot sticks',done:false},{text:'Mixed nuts & dried fruit',done:false},{text:'Rice cakes with cottage cheese',done:false},{text:'Dark chocolate & berries',done:false}],
+// ── SHOPPING LIST MODAL ───────────────────────────────────────────────────────
+function openShoppingList(id){
+  if(A._shopHideDone===undefined)A._shopHideDone=false;
+  renderShoppingModal(id);
+}
+window.openShoppingList=openShoppingList;
+
+function renderShoppingModal(id){
+  const list=A.shoppingLists.find(l=>l.id===id);
+  if(!list)return;
+  const items=list.items||[];
+  const doneCount=items.filter(i=>i.done).length;
+  const hideDone=A._shopHideDone;
+  const itemRow=(item,idx)=>{
+    if(hideDone&&item.done)return'';
+    return`<div class="shop-item-row" draggable="true" data-idx="${idx}" style="display:flex;align-items:center;gap:8px;margin-bottom:6px;background:#fff;border:1px solid ${T.border};border-radius:9px;padding:6px 8px">
+      <span class="drag-handle" style="cursor:grab;color:#c8bfb0;font-size:14px;flex-shrink:0;user-select:none;touch-action:none">⠿</span>
+      <input type="checkbox" ${item.done?'checked':''} onchange="toggleShoppingItem('${id}',${idx},this.checked)">
+      <span style="flex:1;font-size:13px;${item.done?`text-decoration:line-through;color:${T.muted}`:''}">${item.text}</span>
+      <button onclick="removeShoppingItem('${id}',${idx})" style="background:none;border:none;color:${T.muted};font-size:16px;cursor:pointer;padding:2px 4px">×</button>
+    </div>`;
   };
-  const{data}=await sb.from('notes').insert({
-    family_id:A.family.id,title:groupName.split(' ').slice(1).join(' ')+' Ideas',
-    group_id:grp.id,checklist:ideas[groupName]||[],color:'#d0e4f0',pinned:false
-  }).select().single();
-  if(data){A.notes.push(data);openNote(data.id);}
+  const rows=items.map((item,idx)=>itemRow(item,idx)).join('');
+  const visibleCount=hideDone?items.filter(i=>!i.done).length:items.length;
+  showModal(`🛒 ${list.name}`,`
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:${T.muted};margin-bottom:10px;cursor:pointer">
+      <input type="checkbox" ${hideDone?'checked':''} onchange="A._shopHideDone=this.checked;renderShoppingModal('${id}')">
+      👁 Hide completed (${doneCount})
+    </label>
+    <div id="shop-items-${id}">
+      ${visibleCount?rows:`<div style="text-align:center;color:${T.muted};font-size:12px;padding:10px 0">${items.length?'All items completed — toggle above to view':'No items yet — add your first item below'}</div>`}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <input class="inp" id="shop-new-item" placeholder="Add item…" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addShoppingItem('${id}');}">
+      <button class="btn btn-primary btn-sm" onclick="addShoppingItem('${id}')">Add</button>
+    </div>
+    ${items.length?`<button class="btn btn-secondary btn-full" style="margin-top:10px" onclick="resetShoppingList('${id}')">↺ Uncheck all items</button>`:''}
+  `);
+  setTimeout(()=>initShoppingDrag(id),50);
 }
-window.createMealIdeas=createMealIdeas;
+window.renderShoppingModal=renderShoppingModal;
 
-async function sendMealChat(){
-  const inp=document.getElementById('meal-chat-inp');
-  const msgs=document.getElementById('meal-chat-messages');
-  if(!inp||!msgs||!inp.value.trim())return;
-  const q=inp.value.trim(); inp.value='';
-  msgs.innerHTML+=`<div style="text-align:right;margin-bottom:8px"><div style="display:inline-block;background:${T.sage};color:#fff;border-radius:12px 12px 2px 12px;padding:8px 12px;font-size:13px;max-width:85%">${q}</div></div>`;
-  msgs.innerHTML+=`<div id="meal-typing" style="margin-bottom:8px"><div style="display:inline-block;background:${T.parchment};border-radius:12px 12px 12px 2px;padding:8px 12px;font-size:13px;color:${T.muted}">Thinking…</div></div>`;
-  msgs.scrollTop=msgs.scrollHeight;
-  try{
-    const famCtx=`Family: ${getFamily()?.name||'Unknown'}. Members: ${getMembers().map(m=>m.name+(m.age?' (age '+m.age+')':'')).join(', ')}.`;
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',max_tokens:600,
-        system:`You are a friendly family meal assistant for the Kinship app. ${famCtx} Give practical, healthy meal ideas and simple recipes. Keep responses concise and friendly.`,
-        messages:[{role:'user',content:q}]
-      })
+// Mouse + touch drag-to-reorder for shopping list items
+function initShoppingDrag(listId){
+  const cont=document.getElementById('shop-items-'+listId);
+  if(!cont)return;
+  let dragging=null;
+  cont.querySelectorAll('.shop-item-row').forEach(row=>{
+    row.addEventListener('dragstart',()=>{ row.style.opacity='0.4'; dragging=row; });
+    row.addEventListener('dragend',()=>{ row.style.opacity='1'; if(dragging)reorderShoppingItems(listId,cont); dragging=null; });
+    row.addEventListener('dragover',e=>{
+      e.preventDefault();
+      if(!dragging||dragging===row)return;
+      const r=row.getBoundingClientRect();
+      if(e.clientY<r.top+r.height/2)cont.insertBefore(dragging,row);
+      else cont.insertBefore(dragging,row.nextSibling);
     });
-    const d=await resp.json();
-    const reply=d.content?.[0]?.text||'Sorry, I could not get a response.';
-    document.getElementById('meal-typing')?.remove();
-    msgs.innerHTML+=`<div style="margin-bottom:8px"><div style="display:inline-block;background:${T.parchment};border-radius:12px 12px 12px 2px;padding:8px 12px;font-size:13px;max-width:90%;line-height:1.5">${reply.replace(/\n/g,'<br>')}</div></div>`;
-    msgs.scrollTop=msgs.scrollHeight;
-  }catch(e){document.getElementById('meal-typing')?.remove();toast('Chat error: '+e.message,true);}
+    const handle=row.querySelector('.drag-handle');
+    handle.addEventListener('touchstart',()=>{ row.style.opacity='0.5'; dragging=row; },{passive:true});
+    handle.addEventListener('touchmove',e=>{
+      e.preventDefault();
+      const y=e.touches[0].clientY;
+      cont.querySelectorAll('.shop-item-row').forEach(el=>{
+        if(el===dragging)return;
+        const r=el.getBoundingClientRect();
+        if(y>r.top&&y<r.bottom){
+          if(y<r.top+r.height/2)cont.insertBefore(dragging,el);
+          else cont.insertBefore(dragging,el.nextSibling);
+        }
+      });
+    },{passive:false});
+    handle.addEventListener('touchend',()=>{ row.style.opacity='1'; if(dragging)reorderShoppingItems(listId,cont); dragging=null; });
+  });
 }
-window.sendMealChat=sendMealChat;
+window.initShoppingDrag=initShoppingDrag;
+
+// Persist new item order after a drag. Items currently hidden by "Hide completed"
+// keep their relative order and are appended after the visible (reordered) items.
+async function reorderShoppingItems(listId,cont){
+  const list=A.shoppingLists.find(l=>l.id===listId);
+  if(!list)return;
+  const items=list.items||[];
+  const shownIdx=Array.from(cont.querySelectorAll('.shop-item-row')).map(row=>parseInt(row.dataset.idx));
+  const shownSet=new Set(shownIdx);
+  const hiddenIdx=items.map((_,i)=>i).filter(i=>!shownSet.has(i));
+  const finalOrder=[...shownIdx,...hiddenIdx];
+  const newItems=finalOrder.map(i=>items[i]);
+  list.items=newItems;
+  await sb.from('shopping_lists').update({items:newItems}).eq('id',listId);
+  renderShoppingModal(listId);
+}
+window.reorderShoppingItems=reorderShoppingItems;
+
+async function addShoppingItem(listId){
+  const inp=document.getElementById('shop-new-item');
+  const text=inp?.value?.trim();
+  if(!text)return;
+  const list=A.shoppingLists.find(l=>l.id===listId);
+  if(!list)return;
+  const newItem={id:(typeof crypto!=='undefined'&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2),text,done:false};
+  const items=[...(list.items||[]),newItem];
+  list.items=items;
+  await sb.from('shopping_lists').update({items}).eq('id',listId);
+  renderShoppingModal(listId);
+}
+window.addShoppingItem=addShoppingItem;
+
+async function removeShoppingItem(listId,idx){
+  const list=A.shoppingLists.find(l=>l.id===listId);
+  if(!list)return;
+  const items=(list.items||[]).filter((_,i)=>i!==idx);
+  list.items=items;
+  await sb.from('shopping_lists').update({items}).eq('id',listId);
+  renderShoppingModal(listId);
+}
+window.removeShoppingItem=removeShoppingItem;
+
+async function resetShoppingList(listId){
+  const list=A.shoppingLists.find(l=>l.id===listId);
+  if(!list)return;
+  const items=(list.items||[]).map(i=>({...i,done:false}));
+  list.items=items;
+  await sb.from('shopping_lists').update({items}).eq('id',listId);
+  toast('All items unchecked! ✅');
+  renderShoppingModal(listId);
+}
+window.resetShoppingList=resetShoppingList;
+
+// Toggling an item to "done" saves instantly and shows a 5-second Undo toast
+async function toggleShoppingItem(listId,idx,checked){
+  const list=A.shoppingLists.find(l=>l.id===listId);
+  if(!list)return;
+  const items=[...(list.items||[])];
+  if(!items[idx])return;
+  items[idx]={...items[idx],done:checked};
+  list.items=items;
+  await sb.from('shopping_lists').update({items}).eq('id',listId);
+  if(checked) showShopUndoToast(listId,idx);
+  renderShoppingModal(listId);
+}
+window.toggleShoppingItem=toggleShoppingItem;
+
+// Undo toast — clickable, unlike the standard non-interactive .toast style
+function showShopUndoToast(listId,idx){
+  document.getElementById('shop-undo-toast')?.remove();
+  const t=document.createElement('div');
+  t.id='shop-undo-toast';
+  t.className='toast';
+  t.style.background=T.sage;
+  t.style.cursor='pointer';
+  t.style.pointerEvents='auto';
+  t.innerHTML='Item checked ✓ &nbsp; <b style="text-decoration:underline">Undo</b>';
+  t.onclick=()=>{ undoShopCheck(listId,idx); t.remove(); };
+  document.body.appendChild(t);
+  setTimeout(()=>{ if(document.getElementById('shop-undo-toast')===t) t.remove(); },5000);
+}
+window.showShopUndoToast=showShopUndoToast;
+
+async function undoShopCheck(listId,idx){
+  const list=A.shoppingLists.find(l=>l.id===listId);
+  if(!list)return;
+  const items=[...(list.items||[])];
+  if(!items[idx])return;
+  items[idx]={...items[idx],done:false};
+  list.items=items;
+  await sb.from('shopping_lists').update({items}).eq('id',listId);
+  renderShoppingModal(listId);
+}
+window.undoShopCheck=undoShopCheck;
+
+// ── MEAL PLANNER TAB ──────────────────────────────────────────────────────────
+function renderPlannerTab(){
+  if(isSampleMode()){
+    return `<div style="text-align:center;padding:24px;color:${T.muted}">
+      <div style="font-size:36px;margin-bottom:10px">📅</div>
+      <div style="font-weight:700;margin-bottom:6px">Sample Mode</div>
+      <div style="font-size:13px">Switch to My Family to edit your weekly menu.</div>
+    </div>`;
+  }
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-weight:700;font-size:14px">Weekly Menu</div>
+      <button class="btn btn-primary btn-sm" onclick="saveMealPlan()">Save</button>
+    </div>
+    <div style="font-size:11px;color:${T.muted};margin-bottom:8px">A shared weekly template — fill in meals for each day. Everyone in the family sees the same plan.</div>
+    <div style="overflow-x:auto;border-radius:13px;border:1px solid ${T.border}">
+      <table class="tbl" id="meal-plan-table">
+        <thead><tr>
+          <th style="min-width:70px">&nbsp;</th>
+          ${MEAL_PLAN_DAYS.map(d=>`<th style="text-align:center">${d}</th>`).join('')}
+        </tr></thead>
+        <tbody>
+          ${MEAL_PLAN_ROWS.map(row=>`<tr>
+            <td style="font-weight:700;background:${T.parchment}">${row}</td>
+            ${MEAL_PLAN_DAYS.map(day=>`<td style="padding:4px"><textarea class="inp" id="mp-${row}-${day}" rows="2" style="font-size:12px;padding:5px 6px;resize:none;min-width:90px"></textarea></td>`).join('')}
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+window.renderPlannerTab=renderPlannerTab;
+
+// Fill the grid's textareas with previously saved values (called after render)
+function populateMealPlanGrid(){
+  const data=A.mealPlan?.plan_data||{};
+  MEAL_PLAN_ROWS.forEach(row=>{
+    MEAL_PLAN_DAYS.forEach(day=>{
+      const el=document.getElementById(`mp-${row}-${day}`);
+      if(el)el.value=data[row]?.[day]||'';
+    });
+  });
+}
+window.populateMealPlanGrid=populateMealPlanGrid;
+
+// Save the entire grid as one JSON object — single shared row per family (upsert)
+async function saveMealPlan(){
+  if(!A.family){toast('Set up your family first.',true);return;}
+  const plan_data={};
+  MEAL_PLAN_ROWS.forEach(row=>{
+    plan_data[row]={};
+    MEAL_PLAN_DAYS.forEach(day=>{
+      plan_data[row][day]=document.getElementById(`mp-${row}-${day}`)?.value||'';
+    });
+  });
+  let res;
+  if(A.mealPlan?.id){
+    res=await sb.from('meal_plans').update({plan_data,updated_at:new Date().toISOString()}).eq('id',A.mealPlan.id).select().single();
+  } else {
+    res=await sb.from('meal_plans').insert({family_id:A.family.id,plan_data}).select().single();
+  }
+  if(res.error){toast('Error saving menu: '+(res.error.message||'unknown'),true);console.error(res.error);return;}
+  A.mealPlan=res.data;
+  toast('Weekly menu saved! ✅');
+}
+window.saveMealPlan=saveMealPlan;
 
 
 // ── INVENTORY PAGE ─────────────────────────────────────────────────────────────
 function renderInventory(){
   if(!A.invTab) A.invTab='treatments';
-  const TABS=[{id:'treatments',label:'💊 Treatments'},{id:'products',label:'📦 Products'}];
+  const TABS=[{id:'treatments',label:'💊 Frequent meds'},{id:'products',label:'📦 Products'}];
   let tc='';
   if(A.invTab==='treatments'){
     // Treatments tab renders via renderMeds into page-meds, then we copy content
@@ -3593,6 +4023,113 @@ async function sendInvite(email,memberId){
     </div>`);
 }
 window.sendInvite=sendInvite;
+
+// ── INSTANT ACTION / CHECKLIST SAVE ──────────────────────────────────────────
+// Toggles a single action item on an event and saves instantly.
+// Automatically sets or clears completed_at based on whether all actions are done.
+async function toggleEvAction(evId, actionIdx, done) {
+  if (isSampleMode()) return;
+  const ev = A.events.find(e => e.id === evId);
+  if (!ev) return;
+  const actions = (ev.actions || []).map((a, i) => i === actionIdx ? {...a, done} : a);
+  const allDone = actions.length > 0 && actions.every(a => a.done);
+  const completedAt = allDone ? new Date().toISOString() : null;
+  const { error } = await sb.from('events')
+    .update({ actions, completed_at: completedAt })
+    .eq('id', evId);
+  if (error) { toast('Error saving.', true); return; }
+  A.events = A.events.map(e => e.id === evId ? {...e, actions, completed_at: completedAt} : e);
+  // Update label strikethrough in-place — no full modal re-render needed
+  const lbl = document.getElementById(`ev-action-lbl-${actionIdx}`);
+  if (lbl) {
+    lbl.style.textDecoration = done ? 'line-through' : 'none';
+    lbl.style.color = done ? T.muted : T.ink;
+  }
+  // Update the completion banner without re-rendering the modal
+  const banner = document.getElementById('ev-completion-banner');
+  if (banner) {
+    if (allDone) {
+      const x = new Date(completedAt);
+      const t = x.getHours().toString().padStart(2,'0') + ':' + x.getMinutes().toString().padStart(2,'0');
+      banner.innerHTML = `<div style="display:inline-flex;align-items:center;gap:6px;background:${T.sageLight};color:${T.sage};border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;margin-bottom:10px">✅ Completed ${fmt(completedAt)} at ${t}</div>`;
+    } else {
+      banner.innerHTML = '';
+    }
+  }
+}
+window.toggleEvAction = toggleEvAction;
+
+// Manually marks a Task (with no action items) as complete or incomplete.
+async function markEvComplete(evId) {
+  if (isSampleMode()) return;
+  const ev = A.events.find(e => e.id === evId);
+  if (!ev) return;
+  const completedAt = ev.completed_at ? null : new Date().toISOString();
+  const { error } = await sb.from('events')
+    .update({ completed_at: completedAt })
+    .eq('id', evId);
+  if (error) { toast('Error saving.', true); return; }
+  A.events = A.events.map(e => e.id === evId ? {...e, completed_at: completedAt} : e);
+  toast(completedAt ? 'Task marked as complete! ✅' : 'Marked as incomplete.');
+  // Re-render viewEv to refresh the button label and banner
+  _closeModalDOM();
+  setTimeout(() => viewEv(evId), 50);
+}
+window.markEvComplete = markEvComplete;
+
+// Toggles a single checklist item on a note and saves the full note instantly.
+// Automatically sets or clears completed_at based on whether all items are done.
+async function toggleNoteItem(noteId, itemIdx, done) {
+  if (!noteId || isSampleMode()) return;
+  const cont = document.getElementById('ne-cl');
+  if (!cont) return;
+  // Read live checklist state from DOM (captures user's click before we write)
+  const checklist = [];
+  Array.from(cont.children).forEach((row, i) => {
+    const cb  = row.querySelector('input[type="checkbox"]');
+    const inp = row.querySelector('input:not([type="checkbox"])');
+    if (inp?.value?.trim()) {
+      checklist.push({
+        id: 'c' + i,
+        text: inp.value.trim(),
+        done: i === itemIdx ? done : (cb?.checked || false)
+      });
+    }
+  });
+  const allDone = checklist.length > 0 && checklist.every(c => c.done);
+  const completedAt = allDone ? new Date().toISOString() : null;
+  // Save the full note state so no other open field edits are lost
+  const grpVal = document.getElementById('ne-grp')?.value;
+  const data = {
+    title:        document.getElementById('ne-t')?.value || '',
+    content:      document.getElementById('ne-c')?.value || '',
+    color:        document.getElementById('ne-col')?.value || NOTE_COLORS[0],
+    group_id:     grpVal && grpVal !== '__new__' ? grpVal : null,
+    member_id:    document.getElementById('ne-mem')?.value || null,
+    pinned:       document.getElementById('ne-pin')?.checked || false,
+    checklist,
+    completed_at: completedAt,
+  };
+  const { data: saved, error } = await sb.from('notes').update(data).eq('id', noteId).select().single();
+  if (error) { console.error('Note instant save error', error); return; }
+  A.notes = A.notes.map(n => n.id === noteId ? saved : n);
+  updateNoteCompletionUI(completedAt);
+}
+window.toggleNoteItem = toggleNoteItem;
+
+// Updates the completion banner inside the open note modal without re-rendering it.
+function updateNoteCompletionUI(completedAt) {
+  const banner = document.getElementById('note-completion-banner');
+  if (!banner) return;
+  if (completedAt) {
+    const x = new Date(completedAt);
+    const t = x.getHours().toString().padStart(2,'0') + ':' + x.getMinutes().toString().padStart(2,'0');
+    banner.innerHTML = `<div style="background:${T.sageLight};border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;color:${T.sage};margin:0 0 10px">✅ All done — completed ${fmt(x)} at ${t}</div>`;
+  } else {
+    banner.innerHTML = '';
+  }
+}
+window.updateNoteCompletionUI = updateNoteCompletionUI;
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────
 // ── SAMPLE MODE ───────────────────────────────────────────────────────────────
