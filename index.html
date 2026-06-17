@@ -86,6 +86,17 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
 @keyframes slideUp{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes fadeUp{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+/* ── Rich-text note editor (v7) ─────────────────────────────── */
+.note-editor{border:1.5px solid var(--border);border-radius:9px;padding:9px 12px;font-size:14px;color:var(--ink);width:100%;background:var(--surface);min-height:80px;outline:none;line-height:1.6}
+.note-editor:focus{outline:2px solid var(--sage);outline-offset:1px}
+.note-editor b,.note-editor strong{font-weight:700}
+.note-editor i,.note-editor em{font-style:italic}
+.note-editor u{text-decoration:underline}
+.note-editor ul,.note-editor ol{margin:4px 0 4px 18px}
+.note-fmt-bar{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;padding:5px 8px;background:var(--parchment);border-radius:8px;border:1px solid var(--border)}
+.note-fmt-btn{background:#fff;border:1px solid var(--border);border-radius:5px;width:28px;height:28px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--ink);flex-shrink:0;transition:background .15s}
+.note-fmt-btn:hover{background:var(--sage-light)}
+.note-fmt-btn.active{background:var(--sage-light);border-color:var(--sage)}
 </style>
 </head>
 <body>
@@ -175,7 +186,7 @@ try { sb = supabase.createClient(SB_URL, SB_KEY); } catch(e) { console.error('Su
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const T={sage:'#5e8b62',sageMid:'#8ab88e',sageLight:'#d4e8d6',terra:'#b85c38',terraLight:'#f2ddd4',sky:'#3a7ca5',skyLight:'#d0e4f0',plum:'#7c5c8a',plumLight:'#e8d8f0',honey:'#c4892a',honeyLight:'#f5e4c4',rose:'#b85070',roseLight:'#f0d4de',ink:'#1e1b16',muted:'#7a7060',border:'#e0d8cc',bg:'#f5f2ed',surface:'#fff',parchment:'#ede8df'};
-const ET={social:{label:'Social Event',icon:'👥',color:T.sky,bg:T.skyLight,desc:'Gatherings, outings, celebrations'},health:{label:'Health Event',icon:'❤️',color:T.rose,bg:T.roseLight,desc:'Appointments, treatments, check-ups'},wellness:{label:'Wellness Log',icon:'🌿',color:T.sage,bg:T.sageLight,desc:'Daily health summary — sleep, mood, exercise'},task:{label:'Task',icon:'✅',color:T.honey,bg:T.honeyLight,desc:'To-dos assigned to family members'}};
+const ET={task:{label:'Task',icon:'✅',color:T.honey,bg:T.honeyLight,desc:'To-dos assigned to family members'},social:{label:'Social Event',icon:'👥',color:T.sky,bg:T.skyLight,desc:'Gatherings, outings, celebrations'},health:{label:'Health Event',icon:'❤️',color:T.rose,bg:T.roseLight,desc:'Appointments, treatments, check-ups'},wellness:{label:'Wellness Log',icon:'🌿',color:T.sage,bg:T.sageLight,desc:'Daily health summary — sleep, mood, exercise'}};
 const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DN=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const DNF=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -335,6 +346,41 @@ function toast(msg,isErr=false){
   setTimeout(()=>t.remove(),2800);
 }
 
+// ── RICH TEXT HELPERS (v7 — Notebook) ────────────────────────────────────────
+// Strip HTML tags and entities to plain text — used for note card previews
+// and full-text search so the stored HTML doesn't leak into the UI.
+function stripHTML(html){
+  if(!html)return'';
+  const tmp=document.createElement('div');
+  tmp.innerHTML=html;
+  return tmp.textContent||tmp.innerText||'';
+}
+window.stripHTML=stripHTML;
+
+// Format the currently selected text in the note editor
+function formatNote(cmd,val){
+  const ed=document.getElementById('ne-editor');
+  if(!ed)return;
+  ed.focus();
+  document.execCommand(cmd,false,val||null);
+}
+window.formatNote=formatNote;
+
+// Insert an unordered-list bullet via execCommand
+function formatNoteBullet(){
+  const ed=document.getElementById('ne-editor');
+  if(!ed)return;
+  ed.focus();
+  document.execCommand('insertUnorderedList',false,null);
+}
+window.formatNoteBullet=formatNoteBullet;
+
+// Returns the current editor HTML content (innerHTML)
+function getNoteContentHTML(){
+  return document.getElementById('ne-editor')?.innerHTML||'';
+}
+window.getNoteContentHTML=getNoteContentHTML;
+
 function showSavingToast(){
   if(document.getElementById('saving-toast'))return;
   const t=document.createElement('div');
@@ -466,7 +512,10 @@ async function loadAll(){
     sb.from('daily_meds').select('*').order('created_at'),
     sb.from('inventory_products').select('*').order('created_at'),
     sb.from('shopping_lists').select('*').order('created_at'),
-    sb.from('meal_plans').select('*').maybeSingle(),
+    // v7: fetch as array (UNIQUE constraint now in place) then take first row.
+    // Previously used .maybeSingle() which would throw when 2+ rows existed
+    // before the dedup migration was run.
+    sb.from('meal_plans').select('*').order('created_at').limit(1),
   ]);
   if(fam.data){A.family=fam.data;}
   A.members=mems.data||[];
@@ -476,7 +525,8 @@ async function loadAll(){
   A.dailyMeds=dm.data||[];
   A.invProducts=ip.data||[];
   A.shoppingLists=sl.data||[];
-  A.mealPlan=mp.data||null;
+  // mp.data is now an array (from .limit(1)); take the first element or null.
+  A.mealPlan=(mp.data&&mp.data.length>0)?mp.data[0]:null;
 }
 
 
@@ -578,7 +628,16 @@ async function initApp(user){
     if (sBtn) sBtn.style.display = 'none';
     if (_sampleMode) toggleSampleMode();
   }
-  goTo('home');
+  // Only jump to Home on the very first app load. If initApp runs again later
+  // (e.g. a Supabase client reset during a connection retry re-fires a SIGNED_IN
+  // event), stay on whichever page the user was already on instead of resetting
+  // to Home — just refresh that page's data.
+  if (!A._appInitialized) {
+    A._appInitialized = true;
+    goTo('home');
+  } else {
+    goTo(A.page);
+  }
   if(A.showOB)renderOB();
 }
 
@@ -760,13 +819,15 @@ function renderCal(){
             ${spanCont.slice(0,2).map(e=>{
               const pc=pillC(e);
               const isLast=isLastDay(e);
-              return`<div onclick="event.stopPropagation();viewEv('${e.id}')" style="background:${pc};margin:0 -3px 0 -3px;padding:1px 3px;font-size:9px;font-weight:700;color:#fff;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:${isLast?'0 3px 3px 0':'0'};cursor:pointer;display:block">${isLast?shortT(e):' '}</div>`;
+              return`<div onclick="event.stopPropagation();viewEv('${e.id}')" style="background:${pc};margin:0 -3px 0 -3px;padding:1px 3px;font-size:9px;font-weight:700;color:#fff;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:${isLast?'0 3px 3px 0':'0'};cursor:pointer;display:block">${isLast?(e.series_id?'🔁 ':'')+shortT(e):' '}</div>`;
             }).join('')}
             ${dayEvents.slice(0,Math.max(0,3-spanCont.length)).map(e=>{
               const pc=pillC(e);
               const ms=isMultiStart(e);
               // Multi-day start: solid colour pill extending right; single-day: left-border pill
-              return`<div onclick="event.stopPropagation();viewEv('${e.id}')" style="background:${ms?pc:pc+'22'};border-left:2px solid ${pc};border-radius:${ms?'4px 0 0 4px':'0 3px 3px 0'};margin:${ms?'0 -2px 0 0':'0'};padding:1px 2px;font-size:9px;font-weight:700;color:${ms?'#fff':pc};line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer" title="${e.title||ET[e.type].label}">${ET[e.type].icon} ${shortT(e)}</div>`;
+              // 🔁 takes the place of the type icon for recurring events — there's only
+              // room for one symbol at this size, and "this repeats" is the more useful cue.
+              return`<div onclick="event.stopPropagation();viewEv('${e.id}')" style="background:${ms?pc:pc+'22'};border-left:2px solid ${pc};border-radius:${ms?'4px 0 0 4px':'0 3px 3px 0'};margin:${ms?'0 -2px 0 0':'0'};padding:1px 2px;font-size:9px;font-weight:700;color:${ms?'#fff':pc};line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer" title="${e.title||ET[e.type].label}">${e.series_id?'🔁':ET[e.type].icon} ${shortT(e)}</div>`;
             }).join('')}
             ${dayEvents.length+spanCont.length>3?`<div style="font-size:8px;color:${T.muted};font-weight:700;text-align:center;padding-top:1px">+${dayEvents.length+spanCont.length-3} more</div>`:''}
           </div>
@@ -795,7 +856,7 @@ function renderCal(){
             return`<div onclick="viewEv('${e.id}')" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:9px;background:${mc}15;border-left:3px solid ${mc};margin-bottom:5px;cursor:pointer">
               <span style="font-size:14px;flex-shrink:0">${ET[e.type].icon}</span>
               <div style="flex:1;min-width:0">
-                <div style="font-size:12px;font-weight:700;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.title||ET[e.type].label}</div>
+                <div style="font-size:12px;font-weight:700;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.series_id?'🔁 ':''}${e.title||ET[e.type].label}</div>
                 <div style="font-size:10px;color:${mc};font-weight:600;margin-top:1px">${timeLabel}</div>
               </div>
             </div>`;
@@ -989,7 +1050,7 @@ function showDayModal(dt,de){
         <div onclick="_closeModalDOM();setTimeout(()=>viewEv('${e.id}'),50)" style="flex:1;cursor:pointer;display:flex;align-items:center;gap:8px">
           <span style="font-size:16px">${ET[e.type].icon}</span>
           <div>
-            <div style="font-weight:700;font-size:13px;color:#1e1b16">${e.title||ET[e.type].label}</div>
+            <div style="font-weight:700;font-size:13px;color:#1e1b16">${e.series_id?'🔁 ':''}${e.title||ET[e.type].label}</div>
             <div style="font-size:11px;color:#7a7060">${timeStr}${e.location?' · 📍'+e.location:''}</div>
           </div>
         </div>
@@ -2351,7 +2412,10 @@ function renderNB(){
     if(A.noteFGroup!=='all' && A.noteFGroup!=='none' && n.group_id!==A.noteFGroup) return false;
     if(A.noteSearch){
       const q=A.noteSearch.toLowerCase();
-      if(![n.title,n.content,...(n.tags||[]),...(n.checklist||[]).map(c=>c.text)]
+      // v7: strip HTML from content before searching so rich-text markup doesn't
+      // interfere with keyword matching (e.g. searching "bold" doesn't match <b>)
+      const plainContent=stripHTML(n.content||'');
+      if(![n.title,plainContent,...(n.tags||[]),...(n.checklist||[]).map(c=>c.text)]
         .join(' ').toLowerCase().includes(q)) return false;
     }
     return true;
@@ -2361,16 +2425,18 @@ function renderNB(){
   const pinned=filtered.filter(n=>n.pinned);
   const rest  =filtered.filter(n=>!n.pinned);
 
-  // ── NOTE CARD (identical to v5) ──────────────────────────────────────────
+  // ── NOTE CARD (v7: strip HTML in preview) ───────────────────────────────
   const nCard=n=>{
     const mem=getMem(n.member_id);
     const grp=groups.find(g=>g.id===n.group_id);
     const done=(n.checklist||[]).filter(c=>c.done).length;
     const total=(n.checklist||[]).length;
+    // v7: strip HTML tags so rich-text markup doesn't show in the card preview
+    const previewText=stripHTML(n.content||'');
     return`<div class="note-card" style="background:${n.color}" onclick="openNote('${n.id}')">
       ${n.pinned?'<div style="font-size:10px;margin-bottom:3px">📌</div>':''}
       <div style="font-weight:800;font-size:13px;color:${T.ink};margin-bottom:5px;line-height:1.3">${n.title||'Untitled'}</div>
-      ${n.content?`<div style="font-size:12px;color:${T.muted};line-height:1.5;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:6px">${n.content}</div>`:''}
+      ${previewText?`<div style="font-size:12px;color:${T.muted};line-height:1.5;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:6px">${previewText}</div>`:''}
       ${total>0?`<div style="font-size:11px;color:${T.muted};margin-bottom:5px">✅ ${done}/${total}</div>`:''}
       <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
         ${grp?`<span style="font-size:10px;font-weight:700;background:rgba(255,255,255,.55);border-radius:99px;padding:2px 6px;color:${T.ink}">${grp.name}</span>`:''}
@@ -2385,26 +2451,30 @@ function renderNB(){
   // Renders one ribbon section button.
   // Expanded: tap selects the group.
   // Collapsed: tap expands the ribbon (stopPropagation so outer div doesn't double-fire).
-  const rSection=(id,name,color)=>{
+  // v7: user-created groups also get a small ✏️ edit icon when ribbon is open.
+  const rSection=(id,name,color,isUserGroup=false)=>{
     const isActive=A.noteFGroup===id;
     const gc=color||T.muted;
     const clickAction=ribbonOpen
       ? `A.noteFGroup='${id}';renderNB()`
       : `event.stopPropagation();A.noteRibbonOpen=true;renderNB()`;
-    return`<button onclick="${clickAction}" title="${name}"
-      style="display:flex;align-items:center;padding:${ribbonOpen?'10px 8px 10px 0':'10px 0'};border:none;border-bottom:1px solid ${T.border}33;border-left:3px solid ${gc};background:${isActive?gc+'20':'transparent'};color:${isActive?gc:T.ink};font-size:11px;font-weight:${isActive?'800':'600'};cursor:pointer;text-align:left;width:100%;-webkit-tap-highlight-color:transparent">
-      ${ribbonOpen?`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:9px;line-height:1.4">${name}</span>`:''}
-    </button>`;
+    return`<div style="display:flex;align-items:center;border-bottom:1px solid ${T.border}33;border-left:3px solid ${gc};background:${isActive?gc+'20':'transparent'}">
+      <button onclick="${clickAction}" title="${name}"
+        style="flex:1;display:flex;align-items:center;padding:${ribbonOpen?'10px 4px 10px 0':'10px 0'};border:none;background:transparent;color:${isActive?gc:T.ink};font-size:11px;font-weight:${isActive?'800':'600'};cursor:pointer;text-align:left;-webkit-tap-highlight-color:transparent">
+        ${ribbonOpen?`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:9px;line-height:1.4">${name}</span>`:''}
+      </button>
+      ${ribbonOpen&&isUserGroup&&!isSampleMode()?`<button onclick="event.stopPropagation();openEditGroup('${id}')" title="Edit group" style="background:none;border:none;color:${T.muted};cursor:pointer;font-size:11px;padding:4px 8px 4px 2px;-webkit-tap-highlight-color:transparent">✏️</button>`:''}
+    </div>`;
   };
 
   // Section order: user groups first, then a divider, then All Notes + Uncategorized at bottom
-  const userGroupSections=groups.map(g=>rSection(g.id,g.name,g.color||T.sage)).join('');
+  const userGroupSections=groups.map(g=>rSection(g.id,g.name,g.color||T.sage,true)).join('');
   // Divider only rendered when user has at least one group (separates user groups from defaults)
   const dividerEl=groups.length>0
     ? `<div style="height:1px;background:${T.border};margin:${ribbonOpen?'3px 8px 3px 12px':'3px 0'};opacity:.5"></div>`
     : '';
-  const allSection =rSection('all','All Notes',T.sage);
-  const uncatSection=showUncategorized?rSection('none','Uncategorized',T.muted):'';
+  const allSection =rSection('all','All Notes',T.sage,false);
+  const uncatSection=showUncategorized?rSection('none','Uncategorized',T.muted,false):'';
 
   // "+ New Group" only visible when ribbon is expanded (no room when collapsed)
   const addGroupBtn=ribbonOpen&&!isSampleMode()
@@ -2479,6 +2549,62 @@ async function saveGroup(){
 }
 window.saveGroup=saveGroup;
 
+// ── GROUP MANAGEMENT (v7) ─────────────────────────────────────────────────────
+// Edit group name and colour, with option to delete the group.
+function openEditGroup(groupId){
+  if(isSampleMode()){toast('Switch to My Family to edit groups.',true);return;}
+  const grp=A.noteGroups.find(g=>g.id===groupId);
+  if(!grp)return;
+  showModal('Edit Group',`
+    <div class="form-row"><label class="lbl">Group name</label><input class="inp" id="eg-name" value="${grp.name||''}" autofocus></div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveGroupName('${groupId}')">Save Name</button>
+      <button class="btn btn-danger" onclick="deleteGroupPrompt('${groupId}')">🗑 Delete Group</button>
+    </div>`);
+}
+window.openEditGroup=openEditGroup;
+
+async function saveGroupName(groupId){
+  const name=document.getElementById('eg-name')?.value?.trim();
+  if(!name){toast('Please enter a name.',true);return;}
+  const{data,error}=await sb.from('note_groups').update({name}).eq('id',groupId).select().single();
+  if(error){toast('Error saving group name.',true);console.error(error);return;}
+  A.noteGroups=A.noteGroups.map(g=>g.id===groupId?data:g);
+  closeModal();toast('Group renamed! ✅');renderNB();
+}
+window.saveGroupName=saveGroupName;
+
+function deleteGroupPrompt(groupId){
+  const grp=A.noteGroups.find(g=>g.id===groupId);
+  if(!grp)return;
+  const notesInGroup=A.notes.filter(n=>n.group_id===groupId).length;
+  showModal('Delete Group',`
+    <div style="text-align:center;padding:10px 0">
+      <div style="font-size:40px;margin-bottom:12px">🗑</div>
+      <div style="font-weight:700;font-size:16px;margin-bottom:8px">Delete "${grp.name}"?</div>
+      ${notesInGroup>0
+        ?`<div style="font-size:13px;color:${T.muted};margin-bottom:16px">${notesInGroup} note${notesInGroup!==1?'s':''} in this group will become uncategorized — they will not be deleted.</div>`
+        :`<div style="font-size:13px;color:${T.muted};margin-bottom:16px">This group is empty.</div>`}
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-danger" style="flex:1" onclick="confirmDeleteGroup('${groupId}')">Delete</button>
+      </div>
+    </div>`);
+}
+window.deleteGroupPrompt=deleteGroupPrompt;
+
+async function confirmDeleteGroup(groupId){
+  const{error}=await sb.from('note_groups').delete().eq('id',groupId);
+  if(error){toast('Error deleting group.',true);console.error(error);return;}
+  // notes inside become ungrouped (group_id → null) via ON DELETE SET NULL in DB
+  A.notes=A.notes.map(n=>n.group_id===groupId?{...n,group_id:null}:n);
+  A.noteGroups=A.noteGroups.filter(g=>g.id!==groupId);
+  // If we were viewing the now-deleted group, fall back to All Notes
+  if(A.noteFGroup===groupId) A.noteFGroup='all';
+  closeModal();toast('Group deleted.');renderNB();
+}
+window.confirmDeleteGroup=confirmDeleteGroup;
+
 function openNote(noteId){
   if(isSampleMode()){toast('Switch to My Family to edit notes.',true);return;}
   const note=noteId?A.notes.find(n=>n.id===noteId):null;
@@ -2490,9 +2616,23 @@ function openNote(noteId){
     const t = x.getHours().toString().padStart(2,'0') + ':' + x.getMinutes().toString().padStart(2,'0');
     return `<div style="background:${T.sageLight};border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;color:${T.sage};margin:0 0 10px">✅ All done — completed ${fmt(x)} at ${t}</div>`;
   })() : '';
+
+  // v7: rich-text formatting toolbar + contenteditable editor replaces textarea.
+  // The stored `content` field is HTML (innerHTML). For new notes it starts empty.
+  const safeContent = note?.content ? note.content.replace(/`/g,'&#96;') : '';
+
   showModal(noteId?'Edit Note':'New Note',`
     <input id="ne-t" class="inp" value="${note?.title||''}" placeholder="Title…" style="font-size:16px;font-weight:700;margin-bottom:8px" autofocus>
-    <textarea id="ne-c" class="inp" rows="3" placeholder="Write your note…" style="resize:none;margin-bottom:10px">${note?.content||''}</textarea>
+    <!-- Rich-text formatting toolbar -->
+    <div class="note-fmt-bar" id="ne-fmt-bar">
+      <button class="note-fmt-btn" onclick="formatNote('bold')" title="Bold"><b>B</b></button>
+      <button class="note-fmt-btn" onclick="formatNote('italic')" title="Italic"><i>I</i></button>
+      <button class="note-fmt-btn" onclick="formatNote('underline')" title="Underline"><u>U</u></button>
+      <button class="note-fmt-btn" onclick="formatNoteBullet()" title="Bullet list">• ≡</button>
+      <button class="note-fmt-btn" onclick="formatNote('removeFormat')" title="Clear formatting" style="font-size:11px;width:auto;padding:0 7px">✕ fmt</button>
+    </div>
+    <!-- contenteditable rich-text area -->
+    <div id="ne-editor" class="note-editor" contenteditable="true" placeholder="Write your note…" style="margin-bottom:10px">${safeContent}</div>
     <div id="ne-cl" data-note-id="${noteId||''}" style="margin-bottom:6px"></div>
     <button onclick="addCLItem()" style="font-size:12px;color:${T.sage};background:none;border:1px dashed ${T.sageMid};border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:600;margin-bottom:14px">+ Checklist item</button>
     <div id="note-completion-banner">${_noteBanner}</div>
@@ -2518,13 +2658,17 @@ function openNote(noteId){
       ${noteId?`<button class="btn btn-danger" onclick="delNote('${noteId}')">🗑</button>`:''}
     </div>`);
   // Populate checklist with drag-enabled rows after modal renders
-  // Actually: populate from cl variable captured in closure — use setTimeout
   setTimeout(()=>{
     const clCont=document.getElementById('ne-cl');
     if(clCont&&!clCont.children.length){
       const noteObj=A.notes.find(n=>n.id===noteId);
       const items=noteId?(noteObj?.checklist||[]):[];
       items.forEach(item=>addCLItem(item.text,item.done));
+    }
+    // Focus the editor for new notes
+    if(!noteId){
+      const ed=document.getElementById('ne-editor');
+      if(ed){ed.focus();}
     }
   },50);
   // Handle "New Group" selection - use in-app modal instead of browser prompt
@@ -2608,20 +2752,24 @@ async function saveNote(noteId){
     if(inp?.value?.trim())checklist.push({id:'c'+i,text:inp.value.trim(),done:cb?.checked||false});
   });
   const grpVal=document.getElementById('ne-grp')?.value;
+  // v7: read HTML from the rich-text contenteditable editor instead of a textarea
+  const editorEl=document.getElementById('ne-editor');
+  const content=editorEl?editorEl.innerHTML:'';
   const data={
     family_id:A.family.id,
     title:document.getElementById('ne-t')?.value||'',
-    content:document.getElementById('ne-c')?.value||'',
+    content,
     color:document.getElementById('ne-col')?.value||NOTE_COLORS[0],
     group_id:grpVal&&grpVal!=='__new__'?grpVal:null,
     member_id:document.getElementById('ne-mem')?.value||null,
     pinned:document.getElementById('ne-pin')?.checked||false,
     checklist,
   };
+  // v7: sbWrite() for idle-safety
   let res;
-  if(noteId)res=await sb.from('notes').update(data).eq('id',noteId).select().single();
-  else res=await sb.from('notes').insert(data).select().single();
-  if(res.error){toast('Error saving note.',true);console.error(res.error);return;}
+  if(noteId)res=await sbWrite(()=>sb.from('notes').update(data).eq('id',noteId).select().single());
+  else res=await sbWrite(()=>sb.from('notes').insert(data).select().single());
+  if(res.error){toast('Error saving note: '+(res.error.message||'please try again.'),true);console.error(res.error);return;}
   const savedNote = res.data;
   if(noteId)A.notes=A.notes.map(n=>n.id===noteId?savedNote:n);
   else A.notes.push(savedNote);
@@ -2629,13 +2777,30 @@ async function saveNote(noteId){
 }
 window.saveNote=saveNote;
 
-async function delNote(id){
-  if(!confirm('Delete this note?'))return;
-  await sb.from('notes').delete().eq('id',id);
-  A.notes=A.notes.filter(n=>n.id!==id);
-  closeModal();toast('Note deleted.');renderNB();
+// v7: in-app delete confirmation (replaces browser confirm())
+function delNote(id){
+  const note=A.notes.find(n=>n.id===id);
+  if(!note)return;
+  showModal('Delete Note', `
+    <div style="text-align:center;padding:10px 0">
+      <div style="font-size:40px;margin-bottom:12px">🗑</div>
+      <div style="font-weight:700;font-size:16px;margin-bottom:8px">Delete this note?</div>
+      <div style="font-size:13px;color:${T.muted};margin-bottom:16px">"${note.title||'Untitled'}" will be permanently removed.</div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-danger" style="flex:1" onclick="confirmDelNote('${id}')">Delete</button>
+      </div>
+    </div>`);
 }
 window.delNote=delNote;
+
+async function confirmDelNote(id){
+  const{error}=await sb.from('notes').delete().eq('id',id);
+  if(error){toast('Error deleting note.',true);return;}
+  A.notes=A.notes.filter(n=>n.id!==id);
+  closeModal();toast('Note deleted.');renderNB();renderHome();
+}
+window.confirmDelNote=confirmDelNote;
 
 // ── MEDS ──────────────────────────────────────────────────────────────────────
 function exportMedsXLSX() {
@@ -2714,7 +2879,7 @@ function copyOrderToClipboard() {
 }
 window.copyOrderToClipboard = copyOrderToClipboard;
 
-function renderMeds(){
+function renderMeds(targetId){
   const dm=getDM(),s=symC();
   const daysLeft=med=>{const td=(med.member_ids||[]).length*(med.dose_per_day||1);if(!td)return null;return Math.floor((med.stock_today||0)/td);};
   // "Lasts until" now counts forward from the date stock was last confirmed,
@@ -2729,7 +2894,21 @@ function renderMeds(){
   const totalOrder=dm.reduce((sum,m)=>sum+(parseInt(m.new_order_pkgs)||0)*(m.price_per_pkg||0),0);
   const grand=(totalOrder+(parseFloat(A.family?.transport_cost)||0)).toFixed(2);
 
-  document.getElementById('page-meds').innerHTML=`
+  // ── TARGET CONTAINER (v7) ──────────────────────────────────────────────────
+  // renderMeds() can render in two places:
+  //  - '#inv-meds-container' → the LIVE Inventory > "Frequent meds" tab.
+  //    Only the "Frequent Medications" block is shown (table + buttons) —
+  //    Inventory already has its own page header, so we skip duplicating it.
+  //  - '#page-meds' (default/fallback) → legacy hidden page, kept only for
+  //    backward compatibility. Includes the full header + currency selector.
+  // No HTML is copied between elements anymore — whichever container is the
+  // target gets written to directly.
+  const onInvTreatments = A.page==='inventory' && A.invTab==='treatments';
+  const tid = targetId || (onInvTreatments ? 'inv-meds-container' : 'page-meds');
+  const target = document.getElementById(tid);
+  if(!target) return;
+
+  const headerHtml = `
     <div class="page-header">
       <div class="family-label">${getFamily()?.name||''}</div>
       <div class="page-title">Meds & Supplies</div>
@@ -2739,8 +2918,9 @@ function renderMeds(){
         ${CURRENCIES.map(c=>`<option value="${c.code}"${(A.family?.currency||'EUR')===c.code?' selected':''}>${c.code} (${c.sym})</option>`).join('')}
       </select>
       <span style="font-size:12px;color:${T.muted}">All prices in ${s}</span>
-    </div>
+    </div>`;
 
+  const contentHtml = `
     <div style="padding:14px 16px 0">
       <div style="font-family:'Playfair Display',serif;font-size:17px;color:${T.ink};margin-bottom:10px">Frequent Medications</div>
       ${dm.length===0?`<div style="color:${T.muted};font-size:13px;margin-bottom:10px;font-style:italic">No medications added yet.</div>`:''}
@@ -2796,6 +2976,10 @@ function renderMeds(){
         <button class="btn btn-secondary btn-sm" onclick="copyOrderToClipboard()">📋 Copy order</button>
       </div>
     </div>`;
+
+  // Inventory tab shows only the medications block; the legacy page-meds
+  // fallback shows the full header + currency selector too.
+  target.innerHTML = (tid==='inv-meds-container') ? contentHtml : (headerHtml + contentHtml);
 }
 
 async function updateCurrency(code){
@@ -2813,20 +2997,40 @@ async function updateTransport(val){
 window.updateTransport=updateTransport;
 
 async function updateMedOrder(id,val){
-  const{data}=await sb.from('daily_meds').update({new_order_pkgs:parseInt(val)||0}).eq('id',id).select().single();
+  // v7: sbWrite() for idle-safety + surfaces errors instead of failing silently
+  const{data,error}=await sbWrite(()=>sb.from('daily_meds').update({new_order_pkgs:parseInt(val)||0}).eq('id',id).select().single());
+  if(error){toast('Error saving order quantity: '+(error.message||'please try again.'),true);return;}
   if(data){A.dailyMeds=A.dailyMeds.map(m=>m.id===id?data:m);renderMeds();}
 }
 window.updateMedOrder=updateMedOrder;
 
 async function confirmOrder(id){
   const med=A.dailyMeds.find(m=>m.id===id);if(!med)return;
-  const ns=(med.stock_today||0)+((parseInt(med.new_order_pkgs)||0)*(med.units_per_pkg||0));
-  const{data}=await sb.from('daily_meds').update({
+
+  // ── CORRECTED STOCK CALCULATION (v7) ─────────────────────────────────────
+  // `stock_today` is only accurate as of `stock_date` (the last time stock
+  // was physically counted). Time has passed since then, during which the
+  // family kept consuming doses. Before adding the new order, subtract
+  // everything consumed between stock_date and today — THEN add the newly
+  // arrived stock. stock_date is reset to today, the new "last counted" date.
+  const today=todayD();
+  const stockDate=med.stock_date?new Date(med.stock_date+'T00:00:00'):today;
+  const daysPassed=Math.max(0,Math.round((today-stockDate)/86400000));
+  const dailyUse=(med.member_ids||[]).length*(med.dose_per_day||1);
+  const consumed=daysPassed*dailyUse;
+  const ordered=(parseInt(med.new_order_pkgs)||0)*(med.units_per_pkg||0);
+  // Clamp at 0 — stock can't be negative even if the family ran out before
+  // the new order arrived.
+  const ns=Math.max(0,(med.stock_today||0)-consumed)+ordered;
+
+  // v7: sbWrite() for idle-safety
+  const{data,error}=await sbWrite(()=>sb.from('daily_meds').update({
     stock_today:ns,
-    stock_date:toISOLocal(new Date()), // new stock counted today
+    stock_date:toISOLocal(today), // new "last counted" reference: today
     new_order_pkgs:0,
     last_ordered:new Date().toISOString()
-  }).eq('id',id).select().single();
+  }).eq('id',id).select().single());
+  if(error){toast('Error updating stock: '+(error.message||'please try again.'),true);return;}
   if(data){A.dailyMeds=A.dailyMeds.map(m=>m.id===id?data:m);toast('Stock updated! ✅');renderMeds();}
 }
 window.confirmOrder=confirmOrder;
@@ -2848,8 +3052,11 @@ function delDM(id){
 window.delDM=delDM;
 
 async function confirmDelDM(id){
-  const{error}=await sb.from('daily_meds').delete().eq('id',id);
-  if(error){toast('Error removing.',true);return;}
+  // v7: wrapped in sbWrite() — adds a 7s timeout + one automatic retry with a
+  // fresh connection, fixing the "nothing happens" bug after the page has
+  // been idle for a while.
+  const{error}=await sbWrite(()=>sb.from('daily_meds').delete().eq('id',id));
+  if(error){toast('Error removing: '+(error.message||'please try again.'),true);return;}
   A.dailyMeds=A.dailyMeds.filter(m=>m.id!==id);
   closeModal();toast('Medication removed.');renderMeds();
 }
@@ -2890,8 +3097,9 @@ async function saveDM(){
     shared:memberIds.length>1,
     note:document.getElementById('dm-note')?.value||'',
   };
-  const{data:result,error}=await sb.from('daily_meds').insert(data).select().single();
-  if(error){toast('Error adding medication.',true);console.error(error);return;}
+  // v7: sbWrite() for idle-safety (timeout + auto-retry)
+  const{data:result,error}=await sbWrite(()=>sb.from('daily_meds').insert(data).select().single());
+  if(error){toast('Error adding medication: '+(error.message||'please try again.'),true);console.error(error);return;}
   A.dailyMeds.push(result);closeModal();toast('Medication added!');renderMeds();
 }
 window.saveDM=saveDM;
@@ -2934,8 +3142,9 @@ async function saveEditDM(id){
     shared:memberIds.length>1,
     note:document.getElementById('dm-note')?.value||'',
   };
-  const{data:result,error}=await sb.from('daily_meds').update(data).eq('id',id).select().single();
-  if(error){toast('Error saving medication.',true);console.error(error);return;}
+  // v7: sbWrite() for idle-safety (timeout + auto-retry)
+  const{data:result,error}=await sbWrite(()=>sb.from('daily_meds').update(data).eq('id',id).select().single());
+  if(error){toast('Error saving medication: '+(error.message||'please try again.'),true);console.error(error);return;}
   A.dailyMeds=A.dailyMeds.map(m=>m.id===id?result:m);
   closeModal();toast('Medication updated! ✅');renderMeds();
 }
@@ -3182,11 +3391,23 @@ function renderHome(){
   const today=todayD();
   const fmtT=d=>{if(!d)return'';const x=new Date(d);return x.getHours().toString().padStart(2,'0')+':'+x.getMinutes().toString().padStart(2,'0');};
 
+  // ── MEMBER LABEL HELPER (v7) ─────────────────────────────────────────────
+  // Returns a short text label identifying who an event/task is assigned/linked to.
+  const memberLabel=e=>{
+    if(e.participants_all_family) return '👨‍👩‍👧‍👦 Family';
+    const ids = e.member_id ? [e.member_id] : (e.participants||[]);
+    if(!ids.length) return '';
+    if(ids.length===1){ const m=getMem(ids[0]); return m?m.name:''; }
+    return ids.length+' members';
+  };
+
   // ── TODAY SECTION ──────────────────────────────────────────────────────────
   // Include: events starting today + multi-day events spanning through today
-  // Exclude: wellness logs, timed events whose start time has already passed
+  // Exclude: wellness logs, timed events whose start time has already passed,
+  //          and Tasks that have already been marked complete (v7)
   const todayEvs=getEvents().filter(e=>{
     if(e.type==='wellness') return false;
+    if(e.type==='task' && e.completed_at) return false; // v7: hide completed tasks
     const evStart=new Date(e.date);
     const evStartDay=new Date(evStart); evStartDay.setHours(0,0,0,0);
 
@@ -3235,34 +3456,30 @@ function renderHome(){
 
   const upcomingEvs=getEvents().filter(e=>{
     if(e.type==='wellness') return false;
+    if(e.type==='task' && e.completed_at) return false; // v7: hide completed tasks
     const evStart=new Date(e.date); evStart.setHours(0,0,0,0);
     return evStart>=weekStart && evStart<=weekEnd;
   }).sort((a,b)=>new Date(a.date)-new Date(b.date));
 
-  // ── SUMMARY TO DO ─────────────────────────────────────────────────────────
-  // Scope: overdue, today, and up to 7 days ahead
+  // ── OTHER ACTIONS (v7 — renamed from "Summary To Do") ───────────────────────
+  // Scope: overdue, today, and up to 7 days ahead — but ONLY items that are
+  // NOT already shown above in Today / Coming Up, to avoid duplicates.
   const weekAhead = addDays(today, 7); weekAhead.setHours(23,59,59,999);
+  // IDs already visible in Today / Coming Up — exclude these from Other Actions
+  const todayUpcomingIds = new Set([...todayEvs.map(e=>e.id), ...upcomingEvs.map(e=>e.id)]);
   // Calendar items: Tasks + non-task events with open actions — merged, sorted by date
   const todoCalendar = [
-    // All incomplete Task events within scope (with or without action items)
-    ...getEvents().filter(e => e.type === 'task' && !e.completed_at && new Date(e.date) <= weekAhead),
-    // Non-task calendar events with at least one open action item, within scope
-    ...getEvents().filter(e => e.type !== 'task' && e.actions?.length > 0 && e.actions.some(a => !a.done) && new Date(e.date) <= weekAhead),
+    // Incomplete Task events within scope, not already shown above
+    ...getEvents().filter(e => e.type === 'task' && !e.completed_at && new Date(e.date) <= weekAhead && !todayUpcomingIds.has(e.id)),
+    // Non-task calendar events with at least one open action item, within scope, not already shown above
+    ...getEvents().filter(e => e.type !== 'task' && e.actions?.length > 0 && e.actions.some(a => !a.done) && new Date(e.date) <= weekAhead && !todayUpcomingIds.has(e.id)),
   ].sort((a,b) => new Date(a.date) - new Date(b.date));
   // Notebook notes with open checklist items (no date — sorted after calendar items)
   const todoNotes = getNotes()
     .filter(n => n.checklist?.length > 0 && n.checklist.some(c => !c.done));
   const hasToDo = todoCalendar.length > 0 || todoNotes.length > 0;
 
-  // ── MEMBER COLOR HELPER ────────────────────────────────────────────────────
-  const memColor=e=>{
-    if(e.participants_all_family||(!e.member_id&&!(e.participants?.length))||(e.participants?.length>1))return '#9e9488';
-    const mid=e.member_id||(e.participants?.[0]);
-    const m=getMembers().find(m=>m.id===mid);
-    return m?m.color:'#9e9488';
-  };
-
-  // ── EVENT CARD ─────────────────────────────────────────────────────────────
+  // ── EVENT CARD (v7: sky border, member label) ──────────────────────────────
   // showDate: when true, prefix subtitle with compact "Mon 4/6 · " date label
   const evCard=(e,showDate=false)=>{
     const evStart=new Date(e.date);
@@ -3277,11 +3494,14 @@ function renderHome(){
     } else {
       subtitle=timeStr;
     }
+    const mLbl=memberLabel(e);
+    if(mLbl) subtitle+=' · '+mLbl;
     if(e.location) subtitle+=' · '+e.location;
-    return `<div onclick="viewEv('${e.id}')" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:10px;background:#fff;border-left:3px solid ${memColor(e)};margin-bottom:6px;cursor:pointer">
+    // v7: all Today/Coming Up cards use a consistent sky-blue border (matches legend)
+    return `<div onclick="viewEv('${e.id}')" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:10px;background:#fff;border-left:3px solid ${T.sky};margin-bottom:6px;cursor:pointer">
       <span style="font-size:16px">${ET[e.type].icon}</span>
       <div style="flex:1;min-width:0">
-        <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.title||ET[e.type].label}</div>
+        <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.series_id?'🔁 ':''}${e.title||ET[e.type].label}</div>
         <div style="font-size:11px;color:${T.muted}">${subtitle}</div>
       </div>
     </div>`;
@@ -3307,20 +3527,21 @@ function renderHome(){
       ${upcomingEvs.map(e=>evCard(e,true)).join('')}`:''}
 
       ${hasToDo ? `
-      <div style="font-weight:800;font-size:14px;color:${T.ink};margin:14px 0 8px">Summary To Do</div>
+      <div style="font-weight:800;font-size:14px;color:${T.ink};margin:14px 0 4px">Other Actions</div>
+      <div style="font-size:11px;color:${T.muted};margin-bottom:8px;line-height:1.5">Tasks and notes with open action items due within the next 7 days, or already overdue, that aren't already shown above.</div>
       ${todoCalendar.map(e => {
         const isTask = e.type === 'task';
         const isOverdue = new Date(e.date) < today;
         const openCount = (e.actions||[]).filter(a=>!a.done).length;
-        const mem = e.member_id ? getMem(e.member_id) : null;
         const icon = isTask ? '✅' : ET[e.type].icon;
+        const mLbl = memberLabel(e);
         const subtitle = isTask
-          ? `${isOverdue?'⚠️ Overdue · ':''}Due: ${fmt(e.date)}${mem?' · '+mem.name:''}${openCount>0?' · '+openCount+' open item'+(openCount!==1?'s':''):''}`
-          : `${fmt(e.date)} · ${openCount} open item${openCount!==1?'s':''}`;
+          ? `${isOverdue?'⚠️ Overdue · ':''}Due: ${fmt(e.date)}${mLbl?' · '+mLbl:''}${openCount>0?' · '+openCount+' open item'+(openCount!==1?'s':''):''}`
+          : `${fmt(e.date)} · ${openCount} open item${openCount!==1?'s':''}${mLbl?' · '+mLbl:''}`;
         return `<div onclick="viewEv('${e.id}')" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:10px;background:#fff;border-left:3px solid ${T.sky};margin-bottom:6px;cursor:pointer">
           <span style="font-size:16px">${icon}</span>
           <div style="flex:1;min-width:0">
-            <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.title||(isTask?'Untitled Task':ET[e.type].label)}</div>
+            <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.series_id?'🔁 ':''}${e.title||(isTask?'Untitled Task':ET[e.type].label)}</div>
             <div style="font-size:11px;color:${isTask&&isOverdue?T.rose:T.muted}">${subtitle}</div>
           </div>
         </div>`;
@@ -3336,12 +3557,14 @@ function renderHome(){
           </div>
         </div>`;
       }).join('')}
+      ` : ''}
+
+      <!-- v7: color-guide legend now always shown at the bottom of Home -->
       <div style="margin-top:16px;padding-top:10px;border-top:1px solid ${T.border};display:flex;gap:14px;flex-wrap:wrap;align-items:center">
         <span style="font-size:10px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.04em">Color guide</span>
         <span style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:${T.muted}"><span style="width:10px;height:10px;border-radius:2px;background:${T.sky};flex-shrink:0;display:inline-block"></span>Calendar item</span>
         <span style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:${T.muted}"><span style="width:10px;height:10px;border-radius:2px;background:${T.sage};flex-shrink:0;display:inline-block"></span>Notebook note</span>
       </div>
-      ` : ''}
 
     </div>`;
 }
@@ -3391,13 +3614,14 @@ function renderShoppingTab(){
     const items=l.items||[];
     const left=items.filter(i=>!i.done).length;
     const done=items.length-left;
-    return`<div onclick="openShoppingList('${l.id}')" class="card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:10px">
-      <span style="font-size:22px">🛒</span>
-      <div style="flex:1">
-        <div style="font-weight:700;font-size:13px">${l.name}</div>
+    return`<div class="card" style="padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:22px;flex-shrink:0;cursor:pointer" onclick="openShoppingList('${l.id}')">🛒</span>
+      <div style="flex:1;cursor:pointer;min-width:0" onclick="openShoppingList('${l.id}')">
+        <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.name}</div>
         <div style="font-size:11px;color:${T.muted}">${left} item${left!==1?'s':''} left${done?' · '+done+' checked':''}</div>
       </div>
-      <button onclick="event.stopPropagation();deleteShoppingList('${l.id}')" style="background:none;border:none;color:${T.muted};font-size:16px;cursor:pointer;padding:4px">🗑</button>
+      <button onclick="renameShoppingList('${l.id}')" style="background:${T.parchment};border:1px solid ${T.border};border-radius:7px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;color:${T.muted};flex-shrink:0" title="Rename list">✏️</button>
+      <button onclick="deleteShoppingList('${l.id}')" style="background:none;border:none;color:${T.muted};font-size:16px;cursor:pointer;padding:4px;flex-shrink:0">🗑</button>
     </div>`;
   }).join(''):
   `<div style="text-align:center;padding:20px;color:${T.muted}">
@@ -3432,6 +3656,37 @@ async function deleteShoppingList(id){
   renderMeals();
 }
 window.deleteShoppingList=deleteShoppingList;
+
+// ── RENAME SHOPPING LIST (v7) ─────────────────────────────────────────────────
+function renameShoppingList(id){
+  const list=A.shoppingLists.find(l=>l.id===id);
+  if(!list)return;
+  showModal('Rename List',`
+    <div class="form-row">
+      <label class="lbl">List name</label>
+      <input class="inp" id="sl-rename-inp" value="${list.name}" autofocus>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="saveShoppingListName('${id}')">Save</button>`);
+  setTimeout(()=>{
+    const inp=document.getElementById('sl-rename-inp');
+    if(inp){inp.focus();inp.select();}
+  },80);
+}
+window.renameShoppingList=renameShoppingList;
+
+async function saveShoppingListName(id){
+  const name=document.getElementById('sl-rename-inp')?.value?.trim();
+  if(!name){toast('Please enter a name.',true);return;}
+  const list=A.shoppingLists.find(l=>l.id===id);
+  if(!list)return;
+  const{data,error}=await sb.from('shopping_lists').update({name}).eq('id',id).select().single();
+  if(error){toast('Error renaming: '+(error.message||'please try again.'),true);return;}
+  if(data){
+    A.shoppingLists=A.shoppingLists.map(l=>l.id===id?data:l);
+    closeModal();toast('List renamed! ✅');renderMeals();
+  }
+}
+window.saveShoppingListName=saveShoppingListName;
 
 // ── SHOPPING LIST MODAL ───────────────────────────────────────────────────────
 function openShoppingList(id){
@@ -3647,7 +3902,10 @@ function populateMealPlanGrid(){
 }
 window.populateMealPlanGrid=populateMealPlanGrid;
 
-// Save the entire grid as one JSON object — single shared row per family (upsert)
+// Save the entire grid as one JSON object — single shared row per family (upsert).
+// v7: uses Postgres UPSERT via ON CONFLICT DO UPDATE (family_id has a UNIQUE
+// constraint after the dedup migration). This is safer and simpler than the
+// "update if exists, else insert" pattern used in v6.
 async function saveMealPlan(){
   if(!A.family){toast('Set up your family first.',true);return;}
   const plan_data={};
@@ -3657,14 +3915,18 @@ async function saveMealPlan(){
       plan_data[row][day]=document.getElementById(`mp-${row}-${day}`)?.value||'';
     });
   });
-  let res;
-  if(A.mealPlan?.id){
-    res=await sb.from('meal_plans').update({plan_data,updated_at:new Date().toISOString()}).eq('id',A.mealPlan.id).select().single();
-  } else {
-    res=await sb.from('meal_plans').insert({family_id:A.family.id,plan_data}).select().single();
-  }
-  if(res.error){toast('Error saving menu: '+(res.error.message||'unknown'),true);console.error(res.error);return;}
-  A.mealPlan=res.data;
+  const upsertRow={
+    family_id:A.family.id,
+    plan_data,
+    updated_at:new Date().toISOString(),
+  };
+  // .upsert() inserts a new row or updates the existing one on family_id conflict
+  const{data,error}=await sb.from('meal_plans')
+    .upsert(upsertRow,{onConflict:'family_id'})
+    .select()
+    .single();
+  if(error){toast('Error saving menu: '+(error.message||'unknown'),true);console.error(error);return;}
+  A.mealPlan=data;
   toast('Weekly menu saved! ✅');
 }
 window.saveMealPlan=saveMealPlan;
@@ -3676,7 +3938,8 @@ function renderInventory(){
   const TABS=[{id:'treatments',label:'💊 Frequent meds'},{id:'products',label:'📦 Products'}];
   let tc='';
   if(A.invTab==='treatments'){
-    // Treatments tab renders via renderMeds into page-meds, then we copy content
+    // Placeholder container — filled directly by renderMeds('inv-meds-container')
+    // below. No more HTML-copy step (v7).
     tc=`<div id="inv-meds-container">Loading medications…</div>`;
   } else {
     // Products tab — generic inventory items
@@ -3686,14 +3949,18 @@ function renderInventory(){
       <button class="btn btn-primary btn-sm" onclick="openAddProduct()">+ Add Item</button>
     </div>
     ${items.length?`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
-      <thead><tr>${['Item','Category','Stock','Expiry','Cost',''].map(h=>`<th style="text-align:left;padding:6px 8px;background:${T.parchment};border-bottom:2px solid ${T.border};font-weight:700;color:${T.muted};white-space:nowrap">${h}</th>`).join('')}</tr></thead>
+      <thead><tr>${['Item','Category','Stock','In stock since','Expiry','Cost',''].map(h=>`<th style="text-align:left;padding:6px 8px;background:${T.parchment};border-bottom:2px solid ${T.border};font-weight:700;color:${T.muted};white-space:nowrap">${h}</th>`).join('')}</tr></thead>
       <tbody>${items.map(item=>`<tr style="border-bottom:1px solid ${T.border}">
         <td style="padding:7px 8px;font-weight:700">${item.name}</td>
         <td style="padding:7px 8px;color:${T.muted}">${item.category||'—'}</td>
         <td style="padding:7px 8px">${item.stock||0} ${item.unit||''}</td>
+        <td style="padding:7px 8px;font-size:11px;color:${T.muted}">${item.stock_date?fmt(item.stock_date+'T00:00:00'):'—'}</td>
         <td style="padding:7px 8px;color:${item.expiry&&new Date(item.expiry)<new Date()?T.rose:T.muted}">${item.expiry?fmt(item.expiry):'—'}</td>
         <td style="padding:7px 8px">${item.cost?'€'+item.cost:'—'}</td>
-        <td style="padding:7px 8px"><button onclick="delProduct('${item.id}')" style="background:none;border:none;color:${T.muted};cursor:pointer">🗑</button></td>
+        <td style="padding:7px 8px;white-space:nowrap">
+          <button onclick="openEditProduct('${item.id}')" style="background:${T.parchment};border:1px solid ${T.border};border-radius:7px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;color:${T.muted}">✏️</button>
+          <button onclick="delProduct('${item.id}')" style="background:none;border:none;color:${T.muted};cursor:pointer;font-size:14px;margin-left:4px">🗑</button>
+        </td>
       </tr>`).join('')}</tbody>
     </table></div>`:
     `<div style="text-align:center;padding:24px;color:${T.muted}">
@@ -3712,14 +3979,10 @@ function renderInventory(){
     <div class="tabs">${TABS.map(t=>`<button class="tab ${A.invTab===t.id?'active':''}" onclick="A.invTab='${t.id}';renderInventory()">${t.label}</button>`).join('')}</div>
     <div style="padding:14px 16px">${tc}</div>`;
 
-  // If treatments tab, render meds directly into inventory container
-  if(A.invTab==='treatments') setTimeout(()=>{
-    const cont=document.getElementById('inv-meds-container');
-    if(cont){
-      renderMeds();
-      cont.innerHTML=document.getElementById('page-meds')?.querySelector('[style*="padding:14px 16px"]')?.innerHTML||'';
-    }
-  },60);
+  // If treatments tab, render meds directly into the now-visible Inventory
+  // container. renderMeds() writes straight into #inv-meds-container —
+  // no copying, so it can re-render itself in place after any edit/delete.
+  if(A.invTab==='treatments') renderMeds('inv-meds-container');
 }
 window.renderInventory=renderInventory;
 
@@ -3739,7 +4002,10 @@ function openAddProduct(){
       <div class="form-row" style="margin:0"><label class="lbl">Stock qty</label><input class="inp" type="number" id="ap-stock" placeholder="0" onfocus="this.select()"></div>
       <div class="form-row" style="margin:0"><label class="lbl">Cost (€)</label><input class="inp" type="number" id="ap-cost" step="0.01" placeholder="0.00" onfocus="this.select()"></div>
     </div>
-    <div class="form-row"><label class="lbl">Expiry date</label><input class="inp" type="date" id="ap-exp"></div>
+    <div class="grid2">
+      <div class="form-row" style="margin:0"><label class="lbl">In stock since</label><input class="inp" type="date" id="ap-sd" value="${toISOLocal(new Date())}"></div>
+      <div class="form-row" style="margin:0"><label class="lbl">Expiry date</label><input class="inp" type="date" id="ap-exp"></div>
+    </div>
     <div class="form-row"><label class="lbl">Notes</label><textarea class="inp" id="ap-notes" rows="2" placeholder="Provider, where to buy, etc." style="resize:none"></textarea></div>
     <button class="btn btn-primary btn-full" onclick="saveProduct()">Add to Inventory</button>`);
 }
@@ -3756,6 +4022,8 @@ async function saveProduct(){
     unit:document.getElementById('ap-unit')?.value||null,
     stock:parseFloat(document.getElementById('ap-stock')?.value)||0,
     cost:parseFloat(document.getElementById('ap-cost')?.value)||null,
+    // v7: save "in stock since" date for the Products tab
+    stock_date:document.getElementById('ap-sd')?.value||toISOLocal(new Date()),
     expiry:document.getElementById('ap-exp')?.value?new Date(document.getElementById('ap-exp').value).toISOString():null,
     notes:document.getElementById('ap-notes')?.value||null,
   };
@@ -3773,6 +4041,55 @@ async function delProduct(id){
   toast('Item removed.');renderInventory();
 }
 window.delProduct=delProduct;
+
+// ── EDIT PRODUCT (v7) ─────────────────────────────────────────────────────────
+function openEditProduct(id){
+  if(isSampleMode()){toast('Switch to My Family first.',true);return;}
+  const item=A.invProducts.find(p=>p.id===id);
+  if(!item)return;
+  showModal('Edit Product / Supply',`
+    <div class="form-row"><label class="lbl">Item name *</label><input class="inp" id="ap-name" value="${item.name||''}" autofocus></div>
+    <div class="grid2">
+      <div class="form-row" style="margin:0"><label class="lbl">Category</label>
+        <select class="sel" id="ap-cat"><option value="">Select…</option>${['Cosmetics','Food','Medication','Baby supplies','Cleaning','Other'].map(c=>`<option${item.category===c?' selected':''}>${c}</option>`).join('')}</select>
+      </div>
+      <div class="form-row" style="margin:0"><label class="lbl">Unit</label>
+        <input class="inp" id="ap-unit" value="${item.unit||''}" placeholder="ml, pcs, kg…">
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="form-row" style="margin:0"><label class="lbl">Stock qty</label><input class="inp" type="number" id="ap-stock" value="${item.stock||0}" onfocus="this.select()"></div>
+      <div class="form-row" style="margin:0"><label class="lbl">Cost (€)</label><input class="inp" type="number" id="ap-cost" step="0.01" value="${item.cost||''}" onfocus="this.select()"></div>
+    </div>
+    <div class="grid2">
+      <div class="form-row" style="margin:0"><label class="lbl">In stock since</label><input class="inp" type="date" id="ap-sd" value="${item.stock_date||toISOLocal(new Date())}"></div>
+      <div class="form-row" style="margin:0"><label class="lbl">Expiry date</label><input class="inp" type="date" id="ap-exp" value="${item.expiry?toISOLocal(new Date(item.expiry)):''}"></div>
+    </div>
+    <div class="form-row"><label class="lbl">Notes</label><textarea class="inp" id="ap-notes" rows="2" style="resize:none">${item.notes||''}</textarea></div>
+    <button class="btn btn-primary btn-full" onclick="saveEditProduct('${id}')">Save Changes</button>`);
+}
+window.openEditProduct=openEditProduct;
+
+async function saveEditProduct(id){
+  if(!A.family)return;
+  const name=document.getElementById('ap-name')?.value?.trim();
+  if(!name){toast('Please enter an item name.',true);return;}
+  const data={
+    name,
+    category:document.getElementById('ap-cat')?.value||null,
+    unit:document.getElementById('ap-unit')?.value||null,
+    stock:parseFloat(document.getElementById('ap-stock')?.value)||0,
+    cost:parseFloat(document.getElementById('ap-cost')?.value)||null,
+    stock_date:document.getElementById('ap-sd')?.value||toISOLocal(new Date()),
+    expiry:document.getElementById('ap-exp')?.value?new Date(document.getElementById('ap-exp').value).toISOString():null,
+    notes:document.getElementById('ap-notes')?.value||null,
+  };
+  const{data:result,error}=await sb.from('inventory_products').update(data).eq('id',id).select().single();
+  if(error){toast('Error saving item: '+error.message,true);console.error(error);return;}
+  A.invProducts=A.invProducts.map(p=>p.id===id?result:p);
+  _closeModalDOM();toast('Item updated! ✅');renderInventory();
+}
+window.saveEditProduct=saveEditProduct;
 
 // ── SETTINGS ──────────────────────────────────────────────────────────────────
 function renderSettings(){
@@ -4056,6 +4373,8 @@ async function toggleEvAction(evId, actionIdx, done) {
       banner.innerHTML = '';
     }
   }
+  // v7: keep Home's "Other Actions" / Today sections in sync with this change
+  renderHome();
 }
 window.toggleEvAction = toggleEvAction;
 
@@ -4071,6 +4390,8 @@ async function markEvComplete(evId) {
   if (error) { toast('Error saving.', true); return; }
   A.events = A.events.map(e => e.id === evId ? {...e, completed_at: completedAt} : e);
   toast(completedAt ? 'Task marked as complete! ✅' : 'Marked as incomplete.');
+  // v7: keep Home's Today / Other Actions sections in sync with this change
+  renderHome();
   // Re-render viewEv to refresh the button label and banner
   _closeModalDOM();
   setTimeout(() => viewEv(evId), 50);
@@ -4102,7 +4423,8 @@ async function toggleNoteItem(noteId, itemIdx, done) {
   const grpVal = document.getElementById('ne-grp')?.value;
   const data = {
     title:        document.getElementById('ne-t')?.value || '',
-    content:      document.getElementById('ne-c')?.value || '',
+    // v7: read HTML from the rich-text editor (not a textarea)
+    content:      (document.getElementById('ne-editor')?.innerHTML) || '',
     color:        document.getElementById('ne-col')?.value || NOTE_COLORS[0],
     group_id:     grpVal && grpVal !== '__new__' ? grpVal : null,
     member_id:    document.getElementById('ne-mem')?.value || null,
@@ -4110,10 +4432,13 @@ async function toggleNoteItem(noteId, itemIdx, done) {
     checklist,
     completed_at: completedAt,
   };
-  const { data: saved, error } = await sb.from('notes').update(data).eq('id', noteId).select().single();
+  // v7: sbWrite() for idle-safety
+  const { data: saved, error } = await sbWrite(()=>sb.from('notes').update(data).eq('id', noteId).select().single());
   if (error) { console.error('Note instant save error', error); return; }
   A.notes = A.notes.map(n => n.id === noteId ? saved : n);
   updateNoteCompletionUI(completedAt);
+  // v7: keep Home's "Other Actions" section in sync with this change
+  renderHome();
 }
 window.toggleNoteItem = toggleNoteItem;
 
