@@ -1,0 +1,48 @@
+{
+  "name": "Seamly",
+  "short_name": "Seamly",
+  "description": "Your family's all-in-one hub — calendar, notes, meds tracking and shopping",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f2ed",
+  "theme_color": "#5e8b62",
+  "categories": ["lifestyle", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Calendar",
+      "short_name": "Calendar",
+      "description": "Open the family calendar",
+      "url": "/?shortcut=calendar",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Shopping",
+      "short_name": "Shopping",
+      "description": "Open shopping lists",
+      "url": "/?shortcut=shopping",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Notebook",
+      "short_name": "Notebook",
+      "description": "Open the family notebook",
+      "url": "/?shortcut=notebook",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
