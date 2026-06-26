@@ -1,3 +1,4 @@
+<!-- Seamly v8 | STAGING | 26 Jun 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,9 +7,16 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>🌿 Kinship — Family Hub v2.1</title>
+<title>Seamly — Family Hub</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
+<!-- PWA -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#5e8b62">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Seamly">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -97,21 +105,34 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
 .note-fmt-btn{background:#fff;border:1px solid var(--border);border-radius:5px;width:28px;height:28px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--ink);flex-shrink:0;transition:background .15s}
 .note-fmt-btn:hover{background:var(--sage-light)}
 .note-fmt-btn.active{background:var(--sage-light);border-color:var(--sage)}
+/* ── PWA offline banner (v8) ───────────────────────────────────────────────── */
+.offline-banner{display:none;position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#b85c38;color:#fff;text-align:center;font-size:12px;font-weight:700;padding:8px 16px;z-index:9999;letter-spacing:.02em;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.offline-banner.visible{display:block}
+/* ── Notification bell & badge (v8) ──────────────────────── */
+#notif-btn{position:relative;background:none;border:none;font-size:20px;cursor:pointer;padding:2px 6px;color:var(--muted);-webkit-tap-highlight-color:transparent}
+#notif-badge{position:absolute;top:-1px;right:-1px;background:var(--rose);color:#fff;border-radius:99px;font-size:9px;font-weight:800;min-width:16px;height:16px;padding:0 4px;display:none;align-items:center;justify-content:center;box-sizing:border-box;line-height:1}
+/* ── Feedback floating action button (V8) ───────────────────────── */
+.feedback-fab{position:fixed;bottom:80px;right:16px;z-index:100;width:44px;height:44px;border-radius:50%;background:var(--sage);color:#fff;border:none;font-size:18px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;transition:transform .2s,box-shadow .2s;-webkit-tap-highlight-color:transparent}
+.feedback-fab:active{transform:scale(.93);box-shadow:0 2px 8px rgba(0,0,0,.15)}
 </style>
 </head>
 <body>
 
+<div id="offline-banner" class="offline-banner" role="alert" aria-live="polite">
+  📵 You're offline — data cannot be loaded or saved
+</div>
+
 <div id="loading-screen" class="loading-screen">
-  <div style="font-family:'Playfair Display',serif;font-size:24px;color:var(--sage)">🌿 Kinship</div>
+  <div style="font-family:'Playfair Display',serif;font-size:24px;color:var(--sage)">Seamly</div>
   <div class="spinner"></div>
   <div style="font-size:13px;color:var(--muted)">Loading your family hub…</div>
 </div>
 
 <div id="auth-screen" class="auth-screen" style="display:none">
   <div class="auth-card">
-    <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">🌿 Kinship</div>
+    <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">Seamly</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v6 — Jun 2026</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v8 — Jun 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -148,10 +169,11 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
 
 <div id="root" style="display:none">
   <div class="top-bar">
-    <div class="top-logo">🌿 Kinship</div>
+    <div class="top-logo">Seamly</div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sample-btn" onclick="A.family?toggleSampleMode():goTo('settings')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:var(--honey-light);color:var(--honey);border:1px solid var(--honey)44;cursor:pointer;display:none">📋 Sample</button>
       <span id="fam-badge" style="font-size:11px;font-weight:700;color:var(--muted)"></span>
+      <button id="notif-btn" onclick="toggleNotifPanel()" title="Notifications" style="display:none">🔔<span id="notif-badge"></span></button>
       <button onclick="goTo('settings')" style="background:none;border:none;font-size:20px;cursor:pointer;padding:2px 6px;color:var(--muted)" title="Settings">⚙️</button>
       <button class="btn btn-secondary btn-sm" onclick="doSignOut()">Sign out</button>
     </div>
@@ -175,6 +197,9 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   </nav>
   <div id="modal-root"></div>
   <div id="ob-root"></div>
+  <div id="notif-root"></div>
+  <!-- ── Feedback floating action button (V8) ─────────────────── -->
+  <button class="feedback-fab" id="feedback-fab-btn" onclick="openFeedback()" title="Send feedback" aria-label="Send feedback">💬</button>
 </div>
 
 <script>
@@ -325,10 +350,11 @@ let A={
   settingsTab:'family',noteFGroup:'all',noteSearch:'',
   mealsTab:'shopping',invTab:'treatments',noteRibbonOpen:true,
   showOB:false,obStep:0,obFlow:null,
+  medSearch:'',
 };
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
-const fmt=d=>{if(!d)return'';const x=new Date(d);return`${String(x.getDate()).padStart(2,'0')}/${String(x.getMonth()+1).padStart(2,'0')}/${x.getFullYear()}`;};
+const fmt=d=>{if(!d)return'';const x=new Date(d);const _mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return`${String(x.getDate()).padStart(2,'0')}/${_mn[x.getMonth()]}/${x.getFullYear()}`;};
 const toISO=d=>d?new Date(d).toISOString().split('T')[0]:'';
 const todayD=()=>{const d=new Date();d.setHours(0,0,0,0);return d;};
 const addDays=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r;};
@@ -515,7 +541,12 @@ async function loadAll(){
     // v7: fetch as array (UNIQUE constraint now in place) then take first row.
     // Previously used .maybeSingle() which would throw when 2+ rows existed
     // before the dedup migration was run.
-    sb.from('meal_plans').select('*').order('created_at').limit(1),
+    // v8 fix: order by updated_at DESC instead of created_at — the meal_plans
+    // table was originally created without a created_at column, causing this
+    // query to fail silently and show a blank Meal Planner grid. created_at
+    // was added via ALTER TABLE on 19 Jun 2026 as an immediate hotfix, but
+    // updated_at is the semantically correct sort field here anyway.
+    sb.from('meal_plans').select('*').order('updated_at', {ascending: false}).limit(1),
   ]);
   if(fam.data){A.family=fam.data;}
   A.members=mems.data||[];
@@ -628,13 +659,36 @@ async function initApp(user){
     if (sBtn) sBtn.style.display = 'none';
     if (_sampleMode) toggleSampleMode();
   }
+
+  // v8: show notification bell only when the user has a family
+  const bellBtn = document.getElementById('notif-btn');
+  if (bellBtn) bellBtn.style.display = A.family ? 'block' : 'none';
+
+  // v8: load initial notifications and start a polling interval (60s)
+  if (A.family && !isSampleMode()) {
+    loadNotifications();
+    clearInterval(A._notifInterval);
+    A._notifInterval = setInterval(loadNotifications, 60000);
+  }
+
+  // v8: handle PWA shortcut query param (?shortcut=calendar etc.)
+  // Must run after goTo() so the correct page renders.
+  const _shortcutParam = new URLSearchParams(window.location.search).get('shortcut');
+
   // Only jump to Home on the very first app load. If initApp runs again later
   // (e.g. a Supabase client reset during a connection retry re-fires a SIGNED_IN
   // event), stay on whichever page the user was already on instead of resetting
   // to Home — just refresh that page's data.
   if (!A._appInitialized) {
     A._appInitialized = true;
-    goTo('home');
+    if (_shortcutParam && ['calendar','meals','notebook'].includes(_shortcutParam)) {
+      // Open the page requested by the PWA shortcut
+      goTo(_shortcutParam);
+      // Clean the URL so refreshing doesn't re-trigger the shortcut
+      try { history.replaceState({}, '', window.location.pathname); } catch(_) {}
+    } else {
+      goTo('home');
+    }
   } else {
     goTo(A.page);
   }
@@ -688,7 +742,7 @@ window.addEventListener('popstate', () => {
 // ── ONBOARDING ────────────────────────────────────────────────────────────────
 // Single unified onboarding flow — all new users start from Settings
 const OB=[
-  {icon:'👋',title:'Welcome to Kinship',body:"Your family's all-in-one hub — calendar, notes, meds tracking, and wellness insights. Let's take a quick tour!"},
+  {icon:'👋',title:'Welcome to Seamly',body:"Your family's all-in-one hub — calendar, notes, meds tracking, and wellness insights. Let's take a quick tour!"},
   {icon:'⚙️',title:'Settings',body:'Start here — create your family or explore the one you were invited to, add or review family members, and set your preferences.'},
   {icon:'🗓',title:'Calendar',body:'Add social events, health appointments, wellness logs, and tasks. Filter by type or member. Everything shared in one view.'},
   {icon:'📓',title:'Notebook',body:'Digital notes organised into groups. School schedules, health notes, shopping lists, travel plans — shared with your family.'},
@@ -1558,9 +1612,20 @@ function openEvForm(type, evId, dateTs, duplicateId) {
   }
 
   const isDup = !!duplicateId;
+  // v8: show the privacy toggle only when creating a new event OR
+  // when the current user is the original creator of an existing one.
+  // Duplicates are treated as new events — toggle shown, unchecked.
+  const _showEvPriv = !evId || (ev && ev.created_by_user_id === A.user?.id);
+  const privToggleHtml = _showEvPriv
+    ? `<label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin:4px 0 12px;cursor:pointer;background:${T.parchment};border-radius:9px;padding:10px 12px;border:1px solid ${T.border}">
+        <input type="checkbox" id="ef-private" ${(!isDup && ev?.is_private) ? 'checked' : ''}>
+        🔒 Private — only visible to you
+      </label>`
+    : '';
   showModal(`${isDup?'Duplicate':(ev?'Edit':'New')} ${cfg.label}`, `
     <div style="display:flex;flex-direction:column">
       ${fields}
+      ${privToggleHtml}
       <button class="btn btn-primary btn-full btn-lg" style="margin-top:8px" onclick="saveEv('${type}','${isDup?'':evId||''}',${dateTs||'null'})">
         ${isDup||!ev ? 'Add Entry' : 'Save Changes'}
       </button>
@@ -1715,7 +1780,6 @@ function prefillWellness(memberId) {
   setVal('ef-hyd', last.hydration||'');
   setVal('ef-en', last.energy);
   setVal('ef-sl', last.sleep);
-  if (last.mood) { const mSel=document.getElementById('ef-mood'); if(mSel) { mSel.value=last.mood; mSel.style.background='#eef6ef'; mSel.style.borderColor='#8ab88e'; mSel.addEventListener('change',()=>{mSel.style.background='';mSel.style.borderColor='';},{once:true}); } }
   // Add a small label near the form to explain the tint
   setTimeout(()=>{
     const memRow=document.getElementById('ef-mem')?.closest('.form-row');
@@ -2012,6 +2076,21 @@ async function saveEv(type, evId, dateTs) {
       }
     }
 
+    // v8: privacy — stamp fields on data before generating recurrences
+    // so every instance in a series inherits the same privacy setting.
+    if (!evId) {
+      // New event (or duplicate treated as new): record creator + preference.
+      data.created_by_user_id = A.user?.id || null;
+      data.is_private = document.getElementById('ef-private')?.checked || false;
+    } else {
+      // Edit: only update is_private when the current user is the creator.
+      // created_by_user_id is never changed on edits.
+      const _existEv = A.events.find(e => e.id === evId);
+      if (_existEv?.created_by_user_id === A.user?.id) {
+        data.is_private = document.getElementById('ef-private')?.checked || false;
+      }
+    }
+
     // Generate recurring events if needed
     const eventsToSave = generateRecurrences(data);
 
@@ -2022,7 +2101,8 @@ async function saveEv(type, evId, dateTs) {
         'appt_type','member_id','participants','participants_all_family','tags',
         'weight','height','hydration','exercised','activity','activity_mins','mood','energy','sleep',
         'social_type','actions','doctor','specialty','cost','cost_currency',
-        'symptoms','cure','recommended_by','administration','considerations','links','series_id'];
+        'symptoms','cure','recommended_by','administration','considerations','links','series_id',
+        'is_private','created_by_user_id']; // v8: privacy fields
       const clean = {};
       allowed.forEach(k => { if (obj[k] !== undefined) clean[k] = obj[k]; });
       return clean;
@@ -2100,6 +2180,12 @@ async function saveEv(type, evId, dateTs) {
     }
     _saveOk = true;
     _closeModalDOM();
+    // v8: write activity notification so other family members are informed
+    const _notifTitle = data.title || ET[type]?.label || '';
+    writeNotif('event', evId ? 'updated' : 'created',
+      evId ? `${getActorName()} updated an event` : `${getActorName()} added a new event`,
+      _notifTitle
+    );
     toast(seriesUpdateMsg || (evId ? 'Entry updated! ✅' : `Entry added!${eventsToSave.length>1?' ('+eventsToSave.length+' occurrences created)':''}`));
     renderCal();
     renderHome();
@@ -2249,6 +2335,7 @@ function viewEv(id) {
       <span>📅 ${dateStr}</span>
       ${ev.location?`<span>📍 ${ev.location}</span>`:''}
       ${ev.recurrence&&ev.recurrence!=='None'?`<span>🔁 ${ev.recurrence}${ev.recurrence_end_type==='count'?` · ${ev.recurrence_end_count}x`:ev.recurrence_end_type==='date'?` until ${fmt(ev.recurrence_end_date)}`:''}</span>`:''}
+      ${ev.is_private?`<span style="background:${T.parchment};border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;color:${T.muted};border:1px solid ${T.border}">🔒 Private</span>`:''}
     </div>`;
   // Completion banner — updated in-place by toggleEvAction / markEvComplete
   body += `<div id="ev-completion-banner">${ev.completed_at
@@ -2378,9 +2465,12 @@ function delEv(id) {
 window.delEv = delEv;
 
 async function confirmDelEv(id) {
+  const _evToDel = A.events.find(e=>e.id===id);
   const {error} = await sb.from('events').delete().eq('id', id);
   if (error) { toast('Error deleting.', true); return; }
   A.events = A.events.filter(e=>e.id!==id);
+  // v8: notify other family members
+  writeNotif('event','deleted',`${getActorName()} deleted an event`,_evToDel?.title||'');
   closeModal(); toast('Entry deleted.');
   renderCal();
   renderHome();
@@ -2434,7 +2524,7 @@ function renderNB(){
     // v7: strip HTML tags so rich-text markup doesn't show in the card preview
     const previewText=stripHTML(n.content||'');
     return`<div class="note-card" style="background:${n.color}" onclick="openNote('${n.id}')">
-      ${n.pinned?'<div style="font-size:10px;margin-bottom:3px">📌</div>':''}
+      ${(n.pinned||n.is_private)?`<div style="display:flex;align-items:center;gap:5px;font-size:10px;margin-bottom:3px">${n.pinned?'<span>📌</span>':''}${n.is_private?'<span>🔒</span>':''}</div>`:''}
       <div style="font-weight:800;font-size:13px;color:${T.ink};margin-bottom:5px;line-height:1.3">${n.title||'Untitled'}</div>
       ${previewText?`<div style="font-size:12px;color:${T.muted};line-height:1.5;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:6px">${previewText}</div>`:''}
       ${total>0?`<div style="font-size:11px;color:${T.muted};margin-bottom:5px">✅ ${done}/${total}</div>`:''}
@@ -2610,6 +2700,13 @@ function openNote(noteId){
   const note=noteId?A.notes.find(n=>n.id===noteId):null;
   const groups=A.noteGroups;
   const cl=note?.checklist||[];
+  // v8: show privacy toggle for new notes or notes the current user created.
+  const _showNotePriv = !noteId || (note && note.created_by_user_id === A.user?.id);
+  const notePrivToggleHtml = _showNotePriv
+    ? `<label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:16px;cursor:pointer;background:${T.parchment};border-radius:9px;padding:10px 12px;border:1px solid ${T.border}">
+        <input type="checkbox" id="ne-private" ${note?.is_private ? 'checked' : ''}> 🔒 Private — only visible to you
+      </label>`
+    : '';
   // Pre-compute the completion banner string for existing completed notes
   const _noteBanner = note?.completed_at ? (() => {
     const x = new Date(note.completed_at);
@@ -2650,9 +2747,10 @@ function openNote(noteId){
       <div class="form-row" style="margin:0"><label class="lbl">Member</label>
         <select class="sel" id="ne-mem"><option value="">Family</option>${A.members.map(m=>`<option value="${m.id}"${note?.member_id===m.id?' selected':''}>${m.name}</option>`).join('')}</select></div>
     </div>
-    <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:16px;cursor:pointer">
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:${_showNotePriv?'8px':'16px'};cursor:pointer">
       <input type="checkbox" id="ne-pin" ${note?.pinned?'checked':''}> 📌 Pin this note
     </label>
+    ${notePrivToggleHtml}
     <div style="display:flex;gap:10px">
       <button class="btn btn-primary" style="flex:1" onclick="saveNote('${noteId||''}')">Save</button>
       ${noteId?`<button class="btn btn-danger" onclick="delNote('${noteId}')">🗑</button>`:''}
@@ -2755,6 +2853,11 @@ async function saveNote(noteId){
   // v7: read HTML from the rich-text contenteditable editor instead of a textarea
   const editorEl=document.getElementById('ne-editor');
   const content=editorEl?editorEl.innerHTML:'';
+  // v8: privacy — read the toggle if it's visible (user is creator or new note).
+  // If the toggle is not shown (non-creator editing a shared note), preserve
+  // the existing is_private value so it is never accidentally cleared.
+  const _notePrivToggle = document.getElementById('ne-private');
+  const _existNote = noteId ? A.notes.find(n => n.id === noteId) : null;
   const data={
     family_id:A.family.id,
     title:document.getElementById('ne-t')?.value||'',
@@ -2764,7 +2867,10 @@ async function saveNote(noteId){
     member_id:document.getElementById('ne-mem')?.value||null,
     pinned:document.getElementById('ne-pin')?.checked||false,
     checklist,
+    is_private: _notePrivToggle ? _notePrivToggle.checked : (_existNote?.is_private || false),
   };
+  // Set created_by_user_id only when creating a new note — never overwrite on edits.
+  if (!noteId) data.created_by_user_id = A.user?.id || null;
   // v7: sbWrite() for idle-safety
   let res;
   if(noteId)res=await sbWrite(()=>sb.from('notes').update(data).eq('id',noteId).select().single());
@@ -2773,6 +2879,11 @@ async function saveNote(noteId){
   const savedNote = res.data;
   if(noteId)A.notes=A.notes.map(n=>n.id===noteId?savedNote:n);
   else A.notes.push(savedNote);
+  // v8: notify other family members
+  writeNotif('note', noteId ? 'updated' : 'created',
+    noteId ? `${getActorName()} updated a note` : `${getActorName()} added a new note`,
+    data.title || 'Untitled'
+  );
   closeModal();toast(noteId?'Note updated!':'Note saved!');renderNB();
 }
 window.saveNote=saveNote;
@@ -2805,7 +2916,7 @@ window.confirmDelNote=confirmDelNote;
 // ── MEDS ──────────────────────────────────────────────────────────────────────
 function exportMedsXLSX() {
   // Export as HTML that Excel can open natively - no library needed
-  const dm = getDM(), s = symC();
+  const dm = getFilteredMeds(), s = symC();
   const daysLeft = med => { const td=(med.member_ids||[]).length*(med.dose_per_day||1); if(!td)return null; return Math.floor((med.stock_today||0)/td); };
   const stockBase = med => med.stock_date ? new Date(med.stock_date+'T00:00:00') : new Date();
   const lastsUntil = med => { const d=daysLeft(med); if(d===null)return '—'; const r=new Date(stockBase(med)); r.setDate(r.getDate()+d); return fmt(r); };
@@ -2821,26 +2932,26 @@ function exportMedsXLSX() {
     med.last_ordered?fmt(med.last_ordered):'Never'
   ]);
   const headers = ['Medication','Members','Dose/day','Units/pkg',`Price/pkg (${s})`,
-    'In stock','Stock confirmed','Lasts until','New order (pkgs)',`Order cost (${s})`,'Last ordered'];
+    'In stock','Stock count date','Lasts until','New order (pkgs)',`Order cost (${s})`,'Last order received'];
   const tableRows = [headers, ...rows, ['GRAND TOTAL','','','','','','','','',`${s}${grand}`,'']];
   const html = `<html><head><meta charset="UTF-8"></head><body>
-    <h2>${getFamily()?.name||''} — Medication Order — ${new Date().toLocaleDateString('en-GB')}</h2>
+    <h2>${getFamily()?.name||''} — Medication Order — ${fmt(new Date())}</h2>
     <table border="1" cellpadding="5" cellspacing="0">
     ${tableRows.map((r,i)=>`<tr>${r.map(c=>`<${i===0?'th':'td'}>${c}</${i===0?'th':'td'}>`).join('')}</tr>`).join('')}
     </table></body></html>`;
   const blob = new Blob([html], {type:'application/vnd.ms-excel'});
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href=url; a.download='kinship_meds_order.xls'; a.click();
+  const a = document.createElement('a'); a.href=url; a.download='seamly_meds_order.xls'; a.click();
   URL.revokeObjectURL(url);
   toast('Excel file downloaded! ✅');
 }
 
 function exportMedsCSV() {
-  const dm = A.dailyMeds, s = symC();
+  const dm = getFilteredMeds(), s = symC();
   const daysLeft = med => { const td=(med.member_ids||[]).length*(med.dose_per_day||1); if(!td)return null; return Math.floor((med.stock_today||0)/td); };
   const stockBase = med => med.stock_date ? new Date(med.stock_date+'T00:00:00') : new Date();
   const lastsUntil = med => { const d=daysLeft(med); if(d===null)return '—'; const r=new Date(stockBase(med)); r.setDate(r.getDate()+d); return fmt(r); };
-  const header = ['Medication','Members','Dose/day','Units/pkg','Price/pkg','In stock','Stock confirmed','Lasts until','New order (pkgs)','Order cost','Updated until'];
+  const header = ['Medication','Members','Dose/day','Units/pkg','Price/pkg','In stock','Stock count date','Lasts until','New order (pkgs)','Order cost','Updated until'];
   const rows = dm.map(med => {
     const memNames = A.members.filter(m=>(med.member_ids||[]).includes(m.id)).map(m=>m.name).join('+');
     const orderCost = med.new_order_pkgs ? `${s}${((parseInt(med.new_order_pkgs)||0)*med.price_per_pkg).toFixed(2)}` : '—';
@@ -2854,14 +2965,14 @@ function exportMedsCSV() {
   const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], {type:'text/csv'});
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href=url; a.download='kinship_meds_order.csv'; a.click();
+  const a = document.createElement('a'); a.href=url; a.download='seamly_meds_order.csv'; a.click();
   URL.revokeObjectURL(url);
   toast('CSV downloaded! ✅');
 }
 window.exportMedsCSV = exportMedsCSV;
 
 function copyOrderToClipboard() {
-  const dm = A.dailyMeds.filter(m => m.new_order_pkgs && parseInt(m.new_order_pkgs) > 0);
+  const dm = getFilteredMeds().filter(m => m.new_order_pkgs && parseInt(m.new_order_pkgs) > 0);
   if (!dm.length) { toast('No pending orders to copy.', true); return; }
   const s = symC();
   const totalOrder = dm.reduce((sum,m)=>sum+(parseInt(m.new_order_pkgs)||0)*(m.price_per_pkg||0),0);
@@ -2869,8 +2980,7 @@ function copyOrderToClipboard() {
   const lines = ['📦 MEDICATION ORDER — ' + (A.family?.name||'') + '\n' + new Date().toLocaleDateString('en-GB'), ''];
   dm.forEach(m => {
     const memNames = A.members.filter(mem=>(m.member_ids||[]).includes(mem.id)).map(mem=>mem.name).join(', ');
-    const stockInfo = `stock: ${m.stock_today||0}${m.stock_date?' as of '+fmt(m.stock_date+'T00:00:00'):''}`;
-    lines.push(`• ${m.name} × ${m.new_order_pkgs} pkg — ${s}${((parseInt(m.new_order_pkgs)||0)*(m.price_per_pkg||0)).toFixed(2)}${memNames?' ('+memNames+')':''} [${stockInfo}]`);
+    lines.push(`• ${m.name} × ${m.new_order_pkgs} pkg — ${s}${((parseInt(m.new_order_pkgs)||0)*(m.price_per_pkg||0)).toFixed(2)}${memNames?' ('+memNames+')':''}`);
   });
   lines.push('');
   if (A.family?.transport_cost) lines.push(`Transport: ${s}${parseFloat(A.family.transport_cost).toFixed(2)}`);
@@ -2880,7 +2990,7 @@ function copyOrderToClipboard() {
 window.copyOrderToClipboard = copyOrderToClipboard;
 
 function renderMeds(targetId){
-  const dm=getDM(),s=symC();
+  const dm=getFilteredMeds(),s=symC();
   const daysLeft=med=>{const td=(med.member_ids||[]).length*(med.dose_per_day||1);if(!td)return null;return Math.floor((med.stock_today||0)/td);};
   // "Lasts until" now counts forward from the date stock was last confirmed,
   // not always from today. Falls back to today if no date is set yet.
@@ -2923,10 +3033,18 @@ function renderMeds(targetId){
   const contentHtml = `
     <div style="padding:14px 16px 0">
       <div style="font-family:'Playfair Display',serif;font-size:17px;color:${T.ink};margin-bottom:10px">Frequent Medications</div>
-      ${dm.length===0?`<div style="color:${T.muted};font-size:13px;margin-bottom:10px;font-style:italic">No medications added yet.</div>`:''}
+      <div style="margin-bottom:10px;position:relative">
+        <input class="inp" id="med-search-inp" placeholder="🔍  Search by medication or member…" value="${A.medSearch}"
+          style="padding-right:${A.medSearch?'36px':'12px'}"
+          oninput="A.medSearch=this.value;clearTimeout(A._mT);A._mT=setTimeout(renderMeds,300);document.getElementById('med-search-x').style.display=this.value?'flex':'none'">
+        <button id="med-search-x" onclick="A.medSearch='';document.getElementById('med-search-inp').value='';renderMeds();this.style.display='none'"
+          style="display:${A.medSearch?'flex':'none'};position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:${T.muted};font-size:16px;cursor:pointer;width:24px;height:24px;align-items:center;justify-content:center;border-radius:50%">×</button>
+      </div>
+      ${A.medSearch&&dm.length===0?`<div style="color:${T.muted};font-size:13px;margin-bottom:10px;font-style:italic">No medications match your search.</div>`:!A.medSearch&&dm.length===0?`<div style="color:${T.muted};font-size:13px;margin-bottom:10px;font-style:italic">No medications added yet.</div>`:''}
+      ${A.medSearch?`<div style="font-size:11px;color:${T.muted};margin-bottom:8px">Showing ${dm.length} of ${getDM().length} medication${getDM().length!==1?'s':''} — filter also applies to exports</div>`:''}
       <div style="overflow-x:auto;border-radius:13px;border:1px solid ${T.border};background:${T.surface}">
         <table class="tbl">
-          <thead><tr>${['Medication','Members','Dose/day','Pkg units','Pkg price','In stock','Stock confirmed','Lasts until','New order','Order cost','Updated until','Last ordered',''].map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+          <thead><tr>${['Medication','Members','Dose/day','Pkg units','Pkg price','In stock','Stock count date','Lasts until','New order','Order cost','Updated until','Last order received',''].map(h=>`<th>${h}</th>`).join('')}</tr></thead>
           <tbody>
             ${dm.map((med,idx)=>{
               const dl=daysLeft(med);
@@ -3069,14 +3187,16 @@ function openAddDM(){
     <div class="form-row"><label class="lbl">Members</label>
       <div style="display:flex;gap:7px;flex-wrap:wrap" id="dm-mems">
         ${A.members.map(m=>`<button type="button" data-mid="${m.id}" data-sel="false" onclick="togPart(this,'${m.id}')" style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;border:1.5px solid ${T.border};background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:${T.muted}">${av(m,18)} ${m.name}</button>`).join('')}
-      </div></div>
+      </div>
+      <div style="font-size:11px;color:${T.honey};margin-top:6px;background:${T.honeyLight};border-radius:7px;padding:5px 8px;display:flex;align-items:flex-start;gap:4px"><span>⚠️</span><span>Assign at least one member — stock run-out estimates require a daily dose per person to calculate.</span></div>
+    </div>
     <div class="grid2">
       <div class="form-row" style="margin:0"><label class="lbl">Dose/day</label><input class="inp" type="number" id="dm-d" placeholder="1" onfocus="this.select()"></div>
       <div class="form-row" style="margin:0"><label class="lbl">Units/pkg</label><input class="inp" type="number" id="dm-u" placeholder="30" onfocus="this.select()"></div>
       <div class="form-row" style="margin:0"><label class="lbl">Price/pkg</label><input class="inp" type="number" id="dm-p" placeholder="0.00" step="0.01" onfocus="this.select()"></div>
-      <div class="form-row" style="margin:0"><label class="lbl">Stock today</label><input class="inp" type="number" id="dm-s" placeholder="0" onfocus="this.select()"></div>
+      <div class="form-row" style="margin:0"><label class="lbl">In stock</label><input class="inp" type="number" id="dm-s" placeholder="0" onfocus="this.select()"></div>
     </div>
-    <div class="form-row"><label class="lbl">Stock counted on</label><input class="inp" type="date" id="dm-sd" value="${toISOLocal(new Date())}"></div>
+    <div class="form-row"><label class="lbl">Stock count date</label><input class="inp" type="date" id="dm-sd" value="${toISOLocal(new Date())}"></div>
     <div class="form-row"><label class="lbl">Note</label><input class="inp" id="dm-note" placeholder="e.g. Take with food"></div>
     <button class="btn btn-primary btn-full" onclick="saveDM()">Add Medication</button>`);
 }
@@ -3084,23 +3204,38 @@ window.openAddDM=openAddDM;
 
 async function saveDM(){
   if(!A.family)return;
-  const memberIds=Array.from(document.querySelectorAll('#dm-mems button[data-sel="true"]')).map(b=>b.dataset.mid).filter(Boolean);
-  const name=document.getElementById('dm-n')?.value?.trim();
-  if(!name){toast('Please add a name.',true);return;}
-  const data={
-    family_id:A.family.id,name,member_ids:memberIds,
-    dose_per_day:parseFloat(document.getElementById('dm-d')?.value)||1,
-    units_per_pkg:parseInt(document.getElementById('dm-u')?.value)||30,
-    price_per_pkg:parseFloat(document.getElementById('dm-p')?.value)||0,
-    stock_today:parseInt(document.getElementById('dm-s')?.value)||0,
-    stock_date:document.getElementById('dm-sd')?.value||toISOLocal(new Date()),
-    shared:memberIds.length>1,
-    note:document.getElementById('dm-note')?.value||'',
-  };
-  // v7: sbWrite() for idle-safety (timeout + auto-retry)
-  const{data:result,error}=await sbWrite(()=>sb.from('daily_meds').insert(data).select().single());
-  if(error){toast('Error adding medication: '+(error.message||'please try again.'),true);console.error(error);return;}
-  A.dailyMeds.push(result);closeModal();toast('Medication added!');renderMeds();
+  // v8: disable button immediately so double-tap can't fire two inserts
+  const _saveBtn=document.querySelector('.modal-body button.btn-primary');
+  if(_saveBtn){_saveBtn.disabled=true;_saveBtn.dataset.origText=_saveBtn.textContent;_saveBtn.textContent='Saving…';_saveBtn.style.opacity='0.7';}
+  showSavingToast();
+  let _saveOk=false;
+  try{
+    const memberIds=Array.from(document.querySelectorAll('#dm-mems button[data-sel="true"]')).map(b=>b.dataset.mid).filter(Boolean);
+    const name=document.getElementById('dm-n')?.value?.trim();
+    if(!name){toast('Please add a name.',true);return;}
+    const data={
+      family_id:A.family.id,name,member_ids:memberIds,
+      dose_per_day:parseFloat(document.getElementById('dm-d')?.value)||1,
+      units_per_pkg:parseInt(document.getElementById('dm-u')?.value)||30,
+      price_per_pkg:parseFloat(document.getElementById('dm-p')?.value)||0,
+      stock_today:parseInt(document.getElementById('dm-s')?.value)||0,
+      stock_date:document.getElementById('dm-sd')?.value||toISOLocal(new Date()),
+      shared:memberIds.length>1,
+      note:document.getElementById('dm-note')?.value||'',
+    };
+    const{data:result,error}=await sbWrite(()=>sb.from('daily_meds').insert(data).select().single());
+    if(error){toast('Error adding medication: '+(error.message||'please try again.'),true);console.error(error);return;}
+    A.dailyMeds.push(result);
+    _saveOk=true;
+    // v8: notify other family members
+    writeNotif('inventory_meds','created',`${getActorName()} added a medication`,data.name);
+    closeModal();toast('Medication added! ✅');renderMeds();
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    hideSavingToast();
+    if(!_saveOk&&_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent=_saveBtn.dataset.origText||'Add Medication';_saveBtn.style.opacity='';}
+  }
 }
 window.saveDM=saveDM;
 
@@ -3114,14 +3249,19 @@ function openEditDM(id){
     <div class="form-row"><label class="lbl">Members</label>
       <div style="display:flex;gap:7px;flex-wrap:wrap" id="dm-mems">
         ${A.members.map(m=>{const sel=(med.member_ids||[]).includes(m.id);return`<button type="button" data-mid="${m.id}" data-sel="${sel}" onclick="togPart(this,'${m.id}')" style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;border:1.5px solid ${sel?m.color:T.border};background:${sel?m.color+'22':'#fff'};cursor:pointer;font-size:12px;font-weight:600;color:${sel?m.color:T.muted}">${av(m,18)} ${m.name}</button>`;}).join('')}
-      </div></div>
+      </div>
+      <div style="font-size:11px;color:${T.honey};margin-top:6px;background:${T.honeyLight};border-radius:7px;padding:5px 8px;display:flex;align-items:flex-start;gap:4px"><span>⚠️</span><span>Assign at least one member — stock run-out estimates require a daily dose per person to calculate.</span></div>
+    </div>
     <div class="grid2">
       <div class="form-row" style="margin:0"><label class="lbl">Dose/day</label><input class="inp" type="number" id="dm-d" value="${med.dose_per_day||1}" onfocus="this.select()"></div>
       <div class="form-row" style="margin:0"><label class="lbl">Units/pkg</label><input class="inp" type="number" id="dm-u" value="${med.units_per_pkg||30}" onfocus="this.select()"></div>
       <div class="form-row" style="margin:0"><label class="lbl">Price/pkg</label><input class="inp" type="number" id="dm-p" value="${med.price_per_pkg||0}" step="0.01" onfocus="this.select()"></div>
-      <div class="form-row" style="margin:0"><label class="lbl">Stock today</label><input class="inp" type="number" id="dm-s" value="${med.stock_today||0}" onfocus="this.select()"></div>
+      <div class="form-row" style="margin:0"><label class="lbl">In stock</label><input class="inp" type="number" id="dm-s" value="${med.stock_today||0}" onfocus="this.select()"></div>
     </div>
-    <div class="form-row"><label class="lbl">Stock counted on</label><input class="inp" type="date" id="dm-sd" value="${med.stock_date||toISOLocal(new Date())}"></div>
+    <div class="grid2">
+      <div class="form-row" style="margin:0"><label class="lbl">Stock count date</label><input class="inp" type="date" id="dm-sd" value="${med.stock_date||toISOLocal(new Date())}"></div>
+      <div class="form-row" style="margin:0"><label class="lbl">Last order received</label><input class="inp" type="date" id="dm-lo" value="${med.last_ordered?toISOLocal(new Date(med.last_ordered)):''}"></div>
+    </div>
     <div class="form-row"><label class="lbl">Note</label><input class="inp" id="dm-note" value="${med.note||''}" placeholder="e.g. Take with food"></div>
     <button class="btn btn-primary btn-full" onclick="saveEditDM('${id}')">Save Changes</button>`);
 }
@@ -3129,24 +3269,41 @@ window.openEditDM=openEditDM;
 
 async function saveEditDM(id){
   if(!A.family)return;
-  const memberIds=Array.from(document.querySelectorAll('#dm-mems button[data-sel="true"]')).map(b=>b.dataset.mid).filter(Boolean);
-  const name=document.getElementById('dm-n')?.value?.trim();
-  if(!name){toast('Please add a name.',true);return;}
-  const data={
-    name,member_ids:memberIds,
-    dose_per_day:parseFloat(document.getElementById('dm-d')?.value)||1,
-    units_per_pkg:parseInt(document.getElementById('dm-u')?.value)||30,
-    price_per_pkg:parseFloat(document.getElementById('dm-p')?.value)||0,
-    stock_today:parseInt(document.getElementById('dm-s')?.value)||0,
-    stock_date:document.getElementById('dm-sd')?.value||toISOLocal(new Date()),
-    shared:memberIds.length>1,
-    note:document.getElementById('dm-note')?.value||'',
-  };
-  // v7: sbWrite() for idle-safety (timeout + auto-retry)
-  const{data:result,error}=await sbWrite(()=>sb.from('daily_meds').update(data).eq('id',id).select().single());
-  if(error){toast('Error saving medication: '+(error.message||'please try again.'),true);console.error(error);return;}
-  A.dailyMeds=A.dailyMeds.map(m=>m.id===id?result:m);
-  closeModal();toast('Medication updated! ✅');renderMeds();
+  // v8: disable button immediately so double-tap can't fire two saves
+  const _saveBtn=document.querySelector('.modal-body button.btn-primary');
+  if(_saveBtn){_saveBtn.disabled=true;_saveBtn.dataset.origText=_saveBtn.textContent;_saveBtn.textContent='Saving…';_saveBtn.style.opacity='0.7';}
+  showSavingToast();
+  let _saveOk=false;
+  try{
+    const memberIds=Array.from(document.querySelectorAll('#dm-mems button[data-sel="true"]')).map(b=>b.dataset.mid).filter(Boolean);
+    const name=document.getElementById('dm-n')?.value?.trim();
+    if(!name){toast('Please add a name.',true);return;}
+    // v8: last order received — read date-only input and convert to local noon timestamp
+    const loVal=document.getElementById('dm-lo')?.value;
+    const data={
+      name,member_ids:memberIds,
+      dose_per_day:parseFloat(document.getElementById('dm-d')?.value)||1,
+      units_per_pkg:parseInt(document.getElementById('dm-u')?.value)||30,
+      price_per_pkg:parseFloat(document.getElementById('dm-p')?.value)||0,
+      stock_today:parseInt(document.getElementById('dm-s')?.value)||0,
+      stock_date:document.getElementById('dm-sd')?.value||toISOLocal(new Date()),
+      shared:memberIds.length>1,
+      note:document.getElementById('dm-note')?.value||'',
+      last_ordered:loVal?loVal+'T12:00:00':null,
+    };
+    const{data:result,error}=await sbWrite(()=>sb.from('daily_meds').update(data).eq('id',id).select().single());
+    if(error){toast('Error saving medication: '+(error.message||'please try again.'),true);console.error(error);return;}
+    A.dailyMeds=A.dailyMeds.map(m=>m.id===id?result:m);
+    _saveOk=true;
+    // v8: notify other family members
+    writeNotif('inventory_meds','updated',`${getActorName()} updated a medication`,data.name);
+    closeModal();toast('Medication updated! ✅');renderMeds();
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    hideSavingToast();
+    if(!_saveOk&&_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent=_saveBtn.dataset.origText||'Save Changes';_saveBtn.style.opacity='';}
+  }
 }
 window.saveEditDM=saveEditDM;
 
@@ -3791,6 +3948,8 @@ async function addShoppingItem(listId){
   const items=[...(list.items||[]),newItem];
   list.items=items;
   await sb.from('shopping_lists').update({items}).eq('id',listId);
+  // v8: notify other family members
+  writeNotif('shopping','updated',`${getActorName()} added to a shopping list`,text);
   renderShoppingModal(listId);
 }
 window.addShoppingItem=addShoppingItem;
@@ -3927,6 +4086,8 @@ async function saveMealPlan(){
     .single();
   if(error){toast('Error saving menu: '+(error.message||'unknown'),true);console.error(error);return;}
   A.mealPlan=data;
+  // v8: notify other family members
+  writeNotif('meal','updated',`${getActorName()} updated the weekly menu`,'Meal Planner');
   toast('Weekly menu saved! ✅');
 }
 window.saveMealPlan=saveMealPlan;
@@ -4141,15 +4302,37 @@ function renderSettings(){
       </div>
     </div>`;
   } else {
-    tc=`<div class="card" style="padding:14px">
-      <div class="lbl" style="margin-bottom:12px">Reminder Timing</div>
-      ${[['notif_week_before','1 week before'],['notif_day_before','1 day before'],['notif_hour_before','1 hour before'],['notif_ten_min','10 minutes before']].map(([key,label])=>`
-        <label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid ${T.border};cursor:pointer">
-          <input type="checkbox" ${fam?.[key]?'checked':''} onchange="updateNotif('${key}',this.checked)">
-          <span style="font-size:14px;font-weight:600">${label}</span>
-        </label>`).join('')}
-      <p style="font-size:12px;color:${T.muted};margin-top:12px;line-height:1.5;background:${T.honeyLight};border-radius:8px;padding:8px 10px;">🔔 Push notifications are coming in the Kinship mobile app. Your preferences are saved and will activate automatically when the app launches.</p>
-    </div>`;
+    const prefs = getNotifPrefs();
+    const prefRow = (key, icon, label) => `
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid ${T.border};cursor:pointer">
+        <input type="checkbox" ${prefs[key]!==false?'checked':''} onchange="updateNotifPref('${key}',this.checked)">
+        <span style="font-size:16px;flex-shrink:0">${icon}</span>
+        <span style="font-size:14px;font-weight:600">${label}</span>
+      </label>`;
+    tc=`
+      <div class="card" style="padding:14px;margin-bottom:12px">
+        <div class="lbl" style="margin-bottom:10px">Family Activity — what to track</div>
+        <p style="font-size:12px;color:${T.muted};margin-bottom:12px">Shown in the 🔔 panel whenever another family member makes a change.</p>
+        ${prefRow('notif_event','🗓','Calendar events added or changed')}
+        ${prefRow('notif_note','📓','Notes added or changed')}
+        ${prefRow('notif_shopping','🛒','Shopping list items added')}
+        ${prefRow('notif_meal','🍽','Meal planner updated')}
+        ${prefRow('notif_inventory_meds','💊','Medications added or changed')}
+        ${prefRow('notif_inventory_products','📦','Products added or changed')}
+      </div>
+      <div class="card" style="padding:14px;margin-bottom:12px">
+        <div class="lbl" style="margin-bottom:10px">Smart Alerts — computed from your data</div>
+        <p style="font-size:12px;color:${T.muted};margin-bottom:12px">Shown each time you open the notification panel.</p>
+        ${prefRow('alert_low_stock','💊','Low medication stock (≤ 7 days left)')}
+        ${prefRow('alert_expiring','⏰','Products expiring within 30 days')}
+        ${prefRow('alert_overdue','⚠️','Overdue tasks with open items')}
+        ${prefRow('alert_event_start','🔔','Events starting within the next hour')}
+      </div>
+      <div class="card" style="padding:14px">
+        <div class="lbl" style="margin-bottom:10px">Push notifications — coming soon</div>
+        <p style="font-size:12px;color:${T.muted};margin-bottom:12px;line-height:1.6">Get device-level alerts for upcoming events, low stock, and family activity. Your preferences above will activate automatically when push notifications launch.</p>
+        <div style="background:${T.honeyLight};border-radius:9px;padding:10px 12px;font-size:12px;color:${T.honey};font-weight:600">📱 Available in the Seamly PWA — install the app on your home screen to be first to get them.</div>
+      </div>`;
   }
 
   const cu=A.user;
@@ -4457,6 +4640,398 @@ function updateNoteCompletionUI(completedAt) {
 window.updateNoteCompletionUI = updateNoteCompletionUI;
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────
+// ── NOTIFICATIONS (v8) ────────────────────────────────────────────────────────
+// Two-layer in-app notification system:
+//   Layer 1 — Activity: stored in DB, written on any family data change.
+//              Only other family members' actions are shown (own actions filtered out).
+//              7-day retention, max 50 per load.
+//   Layer 2 — Alerts: computed fresh from existing data on every panel open.
+//              Low stock meds, expiring products, overdue tasks, events soon.
+
+let _notifications = []; // Cached activity notifications from DB
+let _notifPanelOpen = false;
+
+// Returns the full set of default notification preferences (all enabled)
+function getDefaultNotifPrefs() {
+  return {
+    notif_member_join: true,
+    notif_event: true,
+    notif_note: true,
+    notif_shopping: true,
+    notif_meal: true,
+    notif_inventory_meds: true,
+    notif_inventory_products: true,
+    alert_low_stock: true,
+    alert_expiring: true,
+    alert_overdue: true,
+    alert_event_start: true,
+  };
+}
+
+// Returns merged preferences: saved family prefs override defaults.
+function getNotifPrefs() {
+  const defaults = getDefaultNotifPrefs();
+  const saved = A.family?.notif_preferences || {};
+  return { ...defaults, ...saved };
+}
+
+// Finds the current user's display name by matching their email to a family_members record.
+function getActorName() {
+  if (!A.user) return 'A family member';
+  const match = A.members.find(m =>
+    m.email && m.email.toLowerCase() === A.user.email?.toLowerCase()
+  );
+  if (match) return match.name;
+  return A.user.user_metadata?.name || 'A family member';
+}
+
+// Writes an activity notification to Supabase. Fire-and-forget.
+function writeNotif(category, action, title, body, referenceId) {
+  if (!A.family || !A.user || isSampleMode()) return;
+  const prefs = getNotifPrefs();
+  const prefKey = category === 'member' ? 'notif_member_join' : 'notif_' + category;
+  if (prefs[prefKey] === false) return;
+  const payload = {
+    family_id: A.family.id,
+    actor_user_id: A.user.id,
+    actor_name: getActorName(),
+    category,
+    action,
+    title: title || '',
+    body: body || '',
+    reference_id: referenceId || null,
+  };
+  sb.from('notifications').insert(payload).then(({ error }) => {
+    if (error) console.warn('Notification write failed:', error.message);
+  });
+}
+
+// Fetches activity notifications from Supabase (other members only, last 7 days)
+async function loadNotifications() {
+  if (!A.family || !A.user || isSampleMode()) return;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 7);
+  const { data, error } = await sb.from('notifications')
+    .select('*')
+    .eq('family_id', A.family.id)
+    .neq('actor_user_id', A.user.id)
+    .gte('created_at', cutoff.toISOString())
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (error) { console.warn('Notifications load error:', error.message); return; }
+  _notifications = data || [];
+  refreshNotifBadge();
+}
+
+// Computes real-time alerts from existing app data. No DB query needed.
+function computeAlerts() {
+  if (isSampleMode()) return [];
+  const alerts = [];
+  const prefs = getNotifPrefs();
+  const today = todayD();
+  const now = new Date();
+
+  // Low stock medications (≤ 7 days of supply remaining)
+  if (prefs.alert_low_stock !== false) {
+    getDM().forEach(med => {
+      const dailyDose = (med.member_ids || []).length * (med.dose_per_day || 1);
+      if (!dailyDose) return;
+      const stockBase = med.stock_date ? new Date(med.stock_date + 'T00:00:00') : today;
+      const daysPassed = Math.max(0, Math.round((today - stockBase) / 86400000));
+      const currentStock = Math.max(0, (med.stock_today || 0) - daysPassed * dailyDose);
+      const daysLeft = Math.floor(currentStock / dailyDose);
+      if (daysLeft <= 7) {
+        const memberNames = A.members
+          .filter(m => (med.member_ids || []).includes(m.id))
+          .map(m => m.name).join(', ');
+        alerts.push({
+          icon: '💊',
+          color: T.rose,
+          title: `${med.name} running ${daysLeft <= 0 ? 'out' : 'low'}`,
+          body: `${daysLeft <= 0 ? 'Out of stock' : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`}${memberNames ? ' · ' + memberNames : ''}`,
+          id: 'low_stock_' + med.id,
+        });
+      }
+    });
+  }
+
+  // Expiring inventory products (within 30 days)
+  if (prefs.alert_expiring !== false) {
+    (A.invProducts || []).forEach(p => {
+      if (!p.expiry) return;
+      const expDate = new Date(p.expiry);
+      const daysUntil = Math.floor((expDate - now) / 86400000);
+      if (daysUntil <= 30) {
+        alerts.push({
+          icon: daysUntil < 0 ? '🚨' : '⏰',
+          color: daysUntil < 0 ? T.rose : T.honey,
+          title: `${p.name} ${daysUntil < 0 ? 'expired' : 'expiring soon'}`,
+          body: daysUntil < 0
+            ? `Expired ${Math.abs(daysUntil)} day${Math.abs(daysUntil) === 1 ? '' : 's'} ago`
+            : `Expires in ${daysUntil} day${daysUntil === 1 ? '' : 's'}`,
+          id: 'expiry_' + p.id,
+        });
+      }
+    });
+  }
+
+  // Overdue tasks with open action items
+  if (prefs.alert_overdue !== false) {
+    getEvents().filter(e => {
+      if (e.type !== 'task' || e.completed_at) return false;
+      const evDay = new Date(e.date); evDay.setHours(0, 0, 0, 0);
+      return evDay < today && (e.actions || []).some(a => !a.done);
+    }).forEach(e => {
+      const openCount = (e.actions || []).filter(a => !a.done).length;
+      alerts.push({
+        icon: '⚠️',
+        color: T.rose,
+        title: `Overdue: ${e.title || 'Task'}`,
+        body: `${openCount} open item${openCount !== 1 ? 's' : ''} · Due ${fmt(e.date)}`,
+        id: 'overdue_' + e.id,
+      });
+    });
+  }
+
+  // Events starting within the next 60 minutes
+  if (prefs.alert_event_start !== false) {
+    const in60 = new Date(); in60.setMinutes(in60.getMinutes() + 60);
+    getEvents().filter(e => {
+      if (e.type === 'wellness' || e.all_day) return false;
+      const start = new Date(e.date);
+      return start > now && start <= in60;
+    }).forEach(e => {
+      const minsAway = Math.round((new Date(e.date) - now) / 60000);
+      alerts.push({
+        icon: '🔔',
+        color: T.sky,
+        title: `Starting soon: ${e.title || ET[e.type].label}`,
+        body: `In ${minsAway} minute${minsAway === 1 ? '' : 's'}${e.location ? ' · ' + e.location : ''}`,
+        id: 'soon_' + e.id,
+      });
+    });
+  }
+
+  return alerts;
+}
+
+// Returns the emoji icon for a notification row based on category + action
+function notifIcon(category, action) {
+  if (category === 'member') return '👤';
+  if (action === 'deleted') return '🗑';
+  if (action === 'created') {
+    return { event:'🗓', note:'📓', shopping:'🛒', meal:'🍽', inventory_meds:'💊', inventory_products:'📦' }[category] || '🔔';
+  }
+  return { event:'✏️', note:'✏️', shopping:'✏️', meal:'🍽', inventory_meds:'💊', inventory_products:'📦' }[category] || '🔔';
+}
+
+// Updates the red badge on the bell icon.
+function refreshNotifBadge() {
+  const badge = document.getElementById('notif-badge');
+  if (!badge) return;
+  const prefs = getNotifPrefs();
+  const lastRead = parseInt(localStorage.getItem('ks_notif_last_read_' + (A.user?.id || '')) || '0');
+  const unread = _notifications.filter(n => {
+    const prefKey = n.category === 'member' ? 'notif_member_join' : 'notif_' + n.category;
+    if (prefs[prefKey] === false) return false;
+    return new Date(n.created_at).getTime() > lastRead;
+  }).length;
+  if (unread > 0) {
+    badge.textContent = unread > 99 ? '99+' : unread;
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// Stamps "last read" timestamp so the badge clears on next refresh
+function markAllNotifsRead() {
+  try {
+    localStorage.setItem('ks_notif_last_read_' + (A.user?.id || ''), Date.now().toString());
+  } catch(_) {}
+  refreshNotifBadge();
+}
+
+// Renders the notification bottom sheet into #notif-root
+function renderNotifPanel() {
+  const alerts = computeAlerts();
+  const prefs = getNotifPrefs();
+  const filtered = _notifications.filter(n => {
+    const prefKey = n.category === 'member' ? 'notif_member_join' : 'notif_' + n.category;
+    return prefs[prefKey] !== false;
+  });
+  const fmtRel = ts => {
+    const diff = Date.now() - new Date(ts).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  };
+  const hasContent = alerts.length > 0 || filtered.length > 0;
+  const root = document.getElementById('notif-root');
+  if (!root) return;
+  root.innerHTML = `
+    <div class="modal-bg" onclick="if(event.target.classList.contains('modal-bg'))toggleNotifPanel()">
+      <div class="modal-sheet">
+        <div class="modal-head">
+          <div class="modal-title">🔔 Notifications</div>
+          <button class="modal-close" onclick="toggleNotifPanel()">×</button>
+        </div>
+        <div class="modal-body">
+          ${alerts.length ? `
+            <div style="font-size:10px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Alerts</div>
+            ${alerts.map(a => `
+              <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:11px;background:${a.color}18;border-left:3px solid ${a.color};margin-bottom:8px">
+                <span style="font-size:18px;flex-shrink:0;margin-top:1px">${a.icon}</span>
+                <div>
+                  <div style="font-weight:700;font-size:13px;color:${T.ink}">${a.title}</div>
+                  <div style="font-size:12px;color:${T.muted};margin-top:2px">${a.body}</div>
+                </div>
+              </div>`).join('')}
+            <div style="height:1px;background:${T.border};margin:14px 0 12px"></div>
+          ` : ''}
+          <div style="font-size:10px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Family Activity</div>
+          ${filtered.length ? filtered.map(n => `
+            <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:11px;background:${T.parchment};margin-bottom:8px">
+              <span style="font-size:18px;flex-shrink:0;margin-top:1px">${notifIcon(n.category, n.action)}</span>
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:700;font-size:13px;color:${T.ink}">${n.title || ''}</div>
+                ${n.body ? `<div style="font-size:12px;color:${T.muted};margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.body}</div>` : ''}
+                <div style="font-size:10px;color:${T.muted};margin-top:4px;font-weight:600">${fmtRel(n.created_at)}</div>
+              </div>
+            </div>`).join('') : `
+            <div style="text-align:center;padding:20px 0;color:${T.muted}">
+              <div style="font-size:32px;margin-bottom:8px">🤝</div>
+              <div style="font-size:13px;font-weight:600;margin-bottom:4px">No activity yet</div>
+              <div style="font-size:12px">Changes made by other family members will appear here.</div>
+            </div>`}
+          <div style="background:${T.honeyLight};border-radius:10px;padding:12px 14px;margin-top:${hasContent ? '16' : '8'}px">
+            <div style="font-size:12px;color:${T.honey};font-weight:700;margin-bottom:4px">📱 Push notifications — coming soon</div>
+            <div style="font-size:11px;color:${T.muted};line-height:1.5">Get device alerts for events, reminders, and family activity. Manage your preferences in <button onclick="toggleNotifPanel();goTo('settings');A.settingsTab='notifs';renderSettings()" style="background:none;border:none;color:${T.sage};font-weight:700;cursor:pointer;font-size:11px;padding:0;text-decoration:underline">Settings → Notifications</button>.</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// Opens or closes the notification panel.
+async function toggleNotifPanel() {
+  _notifPanelOpen = !_notifPanelOpen;
+  if (_notifPanelOpen) {
+    await loadNotifications();
+    renderNotifPanel();
+    markAllNotifsRead();
+  } else {
+    document.getElementById('notif-root').innerHTML = '';
+  }
+}
+window.toggleNotifPanel = toggleNotifPanel;
+
+// Saves a single notification preference key into families.notif_preferences (JSONB).
+async function updateNotifPref(key, val) {
+  if (!A.family) return;
+  const prefs = { ...getNotifPrefs(), [key]: val };
+  const { data, error } = await sb.from('families')
+    .update({ notif_preferences: prefs })
+    .eq('id', A.family.id)
+    .select().single();
+  if (error) { toast('Error saving preference.', true); console.error(error); return; }
+  A.family = data;
+}
+window.updateNotifPref = updateNotifPref;
+
+// ── FEEDBACK ──────────────────────────────────────────────────────────────────
+// Floating 💬 button → modal form → saves to `feedback` table in Supabase.
+
+const FB_TYPES = [
+  { value:'general', icon:'💬', label:'General feedback', desc:'Share your thoughts on the app' },
+  { value:'bug',     icon:'🐛', label:'Report a bug',     desc:"Something isn't working right" },
+  { value:'feature', icon:'✨', label:'Feature request',  desc:"Something you'd love to see added" },
+  { value:'other',   icon:'📝', label:'Other',            desc:'' },
+];
+
+function openFeedback() {
+  showModal('Send Feedback 💬', `
+    <div style="font-size:13px;color:${T.muted};margin-bottom:14px;line-height:1.6">
+      Help us improve Seamly — tell us what's working, what isn't, or what you'd love to see next. We read every message.
+    </div>
+    <div class="form-row">
+      <label class="lbl">Feedback type <span style="color:${T.rose}">*</span></label>
+      <div id="fb-types" style="display:flex;flex-direction:column;gap:7px">
+        ${FB_TYPES.map(t=>`
+          <button type="button" data-type="${t.value}"
+            onclick="selFbType(this,'${t.value}')"
+            style="display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;border:1.5px solid ${T.border};background:#fff;cursor:pointer;text-align:left;width:100%;transition:border .15s,background .15s;-webkit-tap-highlight-color:transparent">
+            <span style="font-size:20px;flex-shrink:0">${t.icon}</span>
+            <div>
+              <div style="font-weight:700;font-size:13px;color:${T.ink}">${t.label}</div>
+              ${t.desc?`<div style="font-size:11px;color:${T.muted};margin-top:1px">${t.desc}</div>`:''}
+            </div>
+          </button>`).join('')}
+      </div>
+      <input type="hidden" id="fb-type" value="">
+    </div>
+    <div class="form-row" style="margin-top:12px">
+      <label class="lbl">Your message <span style="color:${T.rose}">*</span></label>
+      <textarea class="inp" id="fb-msg" rows="4"
+        placeholder="Tell us what's on your mind…"
+        style="resize:none"></textarea>
+    </div>
+    <div class="form-row">
+      <label class="lbl">Which area of the app? (optional)</label>
+      <select class="sel" id="fb-page">
+        <option value="">Select…</option>
+        ${['Home','Calendar','Notebook','Inventory','Meals','Settings','General / Other']
+          .map(p=>`<option value="${p}">${p}</option>`).join('')}
+      </select>
+    </div>
+    <button class="btn btn-primary btn-full btn-lg" style="margin-top:4px" onclick="saveFeedback()">
+      Send Feedback 💚
+    </button>
+    <div style="font-size:11px;color:${T.muted};text-align:center;margin-top:10px;line-height:1.5">
+      Your feedback goes directly to the Seamly team.
+    </div>`);
+}
+window.openFeedback = openFeedback;
+
+function selFbType(btn, type) {
+  document.querySelectorAll('#fb-types button').forEach(b => {
+    b.style.border    = `1.5px solid ${T.border}`;
+    b.style.background = '#fff';
+  });
+  btn.style.border    = `1.5px solid ${T.sage}`;
+  btn.style.background = T.sageLight;
+  document.getElementById('fb-type').value = type;
+}
+window.selFbType = selFbType;
+
+async function saveFeedback() {
+  const type = document.getElementById('fb-type')?.value;
+  const msg  = document.getElementById('fb-msg')?.value?.trim();
+  const page = document.getElementById('fb-page')?.value || null;
+  if (!type) { toast('Please select a feedback type.', true); return; }
+  if (!msg)  { toast('Please write your message — we want to hear from you!', true); return; }
+  const data = {
+    family_id:   A.family?.id   || null,
+    user_email:  A.user?.email  || null,
+    family_name: A.family?.name || null,
+    type,
+    message: msg,
+    page:    page || null,
+  };
+  const { error } = await sbWrite(() => sb.from('feedback').insert(data));
+  if (error) {
+    console.error('Feedback save error', error);
+    toast('Error sending feedback — please try again.', true);
+    return;
+  }
+  closeModal();
+  toast('Feedback sent! Thank you 💚');
+}
+window.saveFeedback = saveFeedback;
+
 // ── SAMPLE MODE ───────────────────────────────────────────────────────────────
 function toggleSampleMode() {
   // Only allow toggle if user has a real family to switch back to
@@ -4482,11 +5057,35 @@ function renderPage() {
 
 function getFamily()  { return _sampleMode ? SD_FAMILY : A.family; }
 function getMembers() { return _sampleMode ? SD_MEMBERS : A.members; }
-function getEvents()  { return _sampleMode ? SD_EVENTS : A.events; }
-function getNotes()   { return _sampleMode ? SD_NOTES : A.notes; }
+// v8: client-side privacy filter — hides private items not owned by
+// the current user. NOTE: Option B (JS-only). Upgrade to Option A
+// (RLS) once beta confirms the feature is valuable.
+function getEvents()  {
+  if (_sampleMode) return SD_EVENTS;
+  return A.events.filter(e => !e.is_private || e.created_by_user_id === A.user?.id);
+}
+// v8: client-side privacy filter — same pattern as getEvents().
+function getNotes()   {
+  if (_sampleMode) return SD_NOTES;
+  return A.notes.filter(n => !n.is_private || n.created_by_user_id === A.user?.id);
+}
 function getGroups()  { return _sampleMode ? SD_GROUPS : A.noteGroups; }
 function getDM()      { return _sampleMode ? SD_DM : A.dailyMeds; }
 function isSampleMode() { return _sampleMode; }
+
+// Returns medications filtered by A.medSearch (searches name and assigned member names).
+// Used by renderMeds(), exports, and clipboard so the active filter is always consistent.
+function getFilteredMeds(){
+  const all=getDM();
+  const q=(A.medSearch||'').toLowerCase().trim();
+  if(!q)return all;
+  return all.filter(med=>{
+    if((med.name||'').toLowerCase().includes(q))return true;
+    const memNames=getMembers().filter(m=>(med.member_ids||[]).includes(m.id)).map(m=>m.name.toLowerCase());
+    return memNames.some(n=>n.includes(q));
+  });
+}
+window.getFilteredMeds=getFilteredMeds;
 
 function showAuth(){
   document.getElementById('loading-screen').style.display='none';
@@ -4529,6 +5128,27 @@ async function handleSession(session){
 }
 
 async function boot(){
+  // ── PWA: service worker registration (v8) ────────────────────────────────
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then(reg => console.log('SW registered, scope:', reg.scope))
+      .catch(err => console.warn('SW registration failed:', err));
+  }
+
+  // ── PWA: offline banner management (v8) ─────────────────────────────────
+  function _updateOnlineStatus() {
+    const banner = document.getElementById('offline-banner');
+    if (!banner) return;
+    if (navigator.onLine) {
+      banner.classList.remove('visible');
+    } else {
+      banner.classList.add('visible');
+    }
+  }
+  window.addEventListener('online',  _updateOnlineStatus);
+  window.addEventListener('offline', _updateOnlineStatus);
+  _updateOnlineStatus(); // set correct state on load
+
   if(!sb){
     document.getElementById('loading-screen').innerHTML=`<div style="text-align:center;padding:40px;font-family:sans-serif">
       <div style="font-size:40px;margin-bottom:16px">⚠️</div>
