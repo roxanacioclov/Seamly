@@ -1,4 +1,4 @@
-<!-- Seamly v10 | STAGING | 09 Jul 2026 -->
+<!-- Seamly v11 | STAGING | 09 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -36,7 +36,8 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
 ::-webkit-scrollbar-thumb{background:#c8bfb0;border-radius:4px}
 #root{max-width:480px;margin:0 auto;min-height:100vh;background:var(--bg);display:flex;flex-direction:column}
 .top-bar{background:var(--bg);border-bottom:1px solid var(--border);padding:9px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:sticky;top:0;z-index:50}
-.top-logo{font-family:'Playfair Display',serif;font-size:18px;color:var(--sage)}
+.top-logo{font-family:'Playfair Display',serif;font-size:18px;color:var(--sage);display:flex;align-items:center;gap:6px}
+.nav-wordmark{display:none;font-family:'Playfair Display',serif;font-size:19px;color:var(--sage);align-items:center;gap:8px}
 .content{flex:1;overflow-y:auto;padding-bottom:72px}
 .bottom-nav{background:var(--surface);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:8px 0 12px;flex-shrink:0;position:sticky;bottom:0;z-index:50;box-shadow:0 -4px 20px rgba(0,0,0,.07)}
 .nav-btn{display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;cursor:pointer;transition:color .2s;-webkit-tap-highlight-color:transparent}
@@ -81,7 +82,8 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
 .tbl th{padding:8px 7px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;text-align:left;border-bottom:1px solid var(--border);background:var(--parchment);white-space:nowrap}
 .tbl td{padding:8px 7px;font-size:13px;color:var(--ink);border-bottom:1px solid var(--border);vertical-align:middle}
 .tbl tr:nth-child(even) td{background:#faf8f466}
-.note-card{border-radius:13px;padding:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.05);transition:transform .15s}
+.note-card{border-radius:13px;padding:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.05);transition:transform .15s;overflow:hidden;word-break:break-word}
+.note-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .note-card:active{transform:scale(.97)}
 .ob-bg{position:fixed;inset:0;background:rgba(20,18,14,.7);backdrop-filter:blur(6px);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn .3s ease}
 .ob-card{background:var(--surface);border-radius:22px;padding:26px;max-width:380px;width:100%}
@@ -114,6 +116,26 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
 /* ── Feedback floating action button (V8) ───────────────────────── */
 .feedback-fab{position:fixed;bottom:80px;right:16px;z-index:100;width:44px;height:44px;border-radius:50%;background:var(--sage);color:#fff;border:none;font-size:18px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;transition:transform .2s,box-shadow .2s;-webkit-tap-highlight-color:transparent}
 .feedback-fab:active{transform:scale(.93);box-shadow:0 2px 8px rgba(0,0,0,.15)}
+@media (min-width:768px){
+  #root{max-width:none;margin:0}
+  .bottom-nav{position:fixed;top:0;left:0;bottom:0;width:220px;flex-direction:column;justify-content:flex-start;align-items:stretch;border-top:none;border-right:1px solid var(--border);box-shadow:none;padding:16px 0;z-index:60;overflow-y:auto}
+  .nav-wordmark{display:flex;padding:0 20px 20px}
+  .nav-btn{flex-direction:row;align-items:center;justify-content:flex-start;gap:12px;padding:11px 20px;font-size:13px;text-transform:none;letter-spacing:0;border-radius:0 20px 20px 0;margin-right:12px}
+  .nav-btn.active{background:var(--sage-light)}
+  .nav-dot{display:none}
+  .top-bar{margin-left:220px}
+  .content{margin-left:220px;padding-bottom:24px}
+  .note-grid{grid-template-columns:repeat(3,1fr)}
+  .modal-bg{align-items:center}
+  .modal-sheet{border-radius:20px;max-width:680px;max-height:85vh;animation:fadeIn .2s ease}
+  #notif-root .modal-sheet{max-width:480px}
+}
+@media (min-width:1200px){
+  .bottom-nav{width:240px}
+  .top-bar{margin-left:240px}
+  .content{margin-left:240px}
+  .note-grid{grid-template-columns:repeat(4,1fr)}
+}
 </style>
 </head>
 <body>
@@ -169,7 +191,18 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
 
 <div id="root" style="display:none">
   <div class="top-bar">
-    <div class="top-logo">Seamly</div>
+    <div class="top-logo">
+      <svg width="22" height="19" viewBox="0 0 26 22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <g stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+          <rect x="2" y="6" width="13" height="14" rx="2.3"/>
+          <line x1="2" y1="10.5" x2="15" y2="10.5"/>
+          <line x1="5.5" y1="4" x2="5.5" y2="7.3"/>
+          <line x1="11.5" y1="4" x2="11.5" y2="7.3"/>
+        </g>
+        <path transform="translate(20,5.5)" fill="currentColor" d="M0,-5 C0.8,-1 0.8,-1 5,0 C0.8,1 0.8,1 0,5 C-0.8,1 -0.8,1 -5,0 C-0.8,-1 -0.8,-1 0,-5 Z"/>
+      </svg>
+      <span>Seamly</span>
+    </div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sample-btn" onclick="A.family?toggleSampleMode():goTo('settings')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:var(--honey-light);color:var(--honey);border:1px solid var(--honey)44;cursor:pointer;display:none">📋 Sample</button>
       <span id="fam-badge" style="font-size:11px;font-weight:700;color:var(--muted)"></span>
@@ -189,11 +222,65 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
     <div id="page-settings" class="page"></div>
   </div>
   <nav class="bottom-nav">
-    <button class="nav-btn" data-page="home" onclick="goTo('home')"><span style="font-size:20px;line-height:1">🏠</span>Home<div class="nav-dot"></div></button>
-    <button class="nav-btn active" data-page="calendar" onclick="goTo('calendar')"><span style="font-size:20px;line-height:1">🗓</span>Calendar<div class="nav-dot"></div></button>
-    <button class="nav-btn" data-page="notebook" onclick="goTo('notebook')"><span style="font-size:20px;line-height:1">📓</span>Notebook<div class="nav-dot"></div></button>
-    <button class="nav-btn" data-page="inventory" onclick="goTo('inventory')"><span style="font-size:20px;line-height:1">📦</span>Inventory<div class="nav-dot"></div></button>
-    <button class="nav-btn" data-page="meals" onclick="goTo('meals')"><span style="font-size:20px;line-height:1">🍽</span>Meals<div class="nav-dot"></div></button>
+    <div class="nav-wordmark">
+      <svg width="22" height="19" viewBox="0 0 26 22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <g stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+          <rect x="2" y="6" width="13" height="14" rx="2.3"/>
+          <line x1="2" y1="10.5" x2="15" y2="10.5"/>
+          <line x1="5.5" y1="4" x2="5.5" y2="7.3"/>
+          <line x1="11.5" y1="4" x2="11.5" y2="7.3"/>
+        </g>
+        <path transform="translate(20,5.5)" fill="currentColor" d="M0,-5 C0.8,-1 0.8,-1 5,0 C0.8,1 0.8,1 0,5 C-0.8,1 -0.8,1 -5,0 C-0.8,-1 -0.8,-1 0,-5 Z"/>
+      </svg>
+      <span>Seamly</span>
+    </div>
+    <button class="nav-btn" data-page="home" onclick="goTo('home')">
+      <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0">
+        <path d="M4 11L12 4L20 11"/>
+        <path d="M6 9.5V18.5C6 19.3 6.7 20 7.5 20H16.5C17.3 20 18 19.3 18 18.5V9.5"/>
+        <rect x="10" y="14" width="4" height="6" rx="1"/>
+      </svg>
+      Home<div class="nav-dot"></div>
+    </button>
+    <button class="nav-btn active" data-page="calendar" onclick="goTo('calendar')">
+      <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0">
+        <rect x="4" y="5" width="16" height="15" rx="3"/>
+        <line x1="4" y1="10" x2="20" y2="10"/>
+        <line x1="8" y1="3" x2="8" y2="7"/>
+        <line x1="16" y1="3" x2="16" y2="7"/>
+        <circle cx="12" cy="15" r="1.4" fill="currentColor" stroke="none"/>
+      </svg>
+      Calendar<div class="nav-dot"></div>
+    </button>
+    <button class="nav-btn" data-page="notebook" onclick="goTo('notebook')">
+      <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0">
+        <rect x="6" y="3" width="14" height="18" rx="2"/>
+        <circle cx="4" cy="6" r="1" fill="currentColor" stroke="none"/>
+        <circle cx="4" cy="10" r="1" fill="currentColor" stroke="none"/>
+        <circle cx="4" cy="14" r="1" fill="currentColor" stroke="none"/>
+        <circle cx="4" cy="18" r="1" fill="currentColor" stroke="none"/>
+        <line x1="9" y1="8" x2="17" y2="8"/>
+        <line x1="9" y1="12" x2="17" y2="12"/>
+        <line x1="9" y1="16" x2="14" y2="16"/>
+      </svg>
+      Notebook<div class="nav-dot"></div>
+    </button>
+    <button class="nav-btn" data-page="inventory" onclick="goTo('inventory')">
+      <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0">
+        <path d="M3 8L12 4L21 8L12 12L3 8Z"/>
+        <path d="M3 8V16L12 20L21 16V8"/>
+        <line x1="12" y1="12" x2="12" y2="20"/>
+      </svg>
+      Inventory<div class="nav-dot"></div>
+    </button>
+    <button class="nav-btn" data-page="meals" onclick="goTo('meals')">
+      <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0">
+        <path d="M3 4H5L7 15C7.15 15.8 7.85 16.4 8.65 16.4H18C18.8 16.4 19.5 15.8 19.65 15L21 6.5H6.3"/>
+        <circle cx="9" cy="20" r="1.4" fill="currentColor" stroke="none"/>
+        <circle cx="17" cy="20" r="1.4" fill="currentColor" stroke="none"/>
+      </svg>
+      Meals<div class="nav-dot"></div>
+    </button>
   </nav>
   <div id="modal-root"></div>
   <div id="ob-root"></div>
@@ -2576,7 +2663,7 @@ function renderNB(){
     const previewText=stripHTML(n.content||'');
     return`<div class="note-card" style="background:${n.color}" onclick="openNote('${n.id}')">
       ${(n.pinned||n.is_private)?`<div style="display:flex;align-items:center;gap:5px;font-size:10px;margin-bottom:3px">${n.pinned?'<span>📌</span>':''}${n.is_private?'<span>🔒</span>':''}</div>`:''}
-      <div style="font-weight:800;font-size:13px;color:${T.ink};margin-bottom:5px;line-height:1.3">${n.title||'Untitled'}</div>
+      <div style="font-weight:800;font-size:13px;color:${T.ink};margin-bottom:5px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.title||'Untitled'}</div>
       ${previewText?`<div style="font-size:12px;color:${T.muted};line-height:1.5;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:6px">${previewText}</div>`:''}
       ${total>0?`<div style="font-size:11px;color:${T.muted};margin-bottom:5px">✅ ${done}/${total}</div>`:''}
       <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
@@ -2673,8 +2760,8 @@ function renderNB(){
       <div style="flex:1;min-width:0;padding:10px 10px 16px 10px">
         ${pinned.length?`
           <div style="font-size:11px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">📌 Pinned</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">${pinned.map(nCard).join('')}</div>`:''}
-        ${rest.length?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${rest.map(nCard).join('')}</div>`:''}
+          <div class="note-grid" style="margin-bottom:14px">${pinned.map(nCard).join('')}</div>`:''}
+        ${rest.length?`<div class="note-grid">${rest.map(nCard).join('')}</div>`:''}
         ${filtered.length===0?`<div style="text-align:center;color:${T.muted};padding:48px 0;font-size:14px">No notes yet ✍️</div>`:''}
       </div>
     </div>`;
