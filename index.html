@@ -1,4 +1,4 @@
-<!-- Seamly v8 | STAGING | 26 Jun 2026 -->
+<!-- Seamly v9 | STAGING | 09 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -132,7 +132,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div class="auth-card">
     <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">Seamly</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v8 — Jun 2026</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v9 — Jul 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -348,7 +348,7 @@ let A={
   page:'home',calView:'month',calDate:new Date(),
   calFType:'all',calFMember:'all',calSearch:'',
   settingsTab:'family',noteFGroup:'all',noteSearch:'',
-  mealsTab:'shopping',invTab:'treatments',noteRibbonOpen:true,
+  mealsTab:'planner',invTab:'treatments',noteRibbonOpen:true,
   showOB:false,obStep:0,obFlow:null,
   medSearch:'',
 };
@@ -682,6 +682,10 @@ async function initApp(user){
   if (!A._appInitialized) {
     A._appInitialized = true;
     if (_shortcutParam && ['calendar','meals','notebook'].includes(_shortcutParam)) {
+      // v9: the "meals" shortcut is labelled "Shopping" on the home screen —
+      // it must always land on the Shopping tab, regardless of the fact that
+      // Meal Planner is now the default tab when opening Meals normally.
+      if (_shortcutParam === 'meals') { A.mealsTab = 'shopping'; }
       // Open the page requested by the PWA shortcut
       goTo(_shortcutParam);
       // Clean the URL so refreshing doesn't re-trigger the shortcut
@@ -2536,21 +2540,30 @@ function renderNB(){
   };
 
   // ── RIBBON BUILDER ───────────────────────────────────────────────────────
-  const rW=ribbonOpen?'115px':'32px';
+  // v9: open-state width auto-sizes to content (fit-content) instead of a
+  // hardcoded pixel value, so long group names don't get cut off and short
+  // ones don't leave excess whitespace. min/max keep it within sane bounds.
+  const rWCss=ribbonOpen
+    ?'width:fit-content;min-width:100px;max-width:190px;'
+    :'width:32px;min-width:32px;max-width:32px;';
 
   // Renders one ribbon section button.
   // Expanded: tap selects the group.
   // Collapsed: tap expands the ribbon (stopPropagation so outer div doesn't double-fire).
   // v7: user-created groups also get a small ✏️ edit icon when ribbon is open.
+  // v9: `color` is kept in the signature (some callers still pass a group's
+  // color field) but is intentionally NOT used for any visual styling —
+  // note_groups.color was never meant to drive ribbon appearance and can be
+  // too light to read against the ribbon background. Selected/unselected
+  // states now always use fixed sage-green styling instead.
   const rSection=(id,name,color,isUserGroup=false)=>{
     const isActive=A.noteFGroup===id;
-    const gc=color||T.muted;
     const clickAction=ribbonOpen
       ? `A.noteFGroup='${id}';renderNB()`
       : `event.stopPropagation();A.noteRibbonOpen=true;renderNB()`;
-    return`<div style="display:flex;align-items:center;border-bottom:1px solid ${T.border}33;border-left:3px solid ${gc};background:${isActive?gc+'20':'transparent'}">
+    return`<div style="display:flex;align-items:center;border-bottom:1px solid ${T.border}33;border-left:3px solid ${isActive?T.sage:'transparent'};background:${isActive?T.sageLight:'transparent'}">
       <button onclick="${clickAction}" title="${name}"
-        style="flex:1;display:flex;align-items:center;padding:${ribbonOpen?'10px 4px 10px 0':'10px 0'};border:none;background:transparent;color:${isActive?gc:T.ink};font-size:11px;font-weight:${isActive?'800':'600'};cursor:pointer;text-align:left;-webkit-tap-highlight-color:transparent">
+        style="flex:1;display:flex;align-items:center;padding:${ribbonOpen?'10px 4px 10px 0':'10px 0'};border:none;background:transparent;color:${isActive?T.sage:T.muted};font-size:11px;font-weight:${isActive?'800':'600'};cursor:pointer;text-align:left;-webkit-tap-highlight-color:transparent">
         ${ribbonOpen?`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:9px;line-height:1.4">${name}</span>`:''}
       </button>
       ${ribbonOpen&&isUserGroup&&!isSampleMode()?`<button onclick="event.stopPropagation();openEditGroup('${id}')" title="Edit group" style="background:none;border:none;color:${T.muted};cursor:pointer;font-size:11px;padding:4px 8px 4px 2px;-webkit-tap-highlight-color:transparent">✏️</button>`:''}
@@ -2591,7 +2604,7 @@ function renderNB(){
       <!-- Left Ribbon
            position:sticky keeps the ribbon in view as the notes column scrolls.
            When collapsed, a click anywhere on the ribbon expands it. -->
-      <div style="width:${rW};min-width:${rW};flex-shrink:0;background:${T.parchment};border-right:1px solid ${T.border};display:flex;flex-direction:column;position:sticky;top:0;align-self:flex-start;${!ribbonOpen?'cursor:pointer;':''}"
+      <div style="${rWCss}flex-shrink:0;background:${T.parchment};border-right:1px solid ${T.border};display:flex;flex-direction:column;position:sticky;top:0;align-self:flex-start;${!ribbonOpen?'cursor:pointer;':''}"
         ${!ribbonOpen?`onclick="A.noteRibbonOpen=true;renderNB()" title="Tap to expand sections"`:''}> 
         <!-- Ribbon header: "Sections" label + collapse / expand toggle -->
         <div style="display:flex;align-items:center;justify-content:${ribbonOpen?'space-between':'center'};padding:7px ${ribbonOpen?'8px':'6px'};border-bottom:1px solid ${T.border};flex-shrink:0">
@@ -2632,10 +2645,23 @@ async function saveGroup(){
   if(!A.family)return;
   const name=document.getElementById('ng-name')?.value?.trim();
   if(!name){toast('Please add a name.',true);return;}
-  const{data,error}=await sb.from('note_groups').insert({family_id:A.family.id,name}).select().single();
-  if(error){toast('Error creating group.',true);console.error(error);return;}
-  A.noteGroups.push(data);
-  closeModal();toast('Group created!');renderNB();
+  // v9: immediate button-disable + saving toast, sbWrite() for idle-safety
+  const _saveBtn=document.querySelector('.modal-body button.btn-primary');
+  if(_saveBtn){_saveBtn.disabled=true;_saveBtn.dataset.origText=_saveBtn.textContent;_saveBtn.textContent='Saving…';_saveBtn.style.opacity='0.7';}
+  showSavingToast();
+  let _saveOk=false;
+  try{
+    const{data,error}=await sbWrite(()=>sb.from('note_groups').insert({family_id:A.family.id,name}).select().single());
+    if(error){toast('Error creating group.',true);console.error(error);return;}
+    A.noteGroups.push(data);
+    _saveOk=true;
+    closeModal();toast('Group created!');renderNB();
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    hideSavingToast();
+    if(!_saveOk&&_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent=_saveBtn.dataset.origText||'Create Group';_saveBtn.style.opacity='';}
+  }
 }
 window.saveGroup=saveGroup;
 
@@ -2657,10 +2683,21 @@ window.openEditGroup=openEditGroup;
 async function saveGroupName(groupId){
   const name=document.getElementById('eg-name')?.value?.trim();
   if(!name){toast('Please enter a name.',true);return;}
-  const{data,error}=await sb.from('note_groups').update({name}).eq('id',groupId).select().single();
-  if(error){toast('Error saving group name.',true);console.error(error);return;}
-  A.noteGroups=A.noteGroups.map(g=>g.id===groupId?data:g);
-  closeModal();toast('Group renamed! ✅');renderNB();
+  // v9: brief button-disable + sbWrite() for idle-safety
+  const _saveBtn=document.querySelector('.modal-body button.btn-primary');
+  if(_saveBtn){_saveBtn.disabled=true;_saveBtn.dataset.origText=_saveBtn.textContent;_saveBtn.textContent='Saving…';_saveBtn.style.opacity='0.7';}
+  let _saveOk=false;
+  try{
+    const{data,error}=await sbWrite(()=>sb.from('note_groups').update({name}).eq('id',groupId).select().single());
+    if(error){toast('Error saving group name.',true);console.error(error);return;}
+    A.noteGroups=A.noteGroups.map(g=>g.id===groupId?data:g);
+    _saveOk=true;
+    closeModal();toast('Group renamed! ✅');renderNB();
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    if(!_saveOk&&_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent=_saveBtn.dataset.origText||'Save Name';_saveBtn.style.opacity='';}
+  }
 }
 window.saveGroupName=saveGroupName;
 
@@ -2684,14 +2721,25 @@ function deleteGroupPrompt(groupId){
 window.deleteGroupPrompt=deleteGroupPrompt;
 
 async function confirmDeleteGroup(groupId){
-  const{error}=await sb.from('note_groups').delete().eq('id',groupId);
-  if(error){toast('Error deleting group.',true);console.error(error);return;}
-  // notes inside become ungrouped (group_id → null) via ON DELETE SET NULL in DB
-  A.notes=A.notes.map(n=>n.group_id===groupId?{...n,group_id:null}:n);
-  A.noteGroups=A.noteGroups.filter(g=>g.id!==groupId);
-  // If we were viewing the now-deleted group, fall back to All Notes
-  if(A.noteFGroup===groupId) A.noteFGroup='all';
-  closeModal();toast('Group deleted.');renderNB();
+  // v9: sbWrite() for idle-safety, brief button-disable to prevent double-tap
+  const _delBtn=document.querySelector('.modal-body button.btn-danger');
+  if(_delBtn){_delBtn.disabled=true;_delBtn.dataset.origText=_delBtn.textContent;_delBtn.textContent='Deleting…';_delBtn.style.opacity='0.7';}
+  let _delOk=false;
+  try{
+    const{error}=await sbWrite(()=>sb.from('note_groups').delete().eq('id',groupId));
+    if(error){toast('Error deleting group.',true);console.error(error);return;}
+    // notes inside become ungrouped (group_id → null) via ON DELETE SET NULL in DB
+    A.notes=A.notes.map(n=>n.group_id===groupId?{...n,group_id:null}:n);
+    A.noteGroups=A.noteGroups.filter(g=>g.id!==groupId);
+    // If we were viewing the now-deleted group, fall back to All Notes
+    if(A.noteFGroup===groupId) A.noteFGroup='all';
+    _delOk=true;
+    closeModal();toast('Group deleted.');renderNB();
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    if(!_delOk&&_delBtn){_delBtn.disabled=false;_delBtn.textContent=_delBtn.dataset.origText||'Delete';_delBtn.style.opacity='';}
+  }
 }
 window.confirmDeleteGroup=confirmDeleteGroup;
 
@@ -2843,48 +2891,65 @@ window.addCLItem=addCLItem;
 
 async function saveNote(noteId){
   if(!A.family){toast('Set up your family first.',true);return;}
-  const checklist=[];
-  document.querySelectorAll('#ne-cl > div').forEach((row,i)=>{
-    const cb=row.querySelector('input[type="checkbox"]');
-    const inp=row.querySelector('input:not([type="checkbox"])');
-    if(inp?.value?.trim())checklist.push({id:'c'+i,text:inp.value.trim(),done:cb?.checked||false});
-  });
-  const grpVal=document.getElementById('ne-grp')?.value;
-  // v7: read HTML from the rich-text contenteditable editor instead of a textarea
-  const editorEl=document.getElementById('ne-editor');
-  const content=editorEl?editorEl.innerHTML:'';
-  // v8: privacy — read the toggle if it's visible (user is creator or new note).
-  // If the toggle is not shown (non-creator editing a shared note), preserve
-  // the existing is_private value so it is never accidentally cleared.
-  const _notePrivToggle = document.getElementById('ne-private');
-  const _existNote = noteId ? A.notes.find(n => n.id === noteId) : null;
-  const data={
-    family_id:A.family.id,
-    title:document.getElementById('ne-t')?.value||'',
-    content,
-    color:document.getElementById('ne-col')?.value||NOTE_COLORS[0],
-    group_id:grpVal&&grpVal!=='__new__'?grpVal:null,
-    member_id:document.getElementById('ne-mem')?.value||null,
-    pinned:document.getElementById('ne-pin')?.checked||false,
-    checklist,
-    is_private: _notePrivToggle ? _notePrivToggle.checked : (_existNote?.is_private || false),
-  };
-  // Set created_by_user_id only when creating a new note — never overwrite on edits.
-  if (!noteId) data.created_by_user_id = A.user?.id || null;
-  // v7: sbWrite() for idle-safety
-  let res;
-  if(noteId)res=await sbWrite(()=>sb.from('notes').update(data).eq('id',noteId).select().single());
-  else res=await sbWrite(()=>sb.from('notes').insert(data).select().single());
-  if(res.error){toast('Error saving note: '+(res.error.message||'please try again.'),true);console.error(res.error);return;}
-  const savedNote = res.data;
-  if(noteId)A.notes=A.notes.map(n=>n.id===noteId?savedNote:n);
-  else A.notes.push(savedNote);
-  // v8: notify other family members
-  writeNotif('note', noteId ? 'updated' : 'created',
-    noteId ? `${getActorName()} updated a note` : `${getActorName()} added a new note`,
-    data.title || 'Untitled'
-  );
-  closeModal();toast(noteId?'Note updated!':'Note saved!');renderNB();
+  // v9: button-disable + saving toast fire IMMEDIATELY on tap, before any
+  // form reading or the Supabase call — previously users saw nothing for
+  // up to 7s (the sbWrite timeout) which caused double-taps. Whole body is
+  // now wrapped in try/catch/finally so this cleanup always runs.
+  const _saveBtn=document.querySelector('.modal-body button.btn-primary');
+  if(_saveBtn){_saveBtn.disabled=true;_saveBtn.dataset.origText=_saveBtn.textContent;_saveBtn.textContent='Saving…';_saveBtn.style.opacity='0.7';}
+  showSavingToast();
+  let _saveOk=false;
+  try{
+    const checklist=[];
+    document.querySelectorAll('#ne-cl > div').forEach((row,i)=>{
+      const cb=row.querySelector('input[type="checkbox"]');
+      const inp=row.querySelector('input:not([type="checkbox"])');
+      if(inp?.value?.trim())checklist.push({id:'c'+i,text:inp.value.trim(),done:cb?.checked||false});
+    });
+    const grpVal=document.getElementById('ne-grp')?.value;
+    // v7: read HTML from the rich-text contenteditable editor instead of a textarea
+    const editorEl=document.getElementById('ne-editor');
+    const content=editorEl?editorEl.innerHTML:'';
+    // v8: privacy — read the toggle if it's visible (user is creator or new note).
+    // If the toggle is not shown (non-creator editing a shared note), preserve
+    // the existing is_private value so it is never accidentally cleared.
+    const _notePrivToggle = document.getElementById('ne-private');
+    const _existNote = noteId ? A.notes.find(n => n.id === noteId) : null;
+    const data={
+      family_id:A.family.id,
+      title:document.getElementById('ne-t')?.value||'',
+      content,
+      color:document.getElementById('ne-col')?.value||NOTE_COLORS[0],
+      group_id:grpVal&&grpVal!=='__new__'?grpVal:null,
+      member_id:document.getElementById('ne-mem')?.value||null,
+      pinned:document.getElementById('ne-pin')?.checked||false,
+      checklist,
+      is_private: _notePrivToggle ? _notePrivToggle.checked : (_existNote?.is_private || false),
+    };
+    // Set created_by_user_id only when creating a new note — never overwrite on edits.
+    if (!noteId) data.created_by_user_id = A.user?.id || null;
+    // v7: sbWrite() for idle-safety
+    let res;
+    if(noteId)res=await sbWrite(()=>sb.from('notes').update(data).eq('id',noteId).select().single());
+    else res=await sbWrite(()=>sb.from('notes').insert(data).select().single());
+    if(res.error){toast('Error saving note: '+(res.error.message||'please try again.'),true);console.error(res.error);return;}
+    const savedNote = res.data;
+    if(noteId)A.notes=A.notes.map(n=>n.id===noteId?savedNote:n);
+    else A.notes.push(savedNote);
+    _saveOk=true;
+    // v8: notify other family members
+    writeNotif('note', noteId ? 'updated' : 'created',
+      noteId ? `${getActorName()} updated a note` : `${getActorName()} added a new note`,
+      data.title || 'Untitled'
+    );
+    closeModal();toast(noteId?'Note updated!':'Note saved!');renderNB();
+  }catch(e){
+    console.error('saveNote error', e);
+    toast('Something went wrong — please try again.', true);
+  }finally{
+    hideSavingToast();
+    if(!_saveOk&&_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent=_saveBtn.dataset.origText||'Save';_saveBtn.style.opacity='';}
+  }
 }
 window.saveNote=saveNote;
 
@@ -2906,10 +2971,21 @@ function delNote(id){
 window.delNote=delNote;
 
 async function confirmDelNote(id){
-  const{error}=await sb.from('notes').delete().eq('id',id);
-  if(error){toast('Error deleting note.',true);return;}
-  A.notes=A.notes.filter(n=>n.id!==id);
-  closeModal();toast('Note deleted.');renderNB();renderHome();
+  // v9: sbWrite() for idle-safety, brief button-disable to prevent double-tap
+  const _delBtn=document.querySelector('.modal-body button.btn-danger');
+  if(_delBtn){_delBtn.disabled=true;_delBtn.dataset.origText=_delBtn.textContent;_delBtn.textContent='Deleting…';_delBtn.style.opacity='0.7';}
+  let _delOk=false;
+  try{
+    const{error}=await sbWrite(()=>sb.from('notes').delete().eq('id',id));
+    if(error){toast('Error deleting note.',true);console.error(error);return;}
+    A.notes=A.notes.filter(n=>n.id!==id);
+    _delOk=true;
+    closeModal();toast('Note deleted.');renderNB();renderHome();
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    if(!_delOk&&_delBtn){_delBtn.disabled=false;_delBtn.textContent=_delBtn.dataset.origText||'Delete';_delBtn.style.opacity='';}
+  }
 }
 window.confirmDelNote=confirmDelNote;
 
@@ -3673,7 +3749,7 @@ function renderHome(){
 
       <div style="display:flex;gap:8px;margin-bottom:14px">
         <button onclick="showPicker(new Date())" style="flex:1;padding:12px;border-radius:12px;background:${T.sage};color:#fff;border:none;font-weight:700;font-size:13px;cursor:pointer">+ Calendar Entry</button>
-        <button onclick="goTo('meals')" style="flex:1;padding:12px;border-radius:12px;background:${T.honeyLight};color:${T.honey};border:1px solid ${T.honey}44;font-weight:700;font-size:13px;cursor:pointer">🛒 Shopping</button>
+        <button onclick="A.mealsTab='shopping';goTo('meals')" style="flex:1;padding:12px;border-radius:12px;background:${T.honeyLight};color:${T.honey};border:1px solid ${T.honey}44;font-weight:700;font-size:13px;cursor:pointer">🛒 Shopping</button>
       </div>
 
       <div style="font-weight:800;font-size:14px;color:${T.ink};margin-bottom:8px">Today — ${fmt(today)}</div>
@@ -3733,8 +3809,8 @@ const MEAL_PLAN_DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const MEAL_PLAN_ROWS=['Breakfast','Lunch','Snack','Dinner'];
 
 function renderMeals(){
-  if(!A.mealsTab||A.mealsTab==='ideas') A.mealsTab='shopping';
-  const TABS=[{id:'shopping',label:'🛒 Shopping'},{id:'planner',label:'📅 Meal Planner'}];
+  if(!A.mealsTab||A.mealsTab==='ideas') A.mealsTab='planner';
+  const TABS=[{id:'planner',label:'📅 Meal Planner'},{id:'shopping',label:'🛒 Shopping'}];
   let tc='';
   if(A.mealsTab==='shopping'){
     tc=renderShoppingTab();
@@ -3789,30 +3865,90 @@ function renderShoppingTab(){
 }
 window.renderShoppingTab=renderShoppingTab;
 
-async function createShoppingList(){
+function createShoppingList(){
   if(isSampleMode()){toast('Switch to My Family to create lists.',true);return;}
   if(!A.family){toast('Set up your family first.',true);return;}
+  // v9: show a naming modal instead of creating the list immediately with an
+  // auto-generated name. The suggested name is pre-filled and auto-selected
+  // so the user can just start typing to override it.
   const listCount=A.shoppingLists.length;
-  const name=listCount===0?'Shopping List':'Shopping List '+(listCount+1);
-  const{data,error}=await sb.from('shopping_lists').insert({
-    family_id:A.family.id,name,items:[]
-  }).select().single();
-  if(error){toast('Error creating list: '+(error.message||'unknown'),true);console.error(error);return;}
-  A.shoppingLists.push(data);
-  renderMeals();
-  openShoppingList(data.id);
+  const suggestedName=listCount===0?'Shopping List':'Shopping List '+(listCount+1);
+  showModal('New Shopping List',`
+    <div class="form-row">
+      <label class="lbl">List name</label>
+      <input class="inp" id="sl-new-name-inp" value="${suggestedName.replace(/"/g,'&quot;')}" autofocus
+        onkeydown="if(event.key==='Enter'){event.preventDefault();confirmCreateShoppingList();}">
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" style="flex:1" onclick="confirmCreateShoppingList()">Create</button>
+    </div>`);
+  setTimeout(()=>{
+    const inp=document.getElementById('sl-new-name-inp');
+    if(inp){inp.focus();inp.select();}
+  },80);
 }
 window.createShoppingList=createShoppingList;
 
-async function deleteShoppingList(id){
-  if(!confirm('Delete this shopping list?'))return;
-  const{error}=await sb.from('shopping_lists').delete().eq('id',id);
-  if(error){toast('Error deleting list.',true);console.error(error);return;}
-  A.shoppingLists=A.shoppingLists.filter(l=>l.id!==id);
-  toast('List deleted.');
-  renderMeals();
+async function confirmCreateShoppingList(){
+  if(!A.family)return;
+  const name=document.getElementById('sl-new-name-inp')?.value?.trim();
+  if(!name){toast('Please add a name.',true);return;}
+  const _saveBtn=document.querySelector('.modal-body button.btn-primary');
+  if(_saveBtn){_saveBtn.disabled=true;_saveBtn.dataset.origText=_saveBtn.textContent;_saveBtn.textContent='Creating…';_saveBtn.style.opacity='0.7';}
+  let _saveOk=false;
+  try{
+    const{data,error}=await sbWrite(()=>sb.from('shopping_lists').insert({
+      family_id:A.family.id,name,items:[]
+    }).select().single());
+    if(error){toast('Error creating list: '+(error.message||'unknown'),true);console.error(error);return;}
+    A.shoppingLists.push(data);
+    _saveOk=true;
+    renderMeals();
+    openShoppingList(data.id);
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    if(!_saveOk&&_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent=_saveBtn.dataset.origText||'Create';_saveBtn.style.opacity='';}
+  }
+}
+window.confirmCreateShoppingList=confirmCreateShoppingList;
+
+function deleteShoppingList(id){
+  const list=A.shoppingLists.find(l=>l.id===id);
+  if(!list)return;
+  // v9: replaced native confirm() with the in-app modal pattern used
+  // everywhere else in the app (events, notes, groups) for consistency.
+  showModal('Delete List',`
+    <div style="text-align:center;padding:10px 0">
+      <div style="font-size:40px;margin-bottom:12px">🗑</div>
+      <div style="font-weight:700;font-size:16px;margin-bottom:8px">Delete "${list.name}"?</div>
+      <div style="font-size:13px;color:${T.muted};margin-bottom:16px">This shopping list and all its items will be permanently removed.</div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-danger" style="flex:1" onclick="confirmDeleteShoppingList('${id}')">Delete</button>
+      </div>
+    </div>`);
 }
 window.deleteShoppingList=deleteShoppingList;
+
+async function confirmDeleteShoppingList(id){
+  const _delBtn=document.querySelector('.modal-body button.btn-danger');
+  if(_delBtn){_delBtn.disabled=true;_delBtn.dataset.origText=_delBtn.textContent;_delBtn.textContent='Deleting…';_delBtn.style.opacity='0.7';}
+  let _delOk=false;
+  try{
+    const{error}=await sbWrite(()=>sb.from('shopping_lists').delete().eq('id',id));
+    if(error){toast('Error deleting list.',true);console.error(error);return;}
+    A.shoppingLists=A.shoppingLists.filter(l=>l.id!==id);
+    _delOk=true;
+    closeModal();toast('List deleted.');renderMeals();
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    if(!_delOk&&_delBtn){_delBtn.disabled=false;_delBtn.textContent=_delBtn.dataset.origText||'Delete';_delBtn.style.opacity='';}
+  }
+}
+window.confirmDeleteShoppingList=confirmDeleteShoppingList;
 
 // ── RENAME SHOPPING LIST (v7) ─────────────────────────────────────────────────
 function renameShoppingList(id){
@@ -3853,6 +3989,10 @@ function openShoppingList(id){
 window.openShoppingList=openShoppingList;
 
 function renderShoppingModal(id){
+  // v9: capture scroll position before rebuilding the modal HTML, so any
+  // action that re-renders (checking an item, adding an item, toggling
+  // "Hide completed") doesn't reset the user back to the top of a long list.
+  const _prevScrollTop=document.querySelector('.modal-body')?.scrollTop;
   const list=A.shoppingLists.find(l=>l.id===id);
   if(!list)return;
   const items=list.items||[];
@@ -3860,10 +4000,17 @@ function renderShoppingModal(id){
   const hideDone=A._shopHideDone;
   const itemRow=(item,idx)=>{
     if(hideDone&&item.done)return'';
+    // v9: item text is now an editable input instead of a read-only span,
+    // styled to visually match the old span (borderless, transparent,
+    // strikethrough preserved when done). Saves silently on blur/Enter via
+    // updateShoppingItemText — no re-render, so no scroll jump.
     return`<div class="shop-item-row" draggable="true" data-idx="${idx}" style="display:flex;align-items:center;gap:8px;margin-bottom:6px;background:#fff;border:1px solid ${T.border};border-radius:9px;padding:6px 8px">
       <span class="drag-handle" style="cursor:grab;color:#c8bfb0;font-size:14px;flex-shrink:0;user-select:none;touch-action:none">⠿</span>
       <input type="checkbox" ${item.done?'checked':''} onchange="toggleShoppingItem('${id}',${idx},this.checked)">
-      <span style="flex:1;font-size:13px;${item.done?`text-decoration:line-through;color:${T.muted}`:''}">${item.text}</span>
+      <input type="text" value="${(item.text||'').replace(/"/g,'&quot;')}"
+        style="flex:1;min-width:0;font-size:13px;border:none;background:transparent;padding:2px 0;font-family:inherit;color:${item.done?T.muted:T.ink};text-decoration:${item.done?'line-through':'none'}"
+        onblur="updateShoppingItemText('${id}',${idx},this.value)"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
       <button onclick="removeShoppingItem('${id}',${idx})" style="background:none;border:none;color:${T.muted};font-size:16px;cursor:pointer;padding:2px 4px">×</button>
     </div>`;
   };
@@ -3883,9 +4030,39 @@ function renderShoppingModal(id){
     </div>
     ${items.length?`<button class="btn btn-secondary btn-full" style="margin-top:10px" onclick="resetShoppingList('${id}')">↺ Uncheck all items</button>`:''}
   `);
-  setTimeout(()=>initShoppingDrag(id),50);
+  // v9: restore scroll position + init drag-to-reorder in the same tick
+  // (both run in this one setTimeout — no extra async tick needed)
+  setTimeout(()=>{
+    initShoppingDrag(id);
+    const mb=document.querySelector('.modal-body');
+    if(mb&&_prevScrollTop)mb.scrollTop=_prevScrollTop;
+  },50);
 }
 window.renderShoppingModal=renderShoppingModal;
+
+// v9: silently saves an edited item's text without triggering a full modal
+// re-render (which would reset scroll position). Reverts to the original
+// text if the field is cleared; no-ops if the text is unchanged.
+async function updateShoppingItemText(listId,idx,newText){
+  const list=A.shoppingLists.find(l=>l.id===listId);
+  if(!list)return;
+  const items=list.items||[];
+  const item=items[idx];
+  if(!item)return;
+  const trimmed=(newText||'').trim();
+  if(!trimmed){
+    // Cleared field — revert the input to the original text, don't save a blank item
+    const inp=document.querySelector(`#shop-items-${listId} .shop-item-row[data-idx="${idx}"] input[type="text"]`);
+    if(inp)inp.value=item.text;
+    return;
+  }
+  if(trimmed===item.text)return; // unchanged — nothing to save
+  const newItems=items.map((it,i)=>i===idx?{...it,text:trimmed}:it);
+  list.items=newItems;
+  const{error}=await sbWrite(()=>sb.from('shopping_lists').update({items:newItems}).eq('id',listId));
+  if(error){toast('Error saving item.',true);console.error(error);}
+}
+window.updateShoppingItemText=updateShoppingItemText;
 
 // Mouse + touch drag-to-reorder for shopping list items
 function initShoppingDrag(listId){
