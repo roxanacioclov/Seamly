@@ -1,4 +1,4 @@
-<!-- Seamly v9 | STAGING | 09 Jul 2026 -->
+<!-- Seamly v10 | STAGING | 09 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -563,9 +563,14 @@ async function loadAll(){
 
 async function seedMedicalGroup(){
   if(!A.family)return;
-  const{data:grp}=await sb.from('note_groups').insert({
+  // v10 (UX hardening): sbWrite() for idle-safety. This runs silently during
+  // first-time setup with no button/UI to give feedback on — if it failed
+  // on a flaky connection, the user just quietly never got their starter
+  // content with no way to know why. No user-facing error needed since
+  // there's nothing actionable for them to do; just make it more reliable.
+  const{data:grp}=await sbWrite(()=>sb.from('note_groups').insert({
     family_id:A.family.id, name:'🏥 Medical Reference'
-  }).select().single();
+  }).select().single());
   if(!grp)return;
   A.noteGroups.push(grp);
   const notes=[
@@ -577,7 +582,7 @@ async function seedMedicalGroup(){
     {title:'🌡 Fever Management',content:'**Managing fever naturally**\n\n💊 Supplements: Vitamin C, Elderberry, plenty of fluids\n\n🌿 Plants: Elder flower tea (promotes sweating), Linden blossom tea, Echinacea\n\n🛢 DoTerra oils: Peppermint diluted on forehead & feet (cooling), Frankincense\n\n⚠️ <38°C: let it fight. 38-39°C: monitor, comfort. >39°C children / >40°C adults → paracetamol & doctor.',color:"#f2ddd4",pinned:false}
   ];
   const toInsert=notes.map(n=>({...n,family_id:A.family.id,group_id:grp.id}));
-  const{data:newNotes}=await sb.from('notes').insert(toInsert).select();
+  const{data:newNotes}=await sbWrite(()=>sb.from('notes').insert(toInsert).select());
   if(newNotes)A.notes.push(...newNotes);
 }
 
@@ -591,10 +596,11 @@ async function cleanupOldMealsGroups(){
   const toRemove=A.noteGroups.filter(g=>OLD_GROUP_NAMES.includes(g.name));
   if(!toRemove.length)return;
   const groupIds=toRemove.map(g=>g.id);
+  // v10 (UX hardening): sbWrite() for idle-safety on both silent cleanup writes.
   // Delete notes inside these groups (group_id is ON DELETE SET NULL, so notes
   // would otherwise survive — we want them gone, they're Meals-only data)
-  await sb.from('notes').delete().in('group_id',groupIds);
-  await sb.from('note_groups').delete().in('id',groupIds);
+  await sbWrite(()=>sb.from('notes').delete().in('group_id',groupIds));
+  await sbWrite(()=>sb.from('note_groups').delete().in('id',groupIds));
   A.notes=A.notes.filter(n=>!groupIds.includes(n.group_id));
   A.noteGroups=A.noteGroups.filter(g=>!groupIds.includes(g.id));
 }
@@ -2134,14 +2140,22 @@ async function saveEv(type, evId, dateTs) {
         const sharedUpdate = {};
         SERIES_SHARED_FIELDS.forEach(k => { if (cleanedData[k] !== undefined) sharedUpdate[k] = cleanedData[k]; });
         if (Object.keys(sharedUpdate).length) {
-          const {data: seriesRows} = await sb.from('events').update(sharedUpdate)
-            .eq('series_id', editSeriesId).neq('id', evId).select();
-          if (seriesRows) {
+          // v10 (UX hardening): this secondary write had no sbWrite() and no
+          // error handling at all — a failure here previously left the user
+          // thinking the whole series was updated when only the tapped
+          // occurrence actually saved. The primary event above already saved
+          // successfully, so on failure here we warn rather than block.
+          const {data: seriesRows, error: seriesErr} = await sbWrite(() => sb.from('events').update(sharedUpdate)
+            .eq('series_id', editSeriesId).neq('id', evId).select());
+          if (seriesErr) {
+            toast('Entry saved, but updating the rest of the series failed — please try again.', true);
+            console.error('Series sibling update error', seriesErr);
+          } else if (seriesRows) {
             A.events = A.events.map(e => e.series_id === editSeriesId && e.id !== evId
               ? {...e, ...sharedUpdate} : e);
+            const siblingsCount = A.events.filter(e => e.series_id === editSeriesId && e.id !== evId).length;
+            seriesUpdateMsg = `Series updated! ✅ (${siblingsCount + 1} occurrences)`;
           }
-          const siblingsCount = A.events.filter(e => e.series_id === editSeriesId && e.id !== evId).length;
-          seriesUpdateMsg = `Series updated! ✅ (${siblingsCount + 1} occurrences)`;
         }
       }
 
@@ -2152,9 +2166,16 @@ async function saveEv(type, evId, dateTs) {
           ? generateRecurrences(cleanedData).slice(1).map(ev => {const {id:__, ...rest} = ev; return rest;})
           : [];
         if (futureInstances.length > 0) {
-          const {data: newRecs} = await sb.from('events').insert(futureInstances.map(e=>{const{family_id:_f,...r}=e;return{family_id:cleanedData.family_id,...r};})).select();
-          if (newRecs) A.events.push(...newRecs);
-          toast(`Entry updated! ${newRecs?.length ? '('+newRecs.length+' recurring instances created)' : ''}`);
+          // v10 (UX hardening): same gap as above — no sbWrite() or error
+          // handling on the future-recurrence insert.
+          const {data: newRecs, error: recErr} = await sbWrite(() => sb.from('events').insert(futureInstances.map(e=>{const{family_id:_f,...r}=e;return{family_id:cleanedData.family_id,...r};})).select());
+          if (recErr) {
+            toast('Entry saved, but creating future recurring dates failed — please try again.', true);
+            console.error('Future recurrence insert error', recErr);
+          } else {
+            if (newRecs) A.events.push(...newRecs);
+            toast(`Entry updated! ${newRecs?.length ? '('+newRecs.length+' recurring instances created)' : ''}`);
+          }
         }
       }
     } else {
@@ -2299,13 +2320,28 @@ window.showRecurrenceEditChoice = showRecurrenceEditChoice;
 async function deleteEntireSeries(seriesId) {
   const toDelete = A.events.filter(e=>e.series_id===seriesId);
   if (!toDelete.length) { closeModal(); return; }
-  const {error} = await sb.from('events').delete().eq('series_id', seriesId);
-  if (error) { toast('Error deleting series.', true); console.error(error); return; }
-  A.events = A.events.filter(e=>e.series_id!==seriesId);
-  closeModal();
-  toast(`Series deleted — ${toDelete.length} occurrence${toDelete.length!==1?'s':''} removed.`);
-  renderCal();
-  renderHome();
+  // v10 (UX hardening): button-disable + saving toast + sbWrite() for idle-safety.
+  // The series delete modal has exactly one danger button ("Delete all X
+  // occurrences"), so this selector is reliable.
+  const _delBtn=document.querySelector('.modal-body button.btn-danger');
+  if(_delBtn){_delBtn.disabled=true;_delBtn.dataset.origText=_delBtn.textContent;_delBtn.textContent='Deleting…';_delBtn.style.opacity='0.7';}
+  showSavingToast();
+  let _delOk=false;
+  try{
+    const {error} = await sbWrite(() => sb.from('events').delete().eq('series_id', seriesId));
+    if (error) { toast('Error deleting series.', true); console.error(error); return; }
+    A.events = A.events.filter(e=>e.series_id!==seriesId);
+    _delOk=true;
+    closeModal();
+    toast(`Series deleted — ${toDelete.length} occurrence${toDelete.length!==1?'s':''} removed.`);
+    renderCal();
+    renderHome();
+  }catch(e){
+    toast('Something went wrong — please try again.', true); console.error(e);
+  }finally{
+    hideSavingToast();
+    if(!_delOk&&_delBtn){_delBtn.disabled=false;_delBtn.textContent=_delBtn.dataset.origText||'Delete';_delBtn.style.opacity='';}
+  }
 }
 window.deleteEntireSeries = deleteEntireSeries;
 
@@ -2470,15 +2506,26 @@ window.delEv = delEv;
 
 async function confirmDelEv(id) {
   const _evToDel = A.events.find(e=>e.id===id);
-  const {error} = await sb.from('events').delete().eq('id', id);
-  if (error) { toast('Error deleting.', true); return; }
-  A.events = A.events.filter(e=>e.id!==id);
-  // v8: notify other family members
-  writeNotif('event','deleted',`${getActorName()} deleted an event`,_evToDel?.title||'');
-  closeModal(); toast('Entry deleted.');
-  renderCal();
-  renderHome();
-  if(A.calSearch || A.calFType!=='all' || A.calFMember!=='all') setTimeout(renderCalResults, 50);
+  // v10 (UX hardening): showSavingToast()/hideSavingToast() + sbWrite() for
+  // idle-safety. No button disable here — this function is called from two
+  // different confirmation modals (simple delete + recurring series choice),
+  // making a single reliable button selector impractical.
+  showSavingToast();
+  try{
+    const {error} = await sbWrite(() => sb.from('events').delete().eq('id', id));
+    if (error) { toast('Error deleting.', true); console.error(error); return; }
+    A.events = A.events.filter(e=>e.id!==id);
+    // v8: notify other family members
+    writeNotif('event','deleted',`${getActorName()} deleted an event`,_evToDel?.title||'');
+    closeModal(); toast('Entry deleted.');
+    renderCal();
+    renderHome();
+    if(A.calSearch || A.calFType!=='all' || A.calFMember!=='all') setTimeout(renderCalResults, 50);
+  }catch(e){
+    toast('Something went wrong — please try again.', true); console.error(e);
+  }finally{
+    hideSavingToast();
+  }
 }
 window.confirmDelEv = confirmDelEv;
 
@@ -2686,6 +2733,9 @@ async function saveGroupName(groupId){
   // v9: brief button-disable + sbWrite() for idle-safety
   const _saveBtn=document.querySelector('.modal-body button.btn-primary');
   if(_saveBtn){_saveBtn.disabled=true;_saveBtn.dataset.origText=_saveBtn.textContent;_saveBtn.textContent='Saving…';_saveBtn.style.opacity='0.7';}
+  // v10 (UX hardening): was missing showSavingToast()/hideSavingToast() —
+  // button-disable alone isn't enough feedback, add the toast too.
+  showSavingToast();
   let _saveOk=false;
   try{
     const{data,error}=await sbWrite(()=>sb.from('note_groups').update({name}).eq('id',groupId).select().single());
@@ -2696,6 +2746,7 @@ async function saveGroupName(groupId){
   }catch(e){
     toast('Something went wrong — please try again.',true);console.error(e);
   }finally{
+    hideSavingToast();
     if(!_saveOk&&_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent=_saveBtn.dataset.origText||'Save Name';_saveBtn.style.opacity='';}
   }
 }
@@ -2724,6 +2775,8 @@ async function confirmDeleteGroup(groupId){
   // v9: sbWrite() for idle-safety, brief button-disable to prevent double-tap
   const _delBtn=document.querySelector('.modal-body button.btn-danger');
   if(_delBtn){_delBtn.disabled=true;_delBtn.dataset.origText=_delBtn.textContent;_delBtn.textContent='Deleting…';_delBtn.style.opacity='0.7';}
+  // v10 (UX hardening): was missing showSavingToast()/hideSavingToast().
+  showSavingToast();
   let _delOk=false;
   try{
     const{error}=await sbWrite(()=>sb.from('note_groups').delete().eq('id',groupId));
@@ -2738,6 +2791,7 @@ async function confirmDeleteGroup(groupId){
   }catch(e){
     toast('Something went wrong — please try again.',true);console.error(e);
   }finally{
+    hideSavingToast();
     if(!_delOk&&_delBtn){_delBtn.disabled=false;_delBtn.textContent=_delBtn.dataset.origText||'Delete';_delBtn.style.opacity='';}
   }
 }
@@ -2974,6 +3028,8 @@ async function confirmDelNote(id){
   // v9: sbWrite() for idle-safety, brief button-disable to prevent double-tap
   const _delBtn=document.querySelector('.modal-body button.btn-danger');
   if(_delBtn){_delBtn.disabled=true;_delBtn.dataset.origText=_delBtn.textContent;_delBtn.textContent='Deleting…';_delBtn.style.opacity='0.7';}
+  // v10 (UX hardening): was missing showSavingToast()/hideSavingToast().
+  showSavingToast();
   let _delOk=false;
   try{
     const{error}=await sbWrite(()=>sb.from('notes').delete().eq('id',id));
@@ -2984,6 +3040,7 @@ async function confirmDelNote(id){
   }catch(e){
     toast('Something went wrong — please try again.',true);console.error(e);
   }finally{
+    hideSavingToast();
     if(!_delOk&&_delBtn){_delBtn.disabled=false;_delBtn.textContent=_delBtn.dataset.origText||'Delete';_delBtn.style.opacity='';}
   }
 }
@@ -3178,14 +3235,20 @@ function renderMeds(targetId){
 
 async function updateCurrency(code){
   if(!A.family)return;
-  const{data}=await sb.from('families').update({currency:code}).eq('id',A.family.id).select().single();
+  // v10 (UX hardening): sbWrite() + error toast — this function previously
+  // had zero error handling at all.
+  const{data,error}=await sbWrite(()=>sb.from('families').update({currency:code}).eq('id',A.family.id).select().single());
+  if(error){toast('Error saving currency.',true);console.error(error);return;}
   if(data){A.family=data;renderMeds();}
 }
 window.updateCurrency=updateCurrency;
 
 async function updateTransport(val){
   if(!A.family)return;
-  await sb.from('families').update({transport_cost:parseFloat(val)||0}).eq('id',A.family.id);
+  // v10 (UX hardening): sbWrite() + error toast — this function previously
+  // had zero error handling at all.
+  const{error}=await sbWrite(()=>sb.from('families').update({transport_cost:parseFloat(val)||0}).eq('id',A.family.id));
+  if(error){toast('Error saving transport cost.',true);console.error(error);return;}
   if(A.family)A.family.transport_cost=parseFloat(val)||0;
 }
 window.updateTransport=updateTransport;
@@ -3972,11 +4035,24 @@ async function saveShoppingListName(id){
   if(!name){toast('Please enter a name.',true);return;}
   const list=A.shoppingLists.find(l=>l.id===id);
   if(!list)return;
-  const{data,error}=await sb.from('shopping_lists').update({name}).eq('id',id).select().single();
-  if(error){toast('Error renaming: '+(error.message||'please try again.'),true);return;}
-  if(data){
-    A.shoppingLists=A.shoppingLists.map(l=>l.id===id?data:l);
-    closeModal();toast('List renamed! ✅');renderMeals();
+  // v10 (UX hardening): button-disable + saving toast + sbWrite() for idle-safety.
+  const _saveBtn=document.querySelector('.modal-body button.btn-primary');
+  if(_saveBtn){_saveBtn.disabled=true;_saveBtn.dataset.origText=_saveBtn.textContent;_saveBtn.textContent='Saving…';_saveBtn.style.opacity='0.7';}
+  showSavingToast();
+  let _saveOk=false;
+  try{
+    const{data,error}=await sbWrite(()=>sb.from('shopping_lists').update({name}).eq('id',id).select().single());
+    if(error){toast('Error renaming: '+(error.message||'please try again.'),true);console.error(error);return;}
+    if(data){
+      A.shoppingLists=A.shoppingLists.map(l=>l.id===id?data:l);
+      _saveOk=true;
+      closeModal();toast('List renamed! ✅');renderMeals();
+    }
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    hideSavingToast();
+    if(!_saveOk&&_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent=_saveBtn.dataset.origText||'Save';_saveBtn.style.opacity='';}
   }
 }
 window.saveShoppingListName=saveShoppingListName;
@@ -4110,7 +4186,10 @@ async function reorderShoppingItems(listId,cont){
   const finalOrder=[...shownIdx,...hiddenIdx];
   const newItems=finalOrder.map(i=>items[i]);
   list.items=newItems;
-  await sb.from('shopping_lists').update({items:newItems}).eq('id',listId);
+  // v10 (UX hardening): sbWrite() + error toast. No loading state — drag-to-
+  // reorder should feel instant. Always re-render regardless of outcome.
+  const{error}=await sbWrite(()=>sb.from('shopping_lists').update({items:newItems}).eq('id',listId));
+  if(error){toast('Error saving new order.',true);console.error(error);}
   renderShoppingModal(listId);
 }
 window.reorderShoppingItems=reorderShoppingItems;
@@ -4123,11 +4202,23 @@ async function addShoppingItem(listId){
   if(!list)return;
   const newItem={id:(typeof crypto!=='undefined'&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2),text,done:false};
   const items=[...(list.items||[]),newItem];
-  list.items=items;
-  await sb.from('shopping_lists').update({items}).eq('id',listId);
-  // v8: notify other family members
-  writeNotif('shopping','updated',`${getActorName()} added to a shopping list`,text);
-  renderShoppingModal(listId);
+  // v10 (UX hardening): brief disable of the inline Add button + sbWrite().
+  // Timing bug fix: local state (list.items) now only updates AFTER the DB
+  // write is confirmed, so a failed write never leaves stale local state.
+  const _addBtn=inp?.nextElementSibling;
+  if(_addBtn){_addBtn.disabled=true;_addBtn.style.opacity='0.7';}
+  try{
+    const{error}=await sbWrite(()=>sb.from('shopping_lists').update({items}).eq('id',listId));
+    if(error){toast('Error adding item.',true);console.error(error);return;}
+    list.items=items;
+    // v8: notify other family members
+    writeNotif('shopping','updated',`${getActorName()} added to a shopping list`,text);
+    renderShoppingModal(listId);
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    if(_addBtn){_addBtn.disabled=false;_addBtn.style.opacity='';}
+  }
 }
 window.addShoppingItem=addShoppingItem;
 
@@ -4136,7 +4227,9 @@ async function removeShoppingItem(listId,idx){
   if(!list)return;
   const items=(list.items||[]).filter((_,i)=>i!==idx);
   list.items=items;
-  await sb.from('shopping_lists').update({items}).eq('id',listId);
+  // v10 (UX hardening): sbWrite() + error toast on failure.
+  const{error}=await sbWrite(()=>sb.from('shopping_lists').update({items}).eq('id',listId));
+  if(error){toast('Error removing item.',true);console.error(error);}
   renderShoppingModal(listId);
 }
 window.removeShoppingItem=removeShoppingItem;
@@ -4145,10 +4238,21 @@ async function resetShoppingList(listId){
   const list=A.shoppingLists.find(l=>l.id===listId);
   if(!list)return;
   const items=(list.items||[]).map(i=>({...i,done:false}));
-  list.items=items;
-  await sb.from('shopping_lists').update({items}).eq('id',listId);
-  toast('All items unchecked! ✅');
-  renderShoppingModal(listId);
+  // v10 (UX hardening): disable the reset button during the write + sbWrite().
+  // This is the only .btn-secondary.btn-full button in this modal.
+  const _resetBtn=document.querySelector('.modal-body .btn-secondary.btn-full');
+  if(_resetBtn){_resetBtn.disabled=true;_resetBtn.style.opacity='0.7';}
+  try{
+    const{error}=await sbWrite(()=>sb.from('shopping_lists').update({items}).eq('id',listId));
+    if(error){toast('Error resetting list.',true);console.error(error);return;}
+    list.items=items;
+    toast('All items unchecked! ✅');
+    renderShoppingModal(listId);
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    if(_resetBtn){_resetBtn.disabled=false;_resetBtn.style.opacity='';}
+  }
 }
 window.resetShoppingList=resetShoppingList;
 
@@ -4159,8 +4263,17 @@ async function toggleShoppingItem(listId,idx,checked){
   const items=[...(list.items||[])];
   if(!items[idx])return;
   items[idx]={...items[idx],done:checked};
+  // v10 (UX hardening): timing bug fix — local state only updates after a
+  // confirmed DB write. On failure, re-render from the unchanged saved state
+  // so the checkbox visually reverts instead of showing a state that was
+  // never actually saved.
+  const{error}=await sbWrite(()=>sb.from('shopping_lists').update({items}).eq('id',listId));
+  if(error){
+    toast('Error saving — please try again.',true);console.error(error);
+    renderShoppingModal(listId);
+    return;
+  }
   list.items=items;
-  await sb.from('shopping_lists').update({items}).eq('id',listId);
   if(checked) showShopUndoToast(listId,idx);
   renderShoppingModal(listId);
 }
@@ -4188,8 +4301,17 @@ async function undoShopCheck(listId,idx){
   const items=[...(list.items||[])];
   if(!items[idx])return;
   items[idx]={...items[idx],done:false};
+  // v10 (UX hardening, follow-up): same timing-bug fix as toggleShoppingItem —
+  // local state only updates after a confirmed DB write. On failure, re-render
+  // from the unchanged saved state so the checkbox visually reverts instead of
+  // showing an undo that was never actually saved.
+  const{error}=await sbWrite(()=>sb.from('shopping_lists').update({items}).eq('id',listId));
+  if(error){
+    toast('Error saving — please try again.',true);console.error(error);
+    renderShoppingModal(listId);
+    return;
+  }
   list.items=items;
-  await sb.from('shopping_lists').update({items}).eq('id',listId);
   renderShoppingModal(listId);
 }
 window.undoShopCheck=undoShopCheck;
@@ -4256,16 +4378,26 @@ async function saveMealPlan(){
     plan_data,
     updated_at:new Date().toISOString(),
   };
-  // .upsert() inserts a new row or updates the existing one on family_id conflict
-  const{data,error}=await sb.from('meal_plans')
-    .upsert(upsertRow,{onConflict:'family_id'})
-    .select()
-    .single();
-  if(error){toast('Error saving menu: '+(error.message||'unknown'),true);console.error(error);return;}
-  A.mealPlan=data;
-  // v8: notify other family members
-  writeNotif('meal','updated',`${getActorName()} updated the weekly menu`,'Meal Planner');
-  toast('Weekly menu saved! ✅');
+  // v10 (UX hardening): showSavingToast()/hideSavingToast() + sbWrite() for
+  // idle-safety. This Save button is inline on the planner page (not inside
+  // a modal), so Pattern C (toast only, no button disable) applies.
+  showSavingToast();
+  try{
+    // .upsert() inserts a new row or updates the existing one on family_id conflict
+    const{data,error}=await sbWrite(()=>sb.from('meal_plans')
+      .upsert(upsertRow,{onConflict:'family_id'})
+      .select()
+      .single());
+    if(error){toast('Error saving menu: '+(error.message||'unknown'),true);console.error(error);return;}
+    A.mealPlan=data;
+    // v8: notify other family members
+    writeNotif('meal','updated',`${getActorName()} updated the weekly menu`,'Meal Planner');
+    toast('Weekly menu saved! ✅');
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    hideSavingToast();
+  }
 }
 window.saveMealPlan=saveMealPlan;
 
@@ -4365,20 +4497,64 @@ async function saveProduct(){
     expiry:document.getElementById('ap-exp')?.value?new Date(document.getElementById('ap-exp').value).toISOString():null,
     notes:document.getElementById('ap-notes')?.value||null,
   };
-  const{data:result,error}=await sb.from('inventory_products').insert(data).select().single();
-  if(error){toast('Error saving item: '+error.message,true);console.error(error);return;}
-  A.invProducts.push(result);
-  _closeModalDOM();toast('Item added! ✅');renderInventory();
+  // v10 (UX hardening): button-disable + saving toast + sbWrite() for idle-safety.
+  const _saveBtn=document.querySelector('.modal-body button.btn-primary');
+  if(_saveBtn){_saveBtn.disabled=true;_saveBtn.dataset.origText=_saveBtn.textContent;_saveBtn.textContent='Saving…';_saveBtn.style.opacity='0.7';}
+  showSavingToast();
+  let _saveOk=false;
+  try{
+    const{data:result,error}=await sbWrite(()=>sb.from('inventory_products').insert(data).select().single());
+    if(error){toast('Error saving item: '+error.message,true);console.error(error);return;}
+    A.invProducts.push(result);
+    _saveOk=true;
+    _closeModalDOM();toast('Item added! ✅');renderInventory();
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    hideSavingToast();
+    if(!_saveOk&&_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent=_saveBtn.dataset.origText||'Add to Inventory';_saveBtn.style.opacity='';}
+  }
 }
 window.saveProduct=saveProduct;
 
-async function delProduct(id){
-  const{error}=await sb.from('inventory_products').delete().eq('id',id);
-  if(error){toast('Error removing item.',true);console.error(error);return;}
-  A.invProducts=A.invProducts.filter(p=>p.id!==id);
-  toast('Item removed.');renderInventory();
+// v10 (UX hardening): Pattern D split — delProduct previously deleted
+// IMMEDIATELY on 🗑 tap with NO confirmation at all. This adds the missing
+// safety step, matching the confirm-modal pattern used everywhere else.
+function delProduct(id){
+  const item=A.invProducts.find(p=>p.id===id);
+  if(!item)return;
+  showModal('Remove this item?',`
+    <div style="text-align:center;padding:10px 0">
+      <div style="font-size:40px;margin-bottom:12px">🗑</div>
+      <div style="font-weight:700;font-size:16px;margin-bottom:8px">Remove this item?</div>
+      <div style="font-size:13px;color:${T.muted};margin-bottom:16px">"${item.name}" will be permanently removed from your inventory.</div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-danger" style="flex:1" onclick="confirmDelProduct('${id}')">Remove</button>
+      </div>
+    </div>`);
 }
 window.delProduct=delProduct;
+
+async function confirmDelProduct(id){
+  const _delBtn=document.querySelector('.modal-body button.btn-danger');
+  if(_delBtn){_delBtn.disabled=true;_delBtn.dataset.origText=_delBtn.textContent;_delBtn.textContent='Removing…';_delBtn.style.opacity='0.7';}
+  showSavingToast();
+  let _delOk=false;
+  try{
+    const{error}=await sbWrite(()=>sb.from('inventory_products').delete().eq('id',id));
+    if(error){toast('Error removing item.',true);console.error(error);return;}
+    A.invProducts=A.invProducts.filter(p=>p.id!==id);
+    _delOk=true;
+    closeModal();toast('Item removed.');renderInventory();
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    hideSavingToast();
+    if(!_delOk&&_delBtn){_delBtn.disabled=false;_delBtn.textContent=_delBtn.dataset.origText||'Remove';_delBtn.style.opacity='';}
+  }
+}
+window.confirmDelProduct=confirmDelProduct;
 
 // ── EDIT PRODUCT (v7) ─────────────────────────────────────────────────────────
 function openEditProduct(id){
@@ -4422,10 +4598,23 @@ async function saveEditProduct(id){
     expiry:document.getElementById('ap-exp')?.value?new Date(document.getElementById('ap-exp').value).toISOString():null,
     notes:document.getElementById('ap-notes')?.value||null,
   };
-  const{data:result,error}=await sb.from('inventory_products').update(data).eq('id',id).select().single();
-  if(error){toast('Error saving item: '+error.message,true);console.error(error);return;}
-  A.invProducts=A.invProducts.map(p=>p.id===id?result:p);
-  _closeModalDOM();toast('Item updated! ✅');renderInventory();
+  // v10 (UX hardening): button-disable + saving toast + sbWrite() for idle-safety.
+  const _saveBtn=document.querySelector('.modal-body button.btn-primary');
+  if(_saveBtn){_saveBtn.disabled=true;_saveBtn.dataset.origText=_saveBtn.textContent;_saveBtn.textContent='Saving…';_saveBtn.style.opacity='0.7';}
+  showSavingToast();
+  let _saveOk=false;
+  try{
+    const{data:result,error}=await sbWrite(()=>sb.from('inventory_products').update(data).eq('id',id).select().single());
+    if(error){toast('Error saving item: '+error.message,true);console.error(error);return;}
+    A.invProducts=A.invProducts.map(p=>p.id===id?result:p);
+    _saveOk=true;
+    _closeModalDOM();toast('Item updated! ✅');renderInventory();
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    hideSavingToast();
+    if(!_saveOk&&_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent=_saveBtn.dataset.origText||'Save Changes';_saveBtn.style.opacity='';}
+  }
 }
 window.saveEditProduct=saveEditProduct;
 
@@ -4529,7 +4718,8 @@ function renderSettings(){
 async function saveFamName(){
   const name=document.getElementById('s-fn')?.value?.trim();
   if(!name||!A.family){toast('Please enter a family name.',true);return;}
-  const{data,error}=await sb.from('families').update({name}).eq('id',A.family.id).select().single();
+  // v10 (UX hardening): sbWrite() for idle-safety (inline settings page, no modal).
+  const{data,error}=await sbWrite(()=>sb.from('families').update({name}).eq('id',A.family.id).select().single());
   if(error){toast('Error saving.',true);console.error(error);return;}
   A.family=data;
   document.getElementById('fam-badge').textContent=data.name;
@@ -4542,7 +4732,8 @@ async function addFamTag(){
   const val=inp?.value?.trim().toLowerCase();
   if(!val||!A.family){return;}
   const tags=[...new Set([...(A.family.tags||[]),val])];
-  const{data,error}=await sb.from('families').update({tags}).eq('id',A.family.id).select().single();
+  // v10 (UX hardening): sbWrite() for idle-safety.
+  const{data,error}=await sbWrite(()=>sb.from('families').update({tags}).eq('id',A.family.id).select().single());
   if(error){toast('Error saving tag.',true);console.error(error);return;}
   A.family=data;toast('Tag added!');renderSettings();
 }
@@ -4551,19 +4742,16 @@ window.addFamTag=addFamTag;
 async function removeTag(tag){
   if(!A.family)return;
   const tags=(A.family.tags||[]).filter(t=>t!==tag);
-  const{data,error}=await sb.from('families').update({tags}).eq('id',A.family.id).select().single();
-  if(error){toast('Error removing tag.',true);return;}
+  // v10 (UX hardening): sbWrite() for idle-safety.
+  const{data,error}=await sbWrite(()=>sb.from('families').update({tags}).eq('id',A.family.id).select().single());
+  if(error){toast('Error removing tag.',true);console.error(error);return;}
   A.family=data;renderSettings();
 }
 window.removeTag=removeTag;
 
-async function updateNotif(key,val){
-  if(!A.family)return;
-  const{data,error}=await sb.from('families').update({[key]:val}).eq('id',A.family.id).select().single();
-  if(error){toast('Error saving.',true);console.error(error);return;}
-  A.family=data;toast('Saved!');
-}
-window.updateNotif=updateNotif;
+// v10 (UX hardening): removed dead updateNotif(key,val) — defined but never
+// called anywhere in the app. The active notification-preference function is
+// updateNotifPref() (Settings → Notifications section, below).
 
 function openEditMem(id){
   const m=A.members.find(x=>x.id===id);if(!m)return;
@@ -4602,26 +4790,70 @@ async function saveEditMem(id){
     color:document.getElementById('em-c')?.value||MCOLORS[0],
     avatar:name[0].toUpperCase(),
   };
-  const{data:result,error}=await sb.from('family_members').update(data).eq('id',id).select().single();
-  if(error){toast('Error saving: '+error.message,true);console.error(error);return;}
-  A.members=A.members.map(m=>m.id===id?result:m);
-  closeModal();toast('Member updated! ✅');renderSettings();
+  // v10 (UX hardening): button-disable + saving toast + sbWrite() for idle-safety.
+  const _saveBtn=document.querySelector('.modal-body button.btn-primary');
+  if(_saveBtn){_saveBtn.disabled=true;_saveBtn.dataset.origText=_saveBtn.textContent;_saveBtn.textContent='Saving…';_saveBtn.style.opacity='0.7';}
+  showSavingToast();
+  let _saveOk=false;
+  try{
+    const{data:result,error}=await sbWrite(()=>sb.from('family_members').update(data).eq('id',id).select().single());
+    if(error){toast('Error saving: '+error.message,true);console.error(error);return;}
+    A.members=A.members.map(m=>m.id===id?result:m);
+    _saveOk=true;
+    closeModal();toast('Member updated! ✅');renderSettings();
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    hideSavingToast();
+    if(!_saveOk&&_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent=_saveBtn.dataset.origText||'Save Changes';_saveBtn.style.opacity='';}
+  }
 }
 window.saveEditMem=saveEditMem;
 
-async function delMem(id){
-  if(!confirm('Remove this family member?'))return;
+// v10 (UX hardening): Pattern D split — replaces native confirm() with the
+// in-app modal pattern used everywhere else in the app.
+function delMem(id){
   const mem=A.members.find(m=>m.id===id);
-  const{error}=await sb.from('family_members').delete().eq('id',id);
-  if(error){toast('Error removing: '+error.message,true);return;}
-  A.members=A.members.filter(m=>m.id!==id);
-  // Also delete any invitations for this member's email
-  if(mem?.email && A.family){
-    await sb.from('invitations').delete().eq('family_id',A.family.id).ilike('email',mem.email);
-  }
-  closeModal();toast('Member removed.');renderSettings();
+  if(!mem)return;
+  showModal('Remove Member',`
+    <div style="text-align:center;padding:10px 0">
+      <div style="font-size:40px;margin-bottom:12px">👤</div>
+      <div style="font-weight:700;font-size:16px;margin-bottom:8px">Remove ${mem.name}?</div>
+      <div style="font-size:13px;color:${T.muted};margin-bottom:16px">This will permanently remove ${mem.name} from your family. Their events and notes will remain but become unassigned.</div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-danger" style="flex:1" onclick="confirmDelMem('${id}')">Remove</button>
+      </div>
+    </div>`);
 }
 window.delMem=delMem;
+
+async function confirmDelMem(id){
+  const mem=A.members.find(m=>m.id===id);
+  const _delBtn=document.querySelector('.modal-body button.btn-danger');
+  if(_delBtn){_delBtn.disabled=true;_delBtn.dataset.origText=_delBtn.textContent;_delBtn.textContent='Removing…';_delBtn.style.opacity='0.7';}
+  showSavingToast();
+  let _delOk=false;
+  try{
+    const{error}=await sbWrite(()=>sb.from('family_members').delete().eq('id',id));
+    if(error){toast('Error removing: '+error.message,true);console.error(error);return;}
+    A.members=A.members.filter(m=>m.id!==id);
+    // Also delete any invitations for this member's email — wrapped in
+    // sbWrite() too, since a failure here previously went completely unnoticed.
+    if(mem?.email && A.family){
+      const{error:invErr}=await sbWrite(()=>sb.from('invitations').delete().eq('family_id',A.family.id).ilike('email',mem.email));
+      if(invErr)console.error('Invitation cleanup error',invErr);
+    }
+    _delOk=true;
+    closeModal();toast('Member removed.');renderSettings();
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    hideSavingToast();
+    if(!_delOk&&_delBtn){_delBtn.disabled=false;_delBtn.textContent=_delBtn.dataset.origText||'Remove';_delBtn.style.opacity='';}
+  }
+}
+window.confirmDelMem=confirmDelMem;
 
 function openAddMem(){
   showModal('Add Family Member',`
@@ -4657,47 +4889,76 @@ async function saveMem(){
     email,color:document.getElementById('nm-c')?.value||MCOLORS[0],
     avatar:name[0].toUpperCase(),is_owner:false,
   };
-  const{data:result,error}=await sb.from('family_members').insert(data).select().single();
-  if(error){toast('Error adding member.',true);console.error(error);return;}
-  A.members.push(result);
-  closeModal();toast(`${name} added! ✅`);renderSettings();
-  // If email provided, show invite option in a non-blocking way
-  if(email){
-    setTimeout(()=>{
-      showModal('Member Added ✅',`<div style="text-align:center;padding:10px 0">
-        <div style="font-size:40px;margin-bottom:10px">👤</div>
-        <div style="font-weight:700;margin-bottom:8px">${name} has been added!</div>
-        <div style="font-size:13px;color:${T.muted};margin-bottom:16px">Would you like to generate an invite link to share with them?</div>
-        <div style="display:flex;gap:10px">
-          <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">Not now</button>
-          <button class="btn btn-primary" style="flex:1" onclick="closeModal();sendInvite('${email}','${result.id}')">🔗 Generate invite</button>
-        </div></div>`);
-    },300);
+  // v10 (UX hardening): button-disable + saving toast + sbWrite() for idle-safety.
+  const _saveBtn=document.querySelector('.modal-body button.btn-primary');
+  if(_saveBtn){_saveBtn.disabled=true;_saveBtn.dataset.origText=_saveBtn.textContent;_saveBtn.textContent='Saving…';_saveBtn.style.opacity='0.7';}
+  showSavingToast();
+  let _saveOk=false;
+  try{
+    const{data:result,error}=await sbWrite(()=>sb.from('family_members').insert(data).select().single());
+    if(error){toast('Error adding member.',true);console.error(error);return;}
+    A.members.push(result);
+    _saveOk=true;
+    closeModal();toast(`${name} added! ✅`);renderSettings();
+    // If email provided, show invite option in a non-blocking way
+    if(email){
+      setTimeout(()=>{
+        showModal('Member Added ✅',`<div style="text-align:center;padding:10px 0">
+          <div style="font-size:40px;margin-bottom:10px">👤</div>
+          <div style="font-weight:700;margin-bottom:8px">${name} has been added!</div>
+          <div style="font-size:13px;color:${T.muted};margin-bottom:16px">Would you like to generate an invite link to share with them?</div>
+          <div style="display:flex;gap:10px">
+            <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">Not now</button>
+            <button class="btn btn-primary" style="flex:1" onclick="closeModal();sendInvite('${email}','${result.id}')">🔗 Generate invite</button>
+          </div></div>`);
+      },300);
+    }
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    hideSavingToast();
+    if(!_saveOk&&_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent=_saveBtn.dataset.origText||'Add Member';_saveBtn.style.opacity='';}
   }
 }
 window.saveMem=saveMem;
 
 async function sendInvite(email,memberId){
   if(!A.family)return;
-  // Check for existing invitation first — reuse if exists
-  const{data:existing}=await sb.from('invitations').select('*').eq('family_id',A.family.id).ilike('email',email).maybeSingle();
-  let data=existing, error=null;
-  if(!existing){
-    const res=await sb.from('invitations').insert({family_id:A.family.id,email}).select().single();
-    data=res.data; error=res.error;
+  // v10 (UX hardening): previously, a failed insert only logged to the
+  // console and the function carried on to show the "Invite Link Ready"
+  // success modal anyway, with a broken '?invite=demo' link. Now any
+  // failure stops here with an error toast instead of a false success
+  // screen. Also added showSavingToast()/hideSavingToast() — this function
+  // is called both from an inline settings button and from a chain that
+  // already closed its modal, so Pattern C (toast only, no button-disable)
+  // is the reliable choice across both call sites.
+  showSavingToast();
+  try{
+    // Check for existing invitation first — reuse if exists
+    const{data:existing,error:lookupErr}=await sbWrite(()=>sb.from('invitations').select('*').eq('family_id',A.family.id).ilike('email',email).maybeSingle());
+    if(lookupErr){toast('Error generating invite — please try again.',true);console.error('Invite lookup error',lookupErr);return;}
+    let data=existing;
+    if(!existing){
+      const{data:inserted,error:insertErr}=await sbWrite(()=>sb.from('invitations').insert({family_id:A.family.id,email}).select().single());
+      if(insertErr){toast('Error generating invite — please try again.',true);console.error('Invite insert error',insertErr);return;}
+      data=inserted;
+    }
+    if(!data?.token){toast('Error generating invite — please try again.',true);console.error('Invite has no token',data);return;}
+    const link=`${window.location.origin}${window.location.pathname}?invite=${data.token}`;
+    showModal('Invite Link Ready 🔗',`
+      <div style="text-align:center;padding:10px 0">
+        <div style="font-size:42px;margin-bottom:12px">📧</div>
+        <div style="font-weight:700;font-size:16px;margin-bottom:8px">Invite link generated!</div>
+        <div style="font-size:13px;color:${T.muted};margin-bottom:14px">Share this link with <b>${email}</b> to give them access to <b>${A.family.name}</b>.</div>
+        <div style="background:${T.parchment};border-radius:9px;padding:10px;font-size:11px;word-break:break-all;color:${T.ink};margin-bottom:14px;text-align:left">${link}</div>
+        <button class="btn btn-primary btn-full" onclick="navigator.clipboard?.writeText('${link}').then(()=>toast('Link copied! 📋'))">📋 Copy invite link</button>
+        <div style="font-size:11px;color:${T.muted};margin-top:12px">Copy this link and send it manually to ${email}. They will use it to join ${A.family.name}. Email sending will be added in a future update.</div>
+      </div>`);
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    hideSavingToast();
   }
-  if(error){console.error('Invite error',error);}
-  const token=data?.token||'demo';
-  const link=`${window.location.origin}${window.location.pathname}?invite=${token}`;
-  showModal('Invite Link Ready 🔗',`
-    <div style="text-align:center;padding:10px 0">
-      <div style="font-size:42px;margin-bottom:12px">📧</div>
-      <div style="font-weight:700;font-size:16px;margin-bottom:8px">Invite link generated!</div>
-      <div style="font-size:13px;color:${T.muted};margin-bottom:14px">Share this link with <b>${email}</b> to give them access to <b>${A.family.name}</b>.</div>
-      <div style="background:${T.parchment};border-radius:9px;padding:10px;font-size:11px;word-break:break-all;color:${T.ink};margin-bottom:14px;text-align:left">${link}</div>
-      <button class="btn btn-primary btn-full" onclick="navigator.clipboard?.writeText('${link}').then(()=>toast('Link copied! 📋'))">📋 Copy invite link</button>
-      <div style="font-size:11px;color:${T.muted};margin-top:12px">Copy this link and send it manually to ${email}. They will use it to join ${A.family.name}. Email sending will be added in a future update.</div>
-    </div>`);
 }
 window.sendInvite=sendInvite;
 
@@ -5110,11 +5371,15 @@ window.toggleNotifPanel = toggleNotifPanel;
 async function updateNotifPref(key, val) {
   if (!A.family) return;
   const prefs = { ...getNotifPrefs(), [key]: val };
-  const { data, error } = await sb.from('families')
+  // v10 (UX hardening): sbWrite() for idle-safety. On failure, re-render
+  // Settings so the toggle visually reverts to the last confirmed state —
+  // previously it stayed checked on-screen even though the DB was never
+  // updated, silently lying to the user.
+  const { data, error } = await sbWrite(() => sb.from('families')
     .update({ notif_preferences: prefs })
     .eq('id', A.family.id)
-    .select().single();
-  if (error) { toast('Error saving preference.', true); console.error(error); return; }
+    .select().single());
+  if (error) { toast('Error saving preference.', true); console.error(error); renderSettings(); return; }
   A.family = data;
 }
 window.updateNotifPref = updateNotifPref;
@@ -5198,14 +5463,29 @@ async function saveFeedback() {
     message: msg,
     page:    page || null,
   };
-  const { error } = await sbWrite(() => sb.from('feedback').insert(data));
-  if (error) {
-    console.error('Feedback save error', error);
-    toast('Error sending feedback — please try again.', true);
-    return;
+  // v10 (UX hardening): sbWrite() already present — adding Pattern B on top
+  // (button-disable, saving toast, try/catch/finally). Button text is
+  // "Sending…" rather than "Saving…" to match the feedback context.
+  const _saveBtn=document.querySelector('.modal-body button.btn-primary');
+  if(_saveBtn){_saveBtn.disabled=true;_saveBtn.dataset.origText=_saveBtn.textContent;_saveBtn.textContent='Sending…';_saveBtn.style.opacity='0.7';}
+  showSavingToast();
+  let _saveOk=false;
+  try{
+    const { error } = await sbWrite(() => sb.from('feedback').insert(data));
+    if (error) {
+      console.error('Feedback save error', error);
+      toast('Error sending feedback — please try again.', true);
+      return;
+    }
+    _saveOk=true;
+    closeModal();
+    toast('Feedback sent! Thank you 💚');
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    hideSavingToast();
+    if(!_saveOk&&_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent=_saveBtn.dataset.origText||'Send';_saveBtn.style.opacity='';}
   }
-  closeModal();
-  toast('Feedback sent! Thank you 💚');
 }
 window.saveFeedback = saveFeedback;
 
