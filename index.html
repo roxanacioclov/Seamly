@@ -1,4 +1,4 @@
-<!-- Seamly v11 | STAGING | 09 Jul 2026 -->
+<!-- Seamly v12 | STAGING | 09 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -111,8 +111,11 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
 .offline-banner{display:none;position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#b85c38;color:#fff;text-align:center;font-size:12px;font-weight:700;padding:8px 16px;z-index:9999;letter-spacing:.02em;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 .offline-banner.visible{display:block}
 /* ── Notification bell & badge (v8) ──────────────────────── */
-#notif-btn{position:relative;background:none;border:none;font-size:20px;cursor:pointer;padding:2px 6px;color:var(--muted);-webkit-tap-highlight-color:transparent}
-#notif-badge{position:absolute;top:-1px;right:-1px;background:var(--rose);color:#fff;border-radius:99px;font-size:9px;font-weight:800;min-width:16px;height:16px;padding:0 4px;display:none;align-items:center;justify-content:center;box-sizing:border-box;line-height:1}
+/* v12: profile-btn replaces the old notif-btn (bell); profile-dot replaces
+   notif-badge — a plain unread dot instead of a numeric count, since the
+   button now opens the consolidated My Profile menu, not just Notifications. */
+#profile-btn{position:relative;background:none;border:none;font-size:20px;cursor:pointer;padding:2px 6px;color:var(--muted);-webkit-tap-highlight-color:transparent}
+#profile-dot{position:absolute;top:1px;right:3px;background:var(--rose);border-radius:99px;width:9px;height:9px;display:none;box-sizing:border-box}
 /* ── Feedback floating action button (V8) ───────────────────────── */
 .feedback-fab{position:fixed;bottom:80px;right:16px;z-index:100;width:44px;height:44px;border-radius:50%;background:var(--sage);color:#fff;border:none;font-size:18px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;transition:transform .2s,box-shadow .2s;-webkit-tap-highlight-color:transparent}
 .feedback-fab:active{transform:scale(.93);box-shadow:0 2px 8px rgba(0,0,0,.15)}
@@ -206,9 +209,8 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sample-btn" onclick="A.family?toggleSampleMode():goTo('settings')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:var(--honey-light);color:var(--honey);border:1px solid var(--honey)44;cursor:pointer;display:none">📋 Sample</button>
       <span id="fam-badge" style="font-size:11px;font-weight:700;color:var(--muted)"></span>
-      <button id="notif-btn" onclick="toggleNotifPanel()" title="Notifications" style="display:none">🔔<span id="notif-badge"></span></button>
-      <button onclick="goTo('settings')" style="background:none;border:none;font-size:20px;cursor:pointer;padding:2px 6px;color:var(--muted)" title="Settings">⚙️</button>
-      <button class="btn btn-secondary btn-sm" onclick="doSignOut()">Sign out</button>
+      <!-- v12: consolidated Notifications + Settings + Sign out into one My Profile entry point -->
+      <button id="profile-btn" onclick="openProfileMenu()" title="My Profile" style="display:none">👤<span id="profile-dot"></span></button>
     </div>
   </div>
   <div class="content" id="content">
@@ -753,9 +755,10 @@ async function initApp(user){
     if (_sampleMode) toggleSampleMode();
   }
 
-  // v8: show notification bell only when the user has a family
-  const bellBtn = document.getElementById('notif-btn');
-  if (bellBtn) bellBtn.style.display = A.family ? 'block' : 'none';
+  // v12: show My Profile button only when the user has a family
+  // (was the notification bell pre-v12 — same condition, new target id)
+  const profileBtn = document.getElementById('profile-btn');
+  if (profileBtn) profileBtn.style.display = A.family ? 'block' : 'none';
 
   // v8: load initial notifications and start a polling interval (60s)
   if (A.family && !isSampleMode()) {
@@ -5352,8 +5355,12 @@ function notifIcon(category, action) {
 
 // Updates the red badge on the bell icon.
 function refreshNotifBadge() {
-  const badge = document.getElementById('notif-badge');
-  if (!badge) return;
+  // v12: target renamed from #notif-badge (numeric badge on old bell) to
+  // #profile-dot (plain dot on the new My Profile button). The unread-
+  // counting logic below is unchanged from v8 — only what we do with the
+  // result changed (show/hide a dot instead of setting a number).
+  const dot = document.getElementById('profile-dot');
+  if (!dot) return;
   const prefs = getNotifPrefs();
   const lastRead = parseInt(localStorage.getItem('ks_notif_last_read_' + (A.user?.id || '')) || '0');
   const unread = _notifications.filter(n => {
@@ -5361,12 +5368,7 @@ function refreshNotifBadge() {
     if (prefs[prefKey] === false) return false;
     return new Date(n.created_at).getTime() > lastRead;
   }).length;
-  if (unread > 0) {
-    badge.textContent = unread > 99 ? '99+' : unread;
-    badge.style.display = 'flex';
-  } else {
-    badge.style.display = 'none';
-  }
+  dot.style.display = unread > 0 ? 'block' : 'none';
 }
 
 // Stamps "last read" timestamp so the badge clears on next refresh
@@ -5376,6 +5378,41 @@ function markAllNotifsRead() {
   } catch(_) {}
   refreshNotifBadge();
 }
+
+// v12: My Profile bottom sheet — consolidates what used to be three separate
+// top-bar controls (🔔 Notifications, ⚙️ Settings, Sign out) behind one 👤
+// entry point. Reuses the existing showModal() bottom-sheet system and the
+// same account-info header markup already shown at the top of Settings.
+// Rows close the sheet first, then call the existing, unmodified functions
+// that already do these jobs — nothing about Notifications, Settings, or
+// Sign-out behaviour itself changes.
+function openProfileMenu() {
+  const cu = A.user;
+  const initial = (cu?.user_metadata?.name || cu?.email || 'U')[0].toUpperCase();
+  const name = cu?.user_metadata?.name || 'My Account';
+  const email = cu?.email || '';
+  // Helper: one tappable row (icon + label + chevron)
+  const row = (icon, label, onclick, isLast) => `
+    <button type="button" onclick="${onclick}" style="display:flex;align-items:center;gap:12px;width:100%;padding:13px 4px;background:none;border:none;${isLast?'':`border-bottom:1px solid ${T.border};`}cursor:pointer;text-align:left;font-family:inherit;-webkit-tap-highlight-color:transparent">
+      <span style="font-size:19px;width:24px;text-align:center;flex-shrink:0">${icon}</span>
+      <span style="flex:1;font-size:14px;font-weight:600;color:${T.ink}">${label}</span>
+      <span style="color:${T.muted};font-size:15px">›</span>
+    </button>`;
+  showModal('My Profile', `
+    <div style="display:flex;align-items:center;gap:12px;padding:2px 4px 18px">
+      <div style="width:44px;height:44px;border-radius:50%;background:${T.sage};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:17px;flex-shrink:0">${initial}</div>
+      <div style="min-width:0">
+        <div style="font-weight:700;font-size:15px;color:${T.ink};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
+        <div style="font-size:12px;color:${T.muted};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${email}</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column">
+      ${row('🔔','Notifications',"closeModal();toggleNotifPanel();")}
+      ${row('⚙️','Settings',"closeModal();goTo('settings');")}
+      ${row('🚪','Sign out',"closeModal();doSignOut();",true)}
+    </div>`);
+}
+window.openProfileMenu = openProfileMenu;
 
 // Renders the notification bottom sheet into #notif-root
 function renderNotifPanel() {
