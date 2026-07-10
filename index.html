@@ -1,4 +1,4 @@
-<!-- Seamly v12 | STAGING | 09 Jul 2026 -->
+<!-- Seamly v13 | STAGING | 10 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -157,7 +157,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div class="auth-card">
     <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">Seamly</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v9 — Jul 2026</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v13 — Jul 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -440,6 +440,14 @@ let A={
   mealsTab:'planner',invTab:'treatments',noteRibbonOpen:true,
   showOB:false,obStep:0,obFlow:null,
   medSearch:'',
+  // v13 auto-save state
+  _noteAutoSaveTimer:null,   // debounce timer handle for note auto-save
+  _noteEditingId:null,       // ID of note being edited (updated after first auto-insert)
+  _noteDirty:false,          // true when note has changes not yet written to DB
+  _mealPlanAutoSaveTimer:null, // debounce timer handle for meal planner auto-save
+  _evDraftInterval:null,     // setInterval handle for periodic event form draft saving
+  _evDraftType:null,         // event type currently being drafted ('social', 'health', etc.)
+  _evDraftRestore:null,      // draft data queued for restoration into a newly opened form
 };
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -793,6 +801,9 @@ async function initApp(user){
     goTo(A.page);
   }
   if(A.showOB)renderOB();
+  // v13: check for an unfinished event form draft saved before a page reload
+  // Delay 1.5s so the home page renders first before showing the banner
+  setTimeout(checkAndOfferEvDraft,1500);
 }
 
 // ── NAV ───────────────────────────────────────────────────────────────────────
@@ -823,6 +834,10 @@ function showModal(title,body){
 }
 // DOM-only close — safe to call before running another function
 function _closeModalDOM(){
+  // v13: cancel any pending auto-save timers so they don't fire into a closed modal
+  if(A._evDraftInterval){clearInterval(A._evDraftInterval);A._evDraftInterval=null;}
+  clearTimeout(A._noteAutoSaveTimer);
+  A._noteAutoSaveTimer=null;
   document.getElementById('modal-root').innerHTML='';
 }
 // Public closeModal — also handles history cleanup
@@ -1298,6 +1313,58 @@ function toISOLocal(d) {
   return `${yr}-${mo}-${dy}`;
 }
 
+// ── CUSTOM TIME PICKER (V13) ───────────────────────────────────────────────
+// Replaces native <input type="time"> which renders as a full-screen clock
+// dial on some Android skins (e.g. MIUI/Xiaomi). Two <select> dropdowns
+// (hour + 5-min-step minute) give a consistent look on every device.
+//
+// baseId: the logical field id, e.g. 'ef-stime'. Renders two selects with
+// ids `${baseId}-h` and `${baseId}-m`. value: optional "HH:MM" to preselect.
+function buildTimeSelect(baseId, value) {
+  const [vh, vm] = (value || '').split(':');
+  const hh = vh !== undefined ? parseInt(vh, 10) : null;
+  // Round minute to nearest 5 so any odd stored value still matches an option
+  const mm = vm !== undefined ? Math.round(parseInt(vm, 10) / 5) * 5 % 60 : null;
+  let hourOpts = '';
+  for (let h = 0; h < 24; h++) {
+    const hs = String(h).padStart(2, '0');
+    hourOpts += `<option value="${hs}"${h === hh ? ' selected' : ''}>${hs}</option>`;
+  }
+  let minOpts = '';
+  for (let m = 0; m < 60; m += 5) {
+    const ms = String(m).padStart(2, '0');
+    minOpts += `<option value="${ms}"${m === mm ? ' selected' : ''}>${ms}</option>`;
+  }
+  return `<div style="display:flex;align-items:center;gap:5px">
+    <select class="sel" id="${baseId}-h" style="flex:1;text-align:center;padding:9px 4px">${hourOpts}</select>
+    <span style="font-weight:700;color:${T.muted}">:</span>
+    <select class="sel" id="${baseId}-m" style="flex:1;text-align:center;padding:9px 4px">${minOpts}</select>
+  </div>`;
+}
+window.buildTimeSelect = buildTimeSelect;
+
+// Reads the two selects for a given baseId and returns "HH:MM", or '' if not found.
+function getTimeVal(baseId) {
+  const h = document.getElementById(baseId + '-h')?.value;
+  const m = document.getElementById(baseId + '-m')?.value;
+  if (h === undefined || h === null || m === undefined || m === null) return '';
+  return `${h}:${m}`;
+}
+window.getTimeVal = getTimeVal;
+
+// Sets the two selects for a given baseId from an "HH:MM" string.
+function setTimeVal(baseId, value) {
+  if (!value) return;
+  const [h, m] = value.split(':');
+  const hEl = document.getElementById(baseId + '-h');
+  const mEl = document.getElementById(baseId + '-m');
+  // Round minute to nearest 5 to match available options
+  const roundedM = String(Math.round(parseInt(m, 10) / 5) * 5 % 60).padStart(2, '0');
+  if (hEl) hEl.value = h;
+  if (mEl) mEl.value = roundedM;
+}
+window.setTimeVal = setTimeVal;
+
 // ── CHECKLIST BUILDER ─────────────────────────────────────────────────────────
 function buildChecklist(containerId, items=[]) {
   const cont = document.getElementById(containerId);
@@ -1475,7 +1542,9 @@ function openEvForm(type, evId, dateTs, duplicateId) {
   const startTime = (_pd?._curSTime) || (dupEv ? defST : (evTime || defST));
   const endDate = (_pd?._curEndDate) || (dupEv ? iDate : (evEndDate || startDate));
   const endTime = (_pd?._curETime) || (dupEv ? defET : (evEndTime || defET));
-  const isAllDay = dupEv ? false : (source ? !!source.all_day : false);
+  // V13: tasks default to All Day (preserves old "blank time = all-day" behaviour);
+  // Social/Health entries keep their existing default of timed (unchecked).
+  const isAllDay = dupEv ? false : (source ? !!source.all_day : (type === 'task'));
   const apptType = source?.appt_type || 'Appointment';
 
   // PARTICIPANTS
@@ -1505,13 +1574,13 @@ function openEvForm(type, evId, dateTs, duplicateId) {
         <div class="form-row" style="margin:0"><label class="lbl">Start Date</label>
           <input class="inp" type="date" id="ef-date" value="${sDate}" onchange="syncEndDate(this.value)"></div>
         <div class="form-row" style="margin:0" id="ef-stime-row"><label class="lbl">Start Time</label>
-          <input class="inp" type="time" id="ef-stime" value="${sTime}" onchange="syncEndTime(this.value)"></div>
+          ${buildTimeSelect('ef-stime', sTime)}</div>
       </div>
       <div class="grid2">
         <div class="form-row" style="margin:0"><label class="lbl">End Date</label>
           <input class="inp" type="date" id="ef-enddate" value="${eDate}"></div>
         <div class="form-row" style="margin:0" id="ef-etime-row"><label class="lbl">End Time</label>
-          <input class="inp" type="time" id="ef-etime" value="${eTime}"></div>
+          ${buildTimeSelect('ef-etime', eTime)}</div>
       </div>`;
 
     const recurrenceFields = (rec, endType, endCount, endDate2) => {
@@ -1696,11 +1765,14 @@ function openEvForm(type, evId, dateTs, duplicateId) {
         <select class="sel" id="ef-mem"><option value="">Anyone</option>${A.members.map(m=>`<option value="${m.id}"${source?.member_id===m.id?' selected':''}>${m.name}</option>`).join('')}</select></div>
       <div class="form-row"><label class="lbl">Title</label>
         <div style="position:relative"><input class="inp" id="ef-title" value="${source?.title||''}" placeholder="Add a title…"></div></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:10px;cursor:pointer">
+        <input type="checkbox" id="ef-allday" ${isAllDay?'checked':''} onchange="toggleAllDay(this.checked)"> All day (no specific time)
+      </label>
       <div class="grid2">
         <div class="form-row" style="margin:0"><label class="lbl">Due Date</label>
           <input class="inp" type="date" id="ef-date" value="${evDate||iDate}"></div>
-        <div class="form-row" style="margin:0"><label class="lbl">Time (optional)</label>
-          <input class="inp" type="time" id="ef-stime" value="${source?.date&&!source?.all_day?new Date(source.date).toTimeString().slice(0,5):''}"></div>
+        <div class="form-row" style="margin:0" id="ef-stime-row"><label class="lbl">Time</label>
+          ${buildTimeSelect('ef-stime', source?.date&&!source?.all_day?new Date(source.date).toTimeString().slice(0,5):defST)}</div>
       </div>
       ${recurrenceFields(source?.recurrence, source?.recurrence_end_type, source?.recurrence_end_count, source?.recurrence_end_date)}
       <div class="form-row"><label class="lbl">Actions / Subtasks</label>
@@ -1736,6 +1808,55 @@ function openEvForm(type, evId, dateTs, duplicateId) {
 
   // Post-render setup
   setTimeout(() => {
+    // v13: track event type and start periodic draft saving every 5 seconds
+    A._evDraftType = type;
+    clearInterval(A._evDraftInterval);
+    A._evDraftInterval = setInterval(saveEvDraft, 5000);
+    // v13: if a draft was queued by restoreEvDraft(), populate the form fields now.
+    // Time fields (ef-stime/ef-etime) are restored separately via setTimeVal() —
+    // they're now hour/minute select pairs, not single inputs with a .value.
+    if (A._evDraftRestore) {
+      const _dr = A._evDraftRestore;
+      delete A._evDraftRestore;
+      // Restore text, select, and number fields (time fields excluded — handled below)
+      ['ef-title','ef-date','ef-enddate','ef-loc','ef-social-type',
+       'ef-desc','ef-mem','ef-rec','ef-recend-n','ef-recend-d',
+       'ef-wt','ef-ht','ef-hyd','ef-act','ef-actm','ef-mood','ef-en','ef-sl','ef-wcomment',
+       'ef-doctor','ef-specialty','ef-cost','ef-cost-cur','ef-recby','ef-considerations',
+       'ef-symptoms','ef-cure'].forEach(id=>{
+        const el=document.getElementById(id);
+        if(el&&_dr.fields?.[id]!==undefined) el.value=_dr.fields[id];
+      });
+      // Restore the two time-picker fields via setTimeVal (hour + minute selects)
+      if (_dr.fields?.['ef-stime'] !== undefined) setTimeVal('ef-stime', _dr.fields['ef-stime']);
+      if (_dr.fields?.['ef-etime'] !== undefined) setTimeVal('ef-etime', _dr.fields['ef-etime']);
+      // Restore checkbox fields and trigger their visual side-effects
+      ['ef-allday','ef-ex','ef-private'].forEach(id=>{
+        const el=document.getElementById(id);
+        if(el&&_dr.fields?.[id]!==undefined){
+          el.checked=_dr.fields[id];
+          if(id==='ef-allday') toggleAllDay(el.checked);
+          if(id==='ef-ex'){const row=document.getElementById('ef-exrow');if(row)row.style.display=el.checked?'grid':'none';}
+        }
+      });
+      // Restore participant button selections
+      (_dr.participants||[]).forEach(mid=>{
+        const btn=document.querySelector(`#ef-parts button[data-mid="${mid}"]`);
+        if(btn&&btn.dataset.sel!=='true') togPart(btn,mid);
+      });
+      // Restore tag button selections
+      (_dr.tags||[]).forEach(tag=>{
+        const btn=document.querySelector(`#ef-tags button[data-tag="${tag}"]`);
+        if(btn&&btn.dataset.sel!=='true') togTag(btn);
+      });
+      // Restore recurrence end type visibility
+      if(_dr.fields?.['ef-recend-type']){
+        const rEl=document.getElementById('ef-recend-type');
+        if(rEl){rEl.value=_dr.fields['ef-recend-type'];updateRecurrenceEndType(rEl.value);}
+      }
+      if(_dr.fields?.['ef-rec']&&_dr.fields['ef-rec']!=='None') updateRecurrenceEnd(_dr.fields['ef-rec']);
+      toast('Draft restored ✓');
+    }
     // Autocomplete
     if (document.getElementById('ef-title')) buildAutocomplete('ef-title', type, 'title');
     // Store initial start date for smart end-date calculation
@@ -1760,6 +1881,16 @@ function openEvForm(type, evId, dateTs, duplicateId) {
       const memSel = document.getElementById('ef-mem');
       if (memSel?.value) prefillWellness(memSel.value);
     }
+    // V13: wire up Start Time selects to auto-advance the End Time selects by
+    // 1 hour, same behaviour as the old native <input type="time"> onchange.
+    // Only applies to Social/Health forms which have both ef-stime and ef-etime.
+    const stHourSel = document.getElementById('ef-stime-h');
+    const stMinSel = document.getElementById('ef-stime-m');
+    if (stHourSel && document.getElementById('ef-etime-h')) {
+      const handler = () => syncEndTime(getTimeVal('ef-stime'));
+      stHourSel.addEventListener('change', handler);
+      stMinSel?.addEventListener('change', handler);
+    }
   }, 80);
 }
 window.openEvForm = openEvForm;
@@ -1768,8 +1899,10 @@ function reloadHealthForm(newType, evId, dateTs) {
   // Capture all current field values before reloading
   const curDate = document.getElementById('ef-date')?.value;
   const curEndDate = document.getElementById('ef-enddate')?.value;
-  const curSTime = document.getElementById('ef-stime')?.value;
-  const curETime = document.getElementById('ef-etime')?.value;
+  // V13: read via getTimeVal() — ef-stime/ef-etime are now hour/minute select
+  // pairs, not single inputs with a .value (native time input was removed).
+  const curSTime = getTimeVal('ef-stime');
+  const curETime = getTimeVal('ef-etime');
   const title = document.getElementById('ef-title')?.value || '';
   const loc = document.getElementById('ef-loc')?.value || '';
   const desc = document.getElementById('ef-desc')?.value || '';
@@ -1829,10 +1962,10 @@ function syncEndDate(newStart) {
 window.syncEndDate = syncEndDate;
 
 function syncEndTime(startTimeVal) {
-  const endInp = document.getElementById('ef-etime');
-  if (!endInp || !startTimeVal) return;
+  if (!document.getElementById('ef-etime-h') || !startTimeVal) return;
   const [h] = startTimeVal.split(':').map(Number);
-  endInp.value = String(Math.min(h+1,23)).padStart(2,'0') + ':00';
+  const newEndTime = String(Math.min(h+1,23)).padStart(2,'0') + ':00';
+  setTimeVal('ef-etime', newEndTime);
 }
 window.syncEndTime = syncEndTime;
 
@@ -2052,13 +2185,15 @@ async function saveEv(type, evId, dateTs) {
       data.title = document.getElementById('ef-title')?.value || '';
       if (!data.title) { toast('Please add a title.', true); return; }
       const dv = document.getElementById('ef-date')?.value;
-      const tv = document.getElementById('ef-stime')?.value;
-      if(tv) {
-        data.date = dv ? localDT(dv, tv) : new Date().toISOString();
-        data.all_day = false;
-      } else {
+      // V13: tasks now use the same All Day checkbox pattern as Social/Health events,
+      // instead of inferring all-day from an empty time value (selects are never empty).
+      const taskAllDay = document.getElementById('ef-allday')?.checked ?? true;
+      data.all_day = taskAllDay;
+      if (taskAllDay) {
         data.date = dv ? dv + 'T12:00:00' : new Date().toISOString();
-        data.all_day = true;
+      } else {
+        const tv = getTimeVal('ef-stime') || '12:00';
+        data.date = dv ? localDT(dv, tv) : new Date().toISOString();
       }
       data.end_date = null;
       data.member_id = document.getElementById('ef-mem')?.value || null;
@@ -2085,9 +2220,9 @@ async function saveEv(type, evId, dateTs) {
       const allDay = document.getElementById('ef-allday')?.checked || false;
       data.all_day = allDay;
       const dateV = document.getElementById('ef-date')?.value;
-      const stV = allDay ? '12:00' : (document.getElementById('ef-stime')?.value || '12:00');
+      const stV = allDay ? '12:00' : (getTimeVal('ef-stime') || '12:00');
       const endDateV = document.getElementById('ef-enddate')?.value || dateV;
-      const etV = allDay ? '12:00' : (document.getElementById('ef-etime')?.value || '12:00');
+      const etV = allDay ? '12:00' : (getTimeVal('ef-etime') || '12:00');
       data.date = dateV ? localDT(dateV, stV) : new Date().toISOString();
       data.end_date = endDateV ? localDT(endDateV, etV) : null;
       data.location = document.getElementById('ef-loc')?.value || null;
@@ -2127,9 +2262,9 @@ async function saveEv(type, evId, dateTs) {
         const allDay = document.getElementById('ef-allday')?.checked || false;
         data.all_day = allDay;
         const dateV = document.getElementById('ef-date')?.value;
-        const stV = allDay ? '12:00' : (document.getElementById('ef-stime')?.value || '12:00');
+        const stV = allDay ? '12:00' : (getTimeVal('ef-stime') || '12:00');
         const endDateV = document.getElementById('ef-enddate')?.value || dateV;
-        const etV = allDay ? '12:00' : (document.getElementById('ef-etime')?.value || '12:00');
+        const etV = allDay ? '12:00' : (getTimeVal('ef-etime') || '12:00');
         data.date = dateV ? localDT(dateV, stV) : new Date().toISOString();
         data.end_date = endDateV ? localDT(endDateV, etV) : null;
         data.location = document.getElementById('ef-loc')?.value || null;
@@ -2294,6 +2429,7 @@ async function saveEv(type, evId, dateTs) {
       }
     }
     _saveOk = true;
+    clearEvDraft(); // v13: event saved successfully — discard the localStorage draft
     _closeModalDOM();
     // v8: write activity notification so other family members are informed
     const _notifTitle = data.title || ET[type]?.label || '';
@@ -2369,6 +2505,109 @@ function generateRecurrences(data) {
   }
   return events;
 }
+
+// ── EVENT FORM DRAFT (v13) ────────────────────────────────────────────────────
+// Protects against iOS Safari silently reloading tabs and destroying unsaved event
+// form data. A draft is written to localStorage every 5 seconds while any event
+// form is open. On the next page load, a banner offers to restore the in-progress entry.
+// Draft is cleared automatically when the event is successfully saved.
+
+const _evDraftKey=()=>'ks_ev_draft_'+(A.user?.id||'anon');
+const _evDraftMaxAge=2*60*60*1000; // discard drafts older than 2 hours
+
+function saveEvDraft(){
+  if(!A.user||!A.family) return;
+  // Collect all possible form field values that exist in the DOM right now.
+  // ef-stime/ef-etime are excluded here — v13's custom time picker made them
+  // hour/minute select pairs rather than single inputs, so they're captured
+  // separately below via getTimeVal().
+  const fieldIds=[
+    'ef-title','ef-date','ef-enddate','ef-allday',
+    'ef-loc','ef-social-type','ef-desc','ef-mem','ef-rec',
+    'ef-recend-type','ef-recend-n','ef-recend-d',
+    'ef-wt','ef-ht','ef-hyd','ef-ex','ef-act','ef-actm','ef-mood','ef-en','ef-sl','ef-wcomment',
+    'ef-apt','ef-doctor','ef-specialty','ef-cost','ef-cost-cur',
+    'ef-symptoms','ef-cure','ef-recby','ef-considerations','ef-private'
+  ];
+  const fields={};
+  fieldIds.forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    fields[id]=el.type==='checkbox'?el.checked:el.value;
+  });
+  // v13: capture the two time-picker fields via getTimeVal() instead of .value
+  const stimeVal=getTimeVal('ef-stime');
+  if(stimeVal) fields['ef-stime']=stimeVal;
+  const etimeVal=getTimeVal('ef-etime');
+  if(etimeVal) fields['ef-etime']=etimeVal;
+  const participants=Array.from(document.querySelectorAll('#ef-parts button[data-sel="true"]')).map(b=>b.dataset.mid).filter(Boolean);
+  const tags=Array.from(document.querySelectorAll('#ef-tags button[data-sel="true"]')).map(b=>b.dataset.tag).filter(Boolean);
+  const draft={
+    type:A._evDraftType||'social',
+    apptType:document.getElementById('ef-apt')?.value||null,
+    timestamp:Date.now(),
+    fields,participants,tags,
+  };
+  try{localStorage.setItem(_evDraftKey(),JSON.stringify(draft));}catch(_){}
+}
+window.saveEvDraft=saveEvDraft;
+
+function clearEvDraft(){
+  try{localStorage.removeItem(_evDraftKey());}catch(_){}
+  A._evDraftType=null;
+}
+window.clearEvDraft=clearEvDraft;
+
+function checkAndOfferEvDraft(){
+  if(!A.user||!A.family) return;
+  let draft;
+  try{
+    const raw=localStorage.getItem(_evDraftKey());
+    if(!raw) return;
+    draft=JSON.parse(raw);
+  }catch(_){return;}
+  // Discard stale drafts
+  if(!draft||!draft.timestamp||Date.now()-draft.timestamp>_evDraftMaxAge){
+    clearEvDraft();return;
+  }
+  // Show a non-intrusive restoration banner at the bottom of the screen
+  const existing=document.getElementById('ev-draft-banner');
+  if(existing) existing.remove();
+  const banner=document.createElement('div');
+  banner.id='ev-draft-banner';
+  banner.style.cssText='position:fixed;bottom:72px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:448px;background:#1e1b16;color:#fff;border-radius:12px;padding:12px 14px;z-index:500;display:flex;align-items:center;justify-content:space-between;gap:10px;box-shadow:0 4px 20px rgba(0,0,0,.3);animation:fadeUp .3s ease';
+  const evType=ET[draft.type]?.label||'entry';
+  const evTitle=draft.fields?.['ef-title'];
+  const draftDate=new Date(draft.timestamp);
+  const tStr=draftDate.getHours().toString().padStart(2,'0')+':'+draftDate.getMinutes().toString().padStart(2,'0');
+  banner.innerHTML=`
+    <div style="min-width:0">
+      <div style="font-weight:700;font-size:13px">📝 Unfinished ${evType}</div>
+      <div style="font-size:11px;opacity:.75;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${evTitle?'"'+evTitle+'"':'No title yet'} · Draft from ${tStr}</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-shrink:0">
+      <button onclick="document.getElementById('ev-draft-banner')?.remove();clearEvDraft()" style="background:rgba(255,255,255,.15);border:none;border-radius:8px;color:#fff;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent">Discard</button>
+      <button onclick="document.getElementById('ev-draft-banner')?.remove();restoreEvDraft()" style="background:#5e8b62;border:none;border-radius:8px;color:#fff;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent">Restore ✓</button>
+    </div>`;
+  document.body.appendChild(banner);
+  setTimeout(()=>document.getElementById('ev-draft-banner')?.remove(),15000); // auto-dismiss
+}
+window.checkAndOfferEvDraft=checkAndOfferEvDraft;
+
+function restoreEvDraft(){
+  let draft;
+  try{
+    const raw=localStorage.getItem(_evDraftKey());
+    if(!raw) return;
+    draft=JSON.parse(raw);
+  }catch(_){return;}
+  if(!draft) return;
+  // Queue the draft data, then open a fresh form — restoration happens inside openEvForm's setTimeout
+  A._evDraftType=draft.type;
+  A._evDraftRestore=draft;
+  openEvForm(draft.type,null,null);
+}
+window.restoreEvDraft=restoreEvDraft;
 
 // ── DUPLICATE EVENT ───────────────────────────────────────────────────────────
 function duplicateEv(id) {
@@ -2943,6 +3182,9 @@ function openNote(noteId){
       <input type="checkbox" id="ne-pin" ${note?.pinned?'checked':''}> 📌 Pin this note
     </label>
     ${notePrivToggleHtml}
+    <div style="min-height:18px;margin-bottom:6px">
+      <span id="note-autosave-status" style="font-size:11px;font-weight:600"></span>
+    </div>
     <div style="display:flex;gap:10px">
       <button class="btn btn-primary" style="flex:1" onclick="saveNote('${noteId||''}')">Save</button>
       ${noteId?`<button class="btn btn-danger" onclick="delNote('${noteId}')">🗑</button>`:''}
@@ -2960,6 +3202,16 @@ function openNote(noteId){
       const ed=document.getElementById('ne-editor');
       if(ed){ed.focus();}
     }
+    // v13: initialise note auto-save state and attach input listeners
+    A._noteEditingId=noteId||null;
+    A._noteDirty=false;
+    clearTimeout(A._noteAutoSaveTimer);
+    A._noteAutoSaveTimer=null;
+    const _onNoteInput=()=>scheduleNoteAutoSave();
+    const _titleEl=document.getElementById('ne-t');
+    const _editorEl=document.getElementById('ne-editor');
+    if(_titleEl) _titleEl.addEventListener('input',_onNoteInput);
+    if(_editorEl) _editorEl.addEventListener('input',_onNoteInput);
   },50);
   // Handle "New Group" selection - use in-app modal instead of browser prompt
   document.getElementById('ne-grp').addEventListener('change',function(){
@@ -3035,6 +3287,9 @@ window.addCLItem=addCLItem;
 
 async function saveNote(noteId){
   if(!A.family){toast('Set up your family first.',true);return;}
+  // v13: cancel any pending auto-save — we're saving manually right now
+  clearTimeout(A._noteAutoSaveTimer);
+  A._noteAutoSaveTimer=null;
   // v9: button-disable + saving toast fire IMMEDIATELY on tap, before any
   // form reading or the Supabase call — previously users saw nothing for
   // up to 7s (the sbWrite timeout) which caused double-taps. Whole body is
@@ -3081,6 +3336,7 @@ async function saveNote(noteId){
     if(noteId)A.notes=A.notes.map(n=>n.id===noteId?savedNote:n);
     else A.notes.push(savedNote);
     _saveOk=true;
+    A._noteDirty=false; // v13: mark note as clean after explicit manual save
     // v8: notify other family members
     writeNotif('note', noteId ? 'updated' : 'created',
       noteId ? `${getActorName()} updated a note` : `${getActorName()} added a new note`,
@@ -3135,6 +3391,75 @@ async function confirmDelNote(id){
   }
 }
 window.confirmDelNote=confirmDelNote;
+
+// ── NOTE AUTO-SAVE (v13) ────────────────────────────────────────────────────────
+// Debounced auto-save for the Notebook note editor.
+// Fires 4 seconds after the user stops typing, saves to DB in the background.
+// Status indicator in the modal shows current state without interrupting writing.
+
+function scheduleNoteAutoSave(){
+  A._noteDirty=true;
+  const status=document.getElementById('note-autosave-status');
+  if(status){status.textContent='● Unsaved changes';status.style.color='#c4892a';}
+  clearTimeout(A._noteAutoSaveTimer);
+  A._noteAutoSaveTimer=setTimeout(_doNoteAutoSave,4000);
+}
+window.scheduleNoteAutoSave=scheduleNoteAutoSave;
+
+async function _doNoteAutoSave(){
+  if(!A.family||!A.user) return;
+  // Bail out if the note modal has been closed while the timer was running
+  if(!document.getElementById('ne-editor')) return;
+  const title=document.getElementById('ne-t')?.value||'';
+  const content=document.getElementById('ne-editor')?.innerHTML||'';
+  // Don't auto-save a completely empty note — wait until there's something worth keeping
+  if(!title&&(!content||content.replace(/<[^>]*>/g,'').trim()==='')) return;
+  const status=document.getElementById('note-autosave-status');
+  if(status){status.textContent='● Saving…';status.style.color='#7a7060';}
+  // Collect current form state — mirrors saveNote logic but without closing the modal
+  const checklist=[];
+  document.querySelectorAll('#ne-cl > div').forEach((row,i)=>{
+    const cb=row.querySelector('input[type="checkbox"]');
+    const inp=row.querySelector('input:not([type="checkbox"])');
+    if(inp?.value?.trim())checklist.push({id:'c'+i,text:inp.value.trim(),done:cb?.checked||false});
+  });
+  const grpVal=document.getElementById('ne-grp')?.value;
+  const _notePrivToggle=document.getElementById('ne-private');
+  const _existNote=A._noteEditingId?A.notes.find(n=>n.id===A._noteEditingId):null;
+  const data={
+    family_id:A.family.id,
+    title,
+    content,
+    color:document.getElementById('ne-col')?.value||NOTE_COLORS[0],
+    group_id:grpVal&&grpVal!=='__new__'?grpVal:null,
+    member_id:document.getElementById('ne-mem')?.value||null,
+    pinned:document.getElementById('ne-pin')?.checked||false,
+    checklist,
+    is_private:_notePrivToggle?_notePrivToggle.checked:(_existNote?.is_private||false),
+  };
+  if(!A._noteEditingId) data.created_by_user_id=A.user?.id||null;
+  // Use update if we already have an ID, insert if this is the first auto-save of a new note
+  const res=A._noteEditingId
+    ?await sbWrite(()=>sb.from('notes').update(data).eq('id',A._noteEditingId).select().single())
+    :await sbWrite(()=>sb.from('notes').insert(data).select().single());
+  // If modal was closed during the async write, exit quietly — don't update a removed status element
+  if(!document.getElementById('note-autosave-status')) return;
+  if(res.error){
+    if(status){status.textContent='⚠ Auto-save failed — click Save';status.style.color='#b85070';}
+    return;
+  }
+  // Update local note state
+  if(A._noteEditingId){
+    A.notes=A.notes.map(n=>n.id===A._noteEditingId?res.data:n);
+  }else{
+    A._noteEditingId=res.data.id; // remember the new ID so subsequent auto-saves use update
+    A.notes.push(res.data);
+  }
+  A._noteDirty=false;
+  const now=new Date();
+  const t=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+  if(status){status.textContent=`✓ Auto-saved at ${t}`;status.style.color='#5e8b62';}
+}
 
 // ── MEDS ──────────────────────────────────────────────────────────────────────
 function exportMedsXLSX() {
@@ -4418,7 +4743,10 @@ function renderPlannerTab(){
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div style="font-weight:700;font-size:14px">Weekly Menu</div>
-      <button class="btn btn-primary btn-sm" onclick="saveMealPlan()">Save</button>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span id="meal-plan-status" style="font-size:11px;font-weight:600"></span>
+        <button class="btn btn-primary btn-sm" onclick="saveMealPlan()">Save</button>
+      </div>
     </div>
     <div style="font-size:11px;color:${T.muted};margin-bottom:8px">A shared weekly template — fill in meals for each day. Everyone in the family sees the same plan.</div>
     <div style="overflow-x:auto;border-radius:13px;border:1px solid ${T.border}">
@@ -4430,7 +4758,7 @@ function renderPlannerTab(){
         <tbody>
           ${MEAL_PLAN_ROWS.map(row=>`<tr>
             <td style="font-weight:700;background:${T.parchment}">${row}</td>
-            ${MEAL_PLAN_DAYS.map(day=>`<td style="padding:4px"><textarea class="inp" id="mp-${row}-${day}" rows="2" style="font-size:12px;padding:5px 6px;resize:none;min-width:90px"></textarea></td>`).join('')}
+            ${MEAL_PLAN_DAYS.map(day=>`<td style="padding:4px"><textarea class="inp" id="mp-${row}-${day}" rows="2" style="font-size:12px;padding:5px 6px;resize:none;min-width:90px" oninput="scheduleMealPlanAutoSave()"></textarea></td>`).join('')}
           </tr>`).join('')}
         </tbody>
       </table>
@@ -4454,8 +4782,8 @@ window.populateMealPlanGrid=populateMealPlanGrid;
 // v7: uses Postgres UPSERT via ON CONFLICT DO UPDATE (family_id has a UNIQUE
 // constraint after the dedup migration). This is safer and simpler than the
 // "update if exists, else insert" pattern used in v6.
-async function saveMealPlan(){
-  if(!A.family){toast('Set up your family first.',true);return;}
+async function saveMealPlan(isSilent=false){
+  if(!A.family){if(!isSilent)toast('Set up your family first.',true);return;}
   const plan_data={};
   MEAL_PLAN_ROWS.forEach(row=>{
     plan_data[row]={};
@@ -4471,25 +4799,48 @@ async function saveMealPlan(){
   // v10 (UX hardening): showSavingToast()/hideSavingToast() + sbWrite() for
   // idle-safety. This Save button is inline on the planner page (not inside
   // a modal), so Pattern C (toast only, no button disable) applies.
-  showSavingToast();
+  // v13: update the status indicator too; only show the full saving toast on
+  // an explicit (non-silent) save — the 3-second auto-save stays quiet.
+  const _mpStatus=document.getElementById('meal-plan-status');
+  if(_mpStatus){_mpStatus.textContent='● Saving…';_mpStatus.style.color='#7a7060';}
+  if(!isSilent) showSavingToast();
   try{
     // .upsert() inserts a new row or updates the existing one on family_id conflict
     const{data,error}=await sbWrite(()=>sb.from('meal_plans')
       .upsert(upsertRow,{onConflict:'family_id'})
       .select()
       .single());
-    if(error){toast('Error saving menu: '+(error.message||'unknown'),true);console.error(error);return;}
+    if(error){
+      if(_mpStatus){_mpStatus.textContent='⚠ Save failed';_mpStatus.style.color='#b85070';}
+      if(!isSilent){toast('Error saving menu: '+(error.message||'unknown'),true);console.error(error);}
+      return;
+    }
     A.mealPlan=data;
-    // v8: notify other family members
-    writeNotif('meal','updated',`${getActorName()} updated the weekly menu`,'Meal Planner');
-    toast('Weekly menu saved! ✅');
+    // v8: notify family members on explicit saves only — not on every 3-second auto-save
+    if(!isSilent) writeNotif('meal','updated',`${getActorName()} updated the weekly menu`,'Meal Planner');
+    const now=new Date();
+    const t=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+    if(_mpStatus){_mpStatus.textContent=isSilent?`✓ Auto-saved at ${t}`:`✓ Saved at ${t}`;_mpStatus.style.color='#5e8b62';}
+    if(!isSilent) toast('Weekly menu saved! ✅');
   }catch(e){
-    toast('Something went wrong — please try again.',true);console.error(e);
+    if(_mpStatus){_mpStatus.textContent='⚠ Save failed';_mpStatus.style.color='#b85070';}
+    if(!isSilent){toast('Something went wrong — please try again.',true);console.error(e);}
   }finally{
-    hideSavingToast();
+    if(!isSilent) hideSavingToast();
   }
 }
 window.saveMealPlan=saveMealPlan;
+
+// ── MEAL PLANNER AUTO-SAVE (v13) ──────────────────────────────────────────────
+// 3-second debounce: fires after the user stops typing in any planner cell.
+// Saves silently (no toast) — only the status indicator updates.
+function scheduleMealPlanAutoSave(){
+  const status=document.getElementById('meal-plan-status');
+  if(status){status.textContent='● Unsaved';status.style.color='#c4892a';}
+  clearTimeout(A._mealPlanAutoSaveTimer);
+  A._mealPlanAutoSaveTimer=setTimeout(()=>saveMealPlan(true),3000);
+}
+window.scheduleMealPlanAutoSave=scheduleMealPlanAutoSave;
 
 
 // ── INVENTORY PAGE ─────────────────────────────────────────────────────────────
@@ -4807,7 +5158,40 @@ function renderSettings(){
 
 async function saveFamName(){
   const name=document.getElementById('s-fn')?.value?.trim();
-  if(!name||!A.family){toast('Please enter a family name.',true);return;}
+  if(!name){toast('Please enter a family name.',true);return;}
+  // v13 fix: previously this function only handled RENAMING an existing
+  // family (an UPDATE), so a brand-new user with no family yet always hit
+  // the "!A.family" guard below and got a misleading "Please enter a family
+  // name" error even after typing one — there was no INSERT path anywhere
+  // in the app to actually create a first family. Handle that case here.
+  if(!A.family){
+    if(!A.user){toast('Please sign in first.',true);return;}
+    const{data,error}=await sbWrite(()=>sb.from('families').insert({owner_id:A.user.id,name}).select().single());
+    if(error){toast('Error creating family: '+(error.message||'please try again.'),true);console.error(error);return;}
+    A.family=data;
+    // Add the signed-in user as the first (owner) family member so they
+    // show up everywhere members are listed — same as any other member.
+    const ownerName=A.user.user_metadata?.name||A.user.email?.split('@')[0]||'Me';
+    const{data:memData,error:memErr}=await sbWrite(()=>sb.from('family_members').insert({
+      family_id:data.id,user_id:A.user.id,name:ownerName,email:A.user.email||null,
+      is_owner:true,avatar:ownerName[0].toUpperCase()
+    }).select().single());
+    if(memErr){
+      console.error(memErr);
+      toast('Family created, but adding you as a member failed — please add yourself under Family Members.',true);
+    }else if(memData){
+      A.members.push(memData);
+    }
+    document.getElementById('fam-badge').textContent=data.name;
+    // Sample mode was showing as a placeholder because there was no real
+    // family yet — turn it off now that one exists, and hide its button.
+    const sBtn=document.getElementById('sample-btn');
+    if(sBtn) sBtn.style.display='none';
+    if(isSampleMode()) toggleSampleMode();
+    toast('Family created! ✅');
+    renderSettings();
+    return;
+  }
   // v10 (UX hardening): sbWrite() for idle-safety (inline settings page, no modal).
   const{data,error}=await sbWrite(()=>sb.from('families').update({name}).eq('id',A.family.id).select().single());
   if(error){toast('Error saving.',true);console.error(error);return;}
