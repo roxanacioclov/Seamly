@@ -1,4 +1,4 @@
-<!-- Seamly v13 | PROD | 10 Jul 2026 -->
+<!-- Seamly v14 | PROD | 12 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -36,8 +36,8 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
 ::-webkit-scrollbar-thumb{background:#c8bfb0;border-radius:4px}
 #root{max-width:480px;margin:0 auto;min-height:100vh;background:var(--bg);display:flex;flex-direction:column}
 .top-bar{background:var(--bg);border-bottom:1px solid var(--border);padding:9px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:sticky;top:0;z-index:50}
-.top-logo{font-family:'Playfair Display',serif;font-size:18px;color:var(--sage);display:flex;align-items:center;gap:6px}
-.nav-wordmark{display:none;font-family:'Playfair Display',serif;font-size:19px;color:var(--sage);align-items:center;gap:8px}
+.top-logo{font-family:'Playfair Display',serif;font-weight:600;font-size:18px;color:var(--sage);display:flex;align-items:center;gap:6px}
+.nav-wordmark{display:none;font-family:'Playfair Display',serif;font-weight:600;font-size:19px;color:var(--sage);align-items:center;gap:8px}
 .content{flex:1;overflow-y:auto;padding-bottom:72px}
 .bottom-nav{background:var(--surface);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:8px 0 12px;flex-shrink:0;position:sticky;bottom:0;z-index:50;box-shadow:0 -4px 20px rgba(0,0,0,.07)}
 .nav-btn{display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;cursor:pointer;transition:color .2s;-webkit-tap-highlight-color:transparent}
@@ -123,10 +123,11 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   #root{max-width:none;margin:0}
   .bottom-nav{position:fixed;top:0;left:0;bottom:0;width:220px;flex-direction:column;justify-content:flex-start;align-items:stretch;border-top:none;border-right:1px solid var(--border);box-shadow:none;padding:16px 0;z-index:60;overflow-y:auto}
   .nav-wordmark{display:flex;padding:0 20px 20px}
+  .top-logo{display:none}
   .nav-btn{flex-direction:row;align-items:center;justify-content:flex-start;gap:12px;padding:11px 20px;font-size:13px;text-transform:none;letter-spacing:0;border-radius:0 20px 20px 0;margin-right:12px}
   .nav-btn.active{background:var(--sage-light)}
   .nav-dot{display:none}
-  .top-bar{margin-left:220px}
+  .top-bar{margin-left:220px;justify-content:flex-end}
   .content{margin-left:220px;padding-bottom:24px}
   .note-grid{grid-template-columns:repeat(3,1fr)}
   .modal-bg{align-items:center}
@@ -148,6 +149,18 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
 </div>
 
 <div id="loading-screen" class="loading-screen">
+  <svg width="60" height="60" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="border-radius:14px">
+    <rect width="512" height="512" rx="115" fill="#5e8b62"/>
+    <rect x="196" y="148" width="16" height="40" rx="8" fill="#3d5c40"/>
+    <rect x="300" y="148" width="16" height="40" rx="8" fill="#3d5c40"/>
+    <rect x="136" y="168" width="240" height="224" rx="28" fill="#f5f2ed"/>
+    <rect x="136" y="168" width="240" height="54" rx="28" fill="#3d5c40"/>
+    <rect x="136" y="196" width="240" height="26" fill="#3d5c40"/>
+    <rect x="164" y="250" width="184" height="14" rx="7" fill="#8ab88e"/>
+    <rect x="164" y="288" width="184" height="14" rx="7" fill="#b85c38"/>
+    <rect x="164" y="326" width="184" height="14" rx="7" fill="#8ab88e"/>
+    <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
+  </svg>
   <div style="font-family:'Playfair Display',serif;font-size:24px;color:var(--sage)">Seamly</div>
   <div class="spinner"></div>
   <div style="font-size:13px;color:var(--muted)">Loading your family hub…</div>
@@ -157,7 +170,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div class="auth-card">
     <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">Seamly</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v13 — Jul 2026</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v14 — Jul 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -195,14 +208,17 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
 <div id="root" style="display:none">
   <div class="top-bar">
     <div class="top-logo">
-      <svg width="22" height="19" viewBox="0 0 26 22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <g stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none">
-          <rect x="2" y="6" width="13" height="14" rx="2.3"/>
-          <line x1="2" y1="10.5" x2="15" y2="10.5"/>
-          <line x1="5.5" y1="4" x2="5.5" y2="7.3"/>
-          <line x1="11.5" y1="4" x2="11.5" y2="7.3"/>
-        </g>
-        <path transform="translate(20,5.5)" fill="currentColor" d="M0,-5 C0.8,-1 0.8,-1 5,0 C0.8,1 0.8,1 0,5 C-0.8,1 -0.8,1 -5,0 C-0.8,-1 -0.8,-1 0,-5 Z"/>
+      <svg width="26" height="26" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="border-radius:6px;flex-shrink:0">
+        <rect width="512" height="512" rx="115" fill="#5e8b62"/>
+        <rect x="196" y="148" width="16" height="40" rx="8" fill="#3d5c40"/>
+        <rect x="300" y="148" width="16" height="40" rx="8" fill="#3d5c40"/>
+        <rect x="136" y="168" width="240" height="224" rx="28" fill="#f5f2ed"/>
+        <rect x="136" y="168" width="240" height="54" rx="28" fill="#3d5c40"/>
+        <rect x="136" y="196" width="240" height="26" fill="#3d5c40"/>
+        <rect x="164" y="250" width="184" height="14" rx="7" fill="#8ab88e"/>
+        <rect x="164" y="288" width="184" height="14" rx="7" fill="#b85c38"/>
+        <rect x="164" y="326" width="184" height="14" rx="7" fill="#8ab88e"/>
+        <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
     </div>
@@ -210,7 +226,13 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
       <button id="sample-btn" onclick="A.family?toggleSampleMode():goTo('settings')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:var(--honey-light);color:var(--honey);border:1px solid var(--honey)44;cursor:pointer;display:none">📋 Sample</button>
       <span id="fam-badge" style="font-size:11px;font-weight:700;color:var(--muted)"></span>
       <!-- v12: consolidated Notifications + Settings + Sign out into one My Profile entry point -->
-      <button id="profile-btn" onclick="openProfileMenu()" title="My Profile" style="display:none">👤<span id="profile-dot"></span></button>
+      <button id="profile-btn" onclick="openProfileMenu()" title="My Profile" style="display:none">
+        <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="vertical-align:middle">
+          <circle cx="12" cy="8" r="3.6"/>
+          <path d="M4.5 20C4.5 16.3 7.8 13.5 12 13.5C16.2 13.5 19.5 16.3 19.5 20"/>
+        </svg>
+        <span id="profile-dot"></span>
+      </button>
     </div>
   </div>
   <div class="content" id="content">
@@ -225,14 +247,17 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   </div>
   <nav class="bottom-nav">
     <div class="nav-wordmark">
-      <svg width="22" height="19" viewBox="0 0 26 22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <g stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none">
-          <rect x="2" y="6" width="13" height="14" rx="2.3"/>
-          <line x1="2" y1="10.5" x2="15" y2="10.5"/>
-          <line x1="5.5" y1="4" x2="5.5" y2="7.3"/>
-          <line x1="11.5" y1="4" x2="11.5" y2="7.3"/>
-        </g>
-        <path transform="translate(20,5.5)" fill="currentColor" d="M0,-5 C0.8,-1 0.8,-1 5,0 C0.8,1 0.8,1 0,5 C-0.8,1 -0.8,1 -5,0 C-0.8,-1 -0.8,-1 0,-5 Z"/>
+      <svg width="26" height="26" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="border-radius:6px;flex-shrink:0">
+        <rect width="512" height="512" rx="115" fill="#5e8b62"/>
+        <rect x="196" y="148" width="16" height="40" rx="8" fill="#3d5c40"/>
+        <rect x="300" y="148" width="16" height="40" rx="8" fill="#3d5c40"/>
+        <rect x="136" y="168" width="240" height="224" rx="28" fill="#f5f2ed"/>
+        <rect x="136" y="168" width="240" height="54" rx="28" fill="#3d5c40"/>
+        <rect x="136" y="196" width="240" height="26" fill="#3d5c40"/>
+        <rect x="164" y="250" width="184" height="14" rx="7" fill="#8ab88e"/>
+        <rect x="164" y="288" width="184" height="14" rx="7" fill="#b85c38"/>
+        <rect x="164" y="326" width="184" height="14" rx="7" fill="#8ab88e"/>
+        <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
     </div>
@@ -448,6 +473,11 @@ let A={
   _evDraftInterval:null,     // setInterval handle for periodic event form draft saving
   _evDraftType:null,         // event type currently being drafted ('social', 'health', etc.)
   _evDraftRestore:null,      // draft data queued for restoration into a newly opened form
+  // v14 auto-save/draft-safety additions
+  _noteSavingManually:false, // true while saveNote()'s write is in flight -- blocks a
+                              // concurrently-firing auto-save from racing it and undoing the save
+  _noteDraftRestore:null,    // note draft data queued for restoration into a newly opened editor
+  _mealPlanDirty:false,      // true when the meal planner grid has unsaved changes
 };
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -804,7 +834,33 @@ async function initApp(user){
   // v13: check for an unfinished event form draft saved before a page reload
   // Delay 1.5s so the home page renders first before showing the banner
   setTimeout(checkAndOfferEvDraft,1500);
+  // v14: same check for Notebook and Meal Planner drafts
+  setTimeout(checkAndOfferNoteDraft,1500);
+  setTimeout(checkAndOfferMealDraft,1500);
 }
+
+// v14: global background-flush safety net for in-progress Notebook and Meal
+// Planner drafts. Mobile browsers can pause or fully discard JS execution the
+// moment a tab/PWA is backgrounded (screen lock, app switch, etc.) — often
+// before a multi-second debounce timer ever gets a chance to fire — so this
+// forces an immediate localStorage snapshot (plus a best-effort remote save
+// attempt) right as that's about to happen. Registered once, globally, since
+// it needs to catch backgrounding regardless of which page is on screen.
+function _flushDraftsOnHide(){
+  if(document.getElementById('ne-editor')&&A._noteDirty){
+    saveNoteDraftLS();
+    // Best-effort remote save too — not guaranteed to finish if the page is
+    // actually being discarded rather than just hidden, but worth attempting.
+    // The localStorage snapshot above is the real safety net either way.
+    _doNoteAutoSave();
+  }
+  if(document.getElementById('meal-plan-table')&&A._mealPlanDirty){
+    saveMealPlanDraftLS();
+    saveMealPlan(true);
+  }
+}
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') _flushDraftsOnHide(); });
+window.addEventListener('pagehide',_flushDraftsOnHide);
 
 // ── NAV ───────────────────────────────────────────────────────────────────────
 function goTo(page){
@@ -1062,7 +1118,6 @@ function renderCal(){
 
   document.getElementById('page-calendar').innerHTML=`
     <div class="page-header">
-      <div class="family-label">${getFamily()?.name||''}</div>
       <div class="page-title">Calendar <button class="btn btn-primary btn-sm" onclick="showPicker(null)">+ Add</button></div>
     </div>
     <div style="padding:8px 16px 0;display:flex;gap:5px;flex-wrap:wrap">
@@ -2157,6 +2212,11 @@ async function saveEv(type, evId, dateTs) {
   delete A._editSeriesMode;
   let seriesUpdateMsg = null;
   let data = { family_id: A.family.id, type };
+  // v14: capture the edited occurrence's ORIGINAL date/time before any of the
+  // user's edits are applied. Needed to compute the date-delta for "edit full
+  // recurrence" further down — must happen now, before `data` gets filled in
+  // with the new values below.
+  const _origEvForDelta = evId ? A.events.find(e => e.id === evId) : null;
   try {
     if (type === 'wellness') {
       data.member_id = document.getElementById('ef-mem')?.value || null;
@@ -2326,8 +2386,15 @@ async function saveEv(type, evId, dateTs) {
       }
     }
 
-    // Generate recurring events if needed
-    const eventsToSave = generateRecurrences(data);
+    // v14: generateRecurrences() must ONLY ever run when creating a brand-new
+    // event. Previously it ran unconditionally on every save — including
+    // edits — which always stamped a fresh series_id onto the edited row
+    // (silently detaching it from its series) and, further down, re-seeded a
+    // whole duplicate set of future occurrences from the edited date. That
+    // was the root cause of the recurring-event edit corruption bug. Edits
+    // (single-occurrence OR full-series) never touch series membership or
+    // generate new rows — they only update the row(s) that already exist.
+    const eventsToSave = evId ? [data] : generateRecurrences(data);
 
     // Strip any undefined/null keys that aren't in schema to avoid DB errors
     const cleanData = obj => {
@@ -2357,49 +2424,66 @@ async function saveEv(type, evId, dateTs) {
       A.events = A.events.map(e => e.id===evId ? res.data : e);
       savedFirst = res.data;
 
-      // Series-wide update: if editing all occurrences, update shared fields on sibling events
+      // v14: "Edit full recurrence" — extended to apply EVERY edited field to
+      // every sibling occurrence (not just a fixed subset), including
+      // all_day, time-of-day, and a calendar-date shift. Date/end_date differ
+      // per sibling (each keeps its own day unless the whole series is being
+      // shifted), so this is a per-row update rather than one blanket UPDATE.
       if (editSeriesId) {
-        const SERIES_SHARED_FIELDS = ['title','description','location','social_type','actions','tags',
-          'links','participants','participants_all_family','member_id','appt_type','doctor','specialty',
-          'cost','cost_currency','symptoms','cure','recommended_by','administration','considerations'];
-        const sharedUpdate = {};
-        SERIES_SHARED_FIELDS.forEach(k => { if (cleanedData[k] !== undefined) sharedUpdate[k] = cleanedData[k]; });
-        if (Object.keys(sharedUpdate).length) {
-          // v10 (UX hardening): this secondary write had no sbWrite() and no
-          // error handling at all — a failure here previously left the user
-          // thinking the whole series was updated when only the tapped
-          // occurrence actually saved. The primary event above already saved
-          // successfully, so on failure here we warn rather than block.
-          const {data: seriesRows, error: seriesErr} = await sbWrite(() => sb.from('events').update(sharedUpdate)
-            .eq('series_id', editSeriesId).neq('id', evId).select());
-          if (seriesErr) {
-            toast('Entry saved, but updating the rest of the series failed — please try again.', true);
-            console.error('Series sibling update error', seriesErr);
-          } else if (seriesRows) {
-            A.events = A.events.map(e => e.series_id === editSeriesId && e.id !== evId
-              ? {...e, ...sharedUpdate} : e);
-            const siblingsCount = A.events.filter(e => e.series_id === editSeriesId && e.id !== evId).length;
-            seriesUpdateMsg = `Series updated! ✅ (${siblingsCount + 1} occurrences)`;
-          }
-        }
-      }
+        const siblings = A.events.filter(e => e.series_id === editSeriesId && e.id !== evId);
+        if (siblings.length) {
+          // Everything except identity/date fields applies identically to
+          // every occurrence. Date/end_date get their own per-occurrence
+          // handling below (day-delta + time-of-day), so they're excluded here.
+          const EXCLUDE_FROM_SHARED = new Set(['family_id','date','end_date','series_id','created_by_user_id','id']);
+          const sharedUpdate = {};
+          Object.keys(cleanedData).forEach(k => { if (!EXCLUDE_FROM_SHARED.has(k)) sharedUpdate[k] = cleanedData[k]; });
 
-      // If recurrence was added/changed on edit, generate future instances
-      if (cleanedData.recurrence && cleanedData.recurrence !== 'None' && eventsToSave.length > 1) {
-        // Insert the additional recurring instances (skip index 0 = the updated event)
-        const futureInstances = cleanedData.recurrence !== 'None'
-          ? generateRecurrences(cleanedData).slice(1).map(ev => {const {id:__, ...rest} = ev; return rest;})
-          : [];
-        if (futureInstances.length > 0) {
-          // v10 (UX hardening): same gap as above — no sbWrite() or error
-          // handling on the future-recurrence insert.
-          const {data: newRecs, error: recErr} = await sbWrite(() => sb.from('events').insert(futureInstances.map(e=>{const{family_id:_f,...r}=e;return{family_id:cleanedData.family_id,...r};})).select());
-          if (recErr) {
-            toast('Entry saved, but creating future recurring dates failed — please try again.', true);
-            console.error('Future recurrence insert error', recErr);
-          } else {
-            if (newRecs) A.events.push(...newRecs);
-            toast(`Entry updated! ${newRecs?.length ? '('+newRecs.length+' recurring instances created)' : ''}`);
+          // Calendar-day delta between the edited occurrence's ORIGINAL date
+          // (captured at the top of this function, before the user's edits)
+          // and its NEW date — applied to every sibling so the whole series
+          // shifts together while preserving relative spacing. A pure
+          // time-of-day change (no date change) produces a delta of 0, so
+          // siblings keep their own day and only pick up the new time.
+          const origDateOnly = _origEvForDelta ? new Date(_origEvForDelta.date) : new Date(cleanedData.date);
+          origDateOnly.setHours(0,0,0,0);
+          const newDateOnly = new Date(cleanedData.date);
+          newDateOnly.setHours(0,0,0,0);
+          const dayDeltaMs = newDateOnly - origDateOnly;
+          const newDateObj = new Date(cleanedData.date);
+          const newEndDateObj = cleanedData.end_date ? new Date(cleanedData.end_date) : null;
+
+          const siblingUpdates = siblings.map(sib => {
+            const shiftedDate = new Date(new Date(sib.date).getTime() + dayDeltaMs);
+            if (cleanedData.all_day) shiftedDate.setHours(12,0,0,0);
+            else shiftedDate.setHours(newDateObj.getHours(), newDateObj.getMinutes(), 0, 0);
+            let shiftedEndDateIso = null;
+            if (sib.end_date) {
+              const shiftedEnd = new Date(new Date(sib.end_date).getTime() + dayDeltaMs);
+              if (cleanedData.all_day) shiftedEnd.setHours(12,0,0,0);
+              else if (newEndDateObj) shiftedEnd.setHours(newEndDateObj.getHours(), newEndDateObj.getMinutes(), 0, 0);
+              shiftedEndDateIso = shiftedEnd.toISOString();
+            }
+            return { id: sib.id, payload: { ...sharedUpdate, date: shiftedDate.toISOString(), end_date: shiftedEndDateIso } };
+          });
+
+          // v10 (UX hardening) carried forward: sbWrite() + explicit error
+          // handling on every sibling write — the primary event above already
+          // saved successfully, so a failure here warns rather than blocks.
+          const results = await Promise.all(siblingUpdates.map(u =>
+            sbWrite(() => sb.from('events').update(u.payload).eq('id', u.id).select().single())
+          ));
+          const failed = results.filter(r => r.error);
+          if (failed.length) {
+            toast(`Entry saved, but ${failed.length} of ${siblings.length} other occurrence${siblings.length!==1?'s':''} failed to update — please try again.`, true);
+            console.error('Series sibling update errors', failed.map(f => f.error));
+          }
+          const succeeded = results.filter(r => !r.error && r.data);
+          if (succeeded.length) {
+            const byId = {};
+            succeeded.forEach(r => { byId[r.data.id] = r.data; });
+            A.events = A.events.map(e => byId[e.id] ? byId[e.id] : e);
+            seriesUpdateMsg = `Series updated! ✅ (${succeeded.length + 1} occurrence${succeeded.length+1!==1?'s':''})`;
           }
         }
       }
@@ -2431,12 +2515,19 @@ async function saveEv(type, evId, dateTs) {
     _saveOk = true;
     clearEvDraft(); // v13: event saved successfully — discard the localStorage draft
     _closeModalDOM();
-    // v8: write activity notification so other family members are informed
-    const _notifTitle = data.title || ET[type]?.label || '';
-    writeNotif('event', evId ? 'updated' : 'created',
-      evId ? `${getActorName()} updated an event` : `${getActorName()} added a new event`,
-      _notifTitle
-    );
+    // v8: write activity notification so other family members are informed.
+    // v14: private events must never generate a visible notification to other
+    // family members — the notification trigger previously ignored is_private
+    // entirely, even though Home/Calendar already hid private events from
+    // everyone but the creator. The creator's own toast confirmation below is
+    // unaffected either way — this only gates the cross-family notification.
+    if (!data.is_private) {
+      const _notifTitle = data.title || ET[type]?.label || '';
+      writeNotif('event', evId ? 'updated' : 'created',
+        evId ? `${getActorName()} updated an event` : `${getActorName()} added a new event`,
+        _notifTitle
+      );
+    }
     toast(seriesUpdateMsg || (evId ? 'Entry updated! ✅' : `Entry added!${eventsToSave.length>1?' ('+eventsToSave.length+' occurrences created)':''}`));
     renderCal();
     renderHome();
@@ -2966,7 +3057,6 @@ function renderNB(){
   // ── PAGE RENDER ──────────────────────────────────────────────────────────
   document.getElementById('page-notebook').innerHTML=`
     <div class="page-header">
-      <div class="family-label">${getFamily()?.name||''}</div>
       <div class="page-title">Notebook <button class="btn btn-primary btn-sm" onclick="openNote(null)">+ Note</button></div>
     </div>
     <!-- Search bar — full width above the split layout -->
@@ -3212,43 +3302,100 @@ function openNote(noteId){
     const _editorEl=document.getElementById('ne-editor');
     if(_titleEl) _titleEl.addEventListener('input',_onNoteInput);
     if(_editorEl) _editorEl.addEventListener('input',_onNoteInput);
+    // v14: restore an unfinished note draft from localStorage, if one was
+    // queued by restoreNoteDraftLS(). This overwrites whatever openNote() just
+    // rendered (blank for a new note, or the live saved version for an
+    // existing one) with the newer unsaved draft content.
+    if(A._noteDraftRestore){
+      const _dr=A._noteDraftRestore;
+      delete A._noteDraftRestore;
+      const _f=_dr.fields||{};
+      if(_titleEl&&_f.title!==undefined) _titleEl.value=_f.title;
+      if(_editorEl&&_f.content!==undefined) _editorEl.innerHTML=_f.content;
+      const _colEl=document.getElementById('ne-col');
+      if(_colEl&&_f.color) _colEl.value=_f.color;
+      const _grpEl=document.getElementById('ne-grp');
+      if(_grpEl&&_f.group_id!==undefined) _grpEl.value=_f.group_id||'';
+      const _memEl=document.getElementById('ne-mem');
+      if(_memEl&&_f.member_id!==undefined) _memEl.value=_f.member_id||'';
+      const _pinEl=document.getElementById('ne-pin');
+      if(_pinEl&&_f.pinned!==undefined) _pinEl.checked=_f.pinned;
+      const _privEl=document.getElementById('ne-private');
+      if(_privEl&&_f.is_private!==undefined) _privEl.checked=_f.is_private;
+      // Replace whatever checklist rows were just populated (from the live
+      // saved note, if editing) with the draft's own checklist state
+      if(clCont){
+        clCont.innerHTML='';
+        (_dr.checklist||[]).forEach(item=>addCLItem(item.text,item.done));
+      }
+      A._noteDirty=true;
+      const _stEl=document.getElementById('note-autosave-status');
+      if(_stEl){_stEl.textContent='● Unsaved changes';_stEl.style.color='#c4892a';}
+      toast('Draft restored ✓');
+    }
   },50);
   // Handle "New Group" selection - use in-app modal instead of browser prompt
+  // v14: the modal's Create button now calls a real named function
+  // (createInlineNoteGroup) instead of an inline onclick string. Inline
+  // onclick attributes only see the global scope, not the sel/overlay
+  // closure variables that used to live here -- that gap caused the button
+  // to silently do nothing (ReferenceError) while the insert had often
+  // already succeeded, orphaned, in the database.
   document.getElementById('ne-grp').addEventListener('change',function(){
     if(this.value==='__new__'){
-      const sel=this;
-      sel.value=''; // Reset while modal is open
-      // Show in-app modal
-      const overlay=document.createElement('div');
-      overlay.style.cssText='position:fixed;inset:0;background:rgba(20,18,14,.55);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px';
-      overlay.innerHTML=`<div style="background:#fff;border-radius:16px;padding:22px;width:100%;max-width:340px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
-        <div style="font-family:Playfair Display,serif;font-size:17px;color:#1e1b16;margin-bottom:14px">New Group</div>
-        <input id="ng-inline-name" class="inp" placeholder="Group name e.g. 🏠 Household" autofocus style="margin-bottom:14px">
-        <div style="display:flex;gap:10px">
-          <button class="btn btn-primary" style="flex:1" onclick="
-            const n=document.getElementById('ng-inline-name').value.trim();
-            if(!n||!A.family)return;
-            sb.from('note_groups').insert({family_id:A.family.id,name:n}).select().single().then(({data})=>{
-              if(data){
-                A.noteGroups.push(data);
-                const opt=document.createElement('option');
-                opt.value=data.id;opt.textContent=data.name;opt.selected=true;
-                sel.insertBefore(opt,sel.querySelector('option[value=\'__new__\']'));
-                sel.value=data.id;
-                toast('Group created!');
-              }
-              document.body.removeChild(overlay);
-            });
-          ">Create</button>
-          <button class="btn btn-secondary" style="flex:1" onclick="document.body.removeChild(this.closest('[style*=fixed]'))">Cancel</button>
-        </div>
-      </div>`;
-      document.body.appendChild(overlay);
-      setTimeout(()=>document.getElementById('ng-inline-name')?.focus(),50);
+      this.value=''; // Reset while modal is open
+      openNewGroupModal('ne-grp');
     }
   });
 }
 window.openNote=openNote;
+
+// v14: opens the "New Group" mini-modal. Takes the target <select>'s id so
+// the Create button (below) can look it up via document.getElementById()
+// at click time -- safe from an inline onclick attribute, unlike a closure
+// variable would be.
+function openNewGroupModal(selectId){
+  const overlay=document.createElement('div');
+  overlay.id='ng-inline-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(20,18,14,.55);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML=`<div style="background:#fff;border-radius:16px;padding:22px;width:100%;max-width:340px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <div style="font-family:Playfair Display,serif;font-size:17px;color:#1e1b16;margin-bottom:14px">New Group</div>
+    <input id="ng-inline-name" class="inp" placeholder="Group name e.g. 🏠 Household" autofocus style="margin-bottom:14px">
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-primary" style="flex:1" onclick="createInlineNoteGroup('${selectId}')">Create</button>
+      <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ng-inline-overlay')?.remove()">Cancel</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(()=>document.getElementById('ng-inline-name')?.focus(),50);
+}
+window.openNewGroupModal=openNewGroupModal;
+
+// v14: creates the new note group and updates the target <select> in place.
+// Looked up by id at call time (not via closure) -- this is the fix for the
+// "New Group does nothing" bug. Also now has proper error handling, which
+// the old inline version never had.
+async function createInlineNoteGroup(selectId){
+  const nameInput=document.getElementById('ng-inline-name');
+  const n=nameInput?.value.trim();
+  if(!n||!A.family)return;
+  const {data,error}=await sbWrite(()=>sb.from('note_groups').insert({family_id:A.family.id,name:n}).select().single());
+  if(error){ toast('Error creating group.', true); console.error('New group insert error', error); return; }
+  if(data){
+    A.noteGroups.push(data);
+    const sel=document.getElementById(selectId);
+    if(sel){
+      const opt=document.createElement('option');
+      opt.value=data.id;opt.textContent=data.name;opt.selected=true;
+      const newOpt=sel.querySelector('option[value="__new__"]');
+      if(newOpt) sel.insertBefore(opt,newOpt); else sel.appendChild(opt);
+      sel.value=data.id;
+    }
+    toast('Group created!');
+  }
+  document.getElementById('ng-inline-overlay')?.remove();
+}
+window.createInlineNoteGroup=createInlineNoteGroup;
 
 function addCLItem(text='', done=false){
   const cont=document.getElementById('ne-cl');
@@ -3290,6 +3437,9 @@ async function saveNote(noteId){
   // v13: cancel any pending auto-save — we're saving manually right now
   clearTimeout(A._noteAutoSaveTimer);
   A._noteAutoSaveTimer=null;
+  // v14: block a concurrently-firing auto-save from racing this manual save
+  // and overwriting it with stale data (see _doNoteAutoSave's matching guard)
+  A._noteSavingManually=true;
   // v9: button-disable + saving toast fire IMMEDIATELY on tap, before any
   // form reading or the Supabase call — previously users saw nothing for
   // up to 7s (the sbWrite timeout) which caused double-taps. Whole body is
@@ -3337,6 +3487,7 @@ async function saveNote(noteId){
     else A.notes.push(savedNote);
     _saveOk=true;
     A._noteDirty=false; // v13: mark note as clean after explicit manual save
+    clearNoteDraftLS(); // v14: saved successfully — discard the localStorage draft
     // v8: notify other family members
     writeNotif('note', noteId ? 'updated' : 'created',
       noteId ? `${getActorName()} updated a note` : `${getActorName()} added a new note`,
@@ -3348,6 +3499,7 @@ async function saveNote(noteId){
     toast('Something went wrong — please try again.', true);
   }finally{
     hideSavingToast();
+    A._noteSavingManually=false; // v14: release the guard regardless of outcome
     if(!_saveOk&&_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent=_saveBtn.dataset.origText||'Save';_saveBtn.style.opacity='';}
   }
 }
@@ -3401,6 +3553,10 @@ function scheduleNoteAutoSave(){
   A._noteDirty=true;
   const status=document.getElementById('note-autosave-status');
   if(status){status.textContent='● Unsaved changes';status.style.color='#c4892a';}
+  // v14: snapshot to localStorage on every keystroke-triggered cycle, not just
+  // when the 4-second remote debounce completes — protects against the tab
+  // being backgrounded/discarded before that timer ever gets to fire.
+  saveNoteDraftLS();
   clearTimeout(A._noteAutoSaveTimer);
   A._noteAutoSaveTimer=setTimeout(_doNoteAutoSave,4000);
 }
@@ -3408,6 +3564,9 @@ window.scheduleNoteAutoSave=scheduleNoteAutoSave;
 
 async function _doNoteAutoSave(){
   if(!A.family||!A.user) return;
+  // v14: a manual Save is currently in flight — bail out so this auto-save
+  // can't land after it and overwrite the just-saved data with stale content
+  if(A._noteSavingManually) return;
   // Bail out if the note modal has been closed while the timer was running
   if(!document.getElementById('ne-editor')) return;
   const title=document.getElementById('ne-t')?.value||'';
@@ -3456,10 +3615,108 @@ async function _doNoteAutoSave(){
     A.notes.push(res.data);
   }
   A._noteDirty=false;
+  clearNoteDraftLS(); // v14: successfully synced to the DB — discard the localStorage draft
   const now=new Date();
   const t=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
   if(status){status.textContent=`✓ Auto-saved at ${t}`;status.style.color='#5e8b62';}
 }
+
+// ── NOTEBOOK DRAFT SAFETY (v14) ──────────────────────────────────────────────
+// Mirrors the Event form's v13 localStorage draft pattern (see saveEvDraft /
+// checkAndOfferEvDraft / restoreEvDraft above). Notebook's 4-second auto-save
+// writes only to Supabase — if the tab/PWA is backgrounded (screen lock, app
+// switch) before that timer fires, mobile browsers commonly pause or fully
+// discard JS execution, losing the draft entirely. This gives Notebook the
+// same safety net: a localStorage copy kept current on every edit, flushed
+// immediately via a visibilitychange/pagehide listener (see bottom of file),
+// with a restore prompt offered on next app open.
+
+const _noteDraftKey=()=>'ks_note_draft_'+(A.user?.id||'anon');
+const _noteDraftMaxAge=2*60*60*1000; // discard drafts older than 2 hours
+
+function saveNoteDraftLS(){
+  if(!A.user||!A.family) return;
+  const editorEl=document.getElementById('ne-editor');
+  if(!editorEl) return; // note editor isn't open right now — nothing to draft
+  const checklist=[];
+  document.querySelectorAll('#ne-cl > div').forEach((row,i)=>{
+    const cb=row.querySelector('input[type="checkbox"]');
+    const inp=row.querySelector('input:not([type="checkbox"])');
+    if(inp?.value?.trim())checklist.push({id:'c'+i,text:inp.value.trim(),done:cb?.checked||false});
+  });
+  const grpVal=document.getElementById('ne-grp')?.value;
+  const draft={
+    noteId:A._noteEditingId||null,
+    timestamp:Date.now(),
+    fields:{
+      title:document.getElementById('ne-t')?.value||'',
+      content:editorEl.innerHTML||'',
+      color:document.getElementById('ne-col')?.value||NOTE_COLORS[0],
+      group_id:grpVal&&grpVal!=='__new__'?grpVal:null,
+      member_id:document.getElementById('ne-mem')?.value||null,
+      pinned:document.getElementById('ne-pin')?.checked||false,
+      is_private:document.getElementById('ne-private')?.checked||false,
+    },
+    checklist,
+  };
+  try{localStorage.setItem(_noteDraftKey(),JSON.stringify(draft));}catch(_){}
+}
+window.saveNoteDraftLS=saveNoteDraftLS;
+
+function clearNoteDraftLS(){
+  try{localStorage.removeItem(_noteDraftKey());}catch(_){}
+}
+window.clearNoteDraftLS=clearNoteDraftLS;
+
+// Checked once at app boot (see boot() below) — offers to restore an
+// unfinished note draft left over from a lost session.
+function checkAndOfferNoteDraft(){
+  if(!A.user||!A.family) return;
+  let draft;
+  try{
+    const raw=localStorage.getItem(_noteDraftKey());
+    if(!raw) return;
+    draft=JSON.parse(raw);
+  }catch(_){return;}
+  if(!draft||!draft.timestamp||Date.now()-draft.timestamp>_noteDraftMaxAge){
+    clearNoteDraftLS();return;
+  }
+  const existing=document.getElementById('note-draft-banner');
+  if(existing) existing.remove();
+  const banner=document.createElement('div');
+  banner.id='note-draft-banner';
+  banner.style.cssText='position:fixed;bottom:72px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:448px;background:#1e1b16;color:#fff;border-radius:12px;padding:12px 14px;z-index:500;display:flex;align-items:center;justify-content:space-between;gap:10px;box-shadow:0 4px 20px rgba(0,0,0,.3);animation:fadeUp .3s ease';
+  const noteTitle=draft.fields?.title;
+  const draftDate=new Date(draft.timestamp);
+  const tStr=draftDate.getHours().toString().padStart(2,'0')+':'+draftDate.getMinutes().toString().padStart(2,'0');
+  banner.innerHTML=`
+    <div style="min-width:0">
+      <div style="font-weight:700;font-size:13px">📝 Unfinished note</div>
+      <div style="font-size:11px;opacity:.75;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${noteTitle?'"'+noteTitle+'"':'No title yet'} · Draft from ${tStr}</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-shrink:0">
+      <button onclick="document.getElementById('note-draft-banner')?.remove();clearNoteDraftLS()" style="background:rgba(255,255,255,.15);border:none;border-radius:8px;color:#fff;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent">Discard</button>
+      <button onclick="document.getElementById('note-draft-banner')?.remove();restoreNoteDraftLS()" style="background:#5e8b62;border:none;border-radius:8px;color:#fff;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent">Restore ✓</button>
+    </div>`;
+  document.body.appendChild(banner);
+  setTimeout(()=>document.getElementById('note-draft-banner')?.remove(),15000); // auto-dismiss
+}
+window.checkAndOfferNoteDraft=checkAndOfferNoteDraft;
+
+// Queues the saved draft, then opens the note editor — restoration itself
+// happens inside openNote()'s setTimeout, mirroring restoreEvDraft/openEvForm.
+function restoreNoteDraftLS(){
+  let draft;
+  try{
+    const raw=localStorage.getItem(_noteDraftKey());
+    if(!raw) return;
+    draft=JSON.parse(raw);
+  }catch(_){return;}
+  if(!draft) return;
+  A._noteDraftRestore=draft;
+  openNote(draft.noteId||null);
+}
+window.restoreNoteDraftLS=restoreNoteDraftLS;
 
 // ── MEDS ──────────────────────────────────────────────────────────────────────
 function exportMedsXLSX() {
@@ -3568,7 +3825,6 @@ function renderMeds(targetId){
 
   const headerHtml = `
     <div class="page-header">
-      <div class="family-label">${getFamily()?.name||''}</div>
       <div class="page-title">Meds & Supplies</div>
     </div>
     <div style="padding:10px 16px 0;display:flex;gap:8px;align-items:center">
@@ -3921,7 +4177,6 @@ function renderInsights(){
 
   document.getElementById('page-insights').innerHTML=`
     <div class="page-header">
-      <div class="family-label">${getFamily()?.name||''}</div>
       <div class="page-title">Insights</div>
     </div>
     ${memberFilter}
@@ -4220,7 +4475,6 @@ function renderHome(){
 
   document.getElementById('page-home').innerHTML=`
     <div class="page-header">
-      <div class="family-label">${getFamily()?.name||''}</div>
       <div class="page-title" style="font-size:20px">Good ${new Date().getHours()<12?'morning':'afternoon'} 👋</div>
     </div>
     <div style="padding:12px 16px">
@@ -4297,7 +4551,6 @@ function renderMeals(){
   }
   document.getElementById('page-meals').innerHTML=`
     <div class="page-header">
-      <div class="family-label">${getFamily()?.name||''}</div>
       <div class="page-title">Meals</div>
     </div>
     <div class="tabs">${TABS.map(t=>`<button class="tab ${A.mealsTab===t.id?'active':''}" onclick="A.mealsTab='${t.id}';renderMeals()">${t.label}</button>`).join('')}</div>
@@ -4605,6 +4858,9 @@ async function reorderShoppingItems(listId,cont){
   // reorder should feel instant. Always re-render regardless of outcome.
   const{error}=await sbWrite(()=>sb.from('shopping_lists').update({items:newItems}).eq('id',listId));
   if(error){toast('Error saving new order.',true);console.error(error);}
+  // v14: keep the Shopping tab page behind this modal in sync too — it was
+  // previously only refreshed by leaving and returning to the Meals tab.
+  renderMeals();
   renderShoppingModal(listId);
 }
 window.reorderShoppingItems=reorderShoppingItems;
@@ -4628,6 +4884,8 @@ async function addShoppingItem(listId){
     list.items=items;
     // v8: notify other family members
     writeNotif('shopping','updated',`${getActorName()} added to a shopping list`,text);
+    // v14: keep the Shopping tab page behind this modal in sync too.
+    renderMeals();
     renderShoppingModal(listId);
   }catch(e){
     toast('Something went wrong — please try again.',true);console.error(e);
@@ -4645,6 +4903,8 @@ async function removeShoppingItem(listId,idx){
   // v10 (UX hardening): sbWrite() + error toast on failure.
   const{error}=await sbWrite(()=>sb.from('shopping_lists').update({items}).eq('id',listId));
   if(error){toast('Error removing item.',true);console.error(error);}
+  // v14: keep the Shopping tab page behind this modal in sync too.
+  renderMeals();
   renderShoppingModal(listId);
 }
 window.removeShoppingItem=removeShoppingItem;
@@ -4662,6 +4922,8 @@ async function resetShoppingList(listId){
     if(error){toast('Error resetting list.',true);console.error(error);return;}
     list.items=items;
     toast('All items unchecked! ✅');
+    // v14: keep the Shopping tab page behind this modal in sync too.
+    renderMeals();
     renderShoppingModal(listId);
   }catch(e){
     toast('Something went wrong — please try again.',true);console.error(e);
@@ -4690,6 +4952,8 @@ async function toggleShoppingItem(listId,idx,checked){
   }
   list.items=items;
   if(checked) showShopUndoToast(listId,idx);
+  // v14: keep the Shopping tab page behind this modal in sync too.
+  renderMeals();
   renderShoppingModal(listId);
 }
 window.toggleShoppingItem=toggleShoppingItem;
@@ -4727,6 +4991,10 @@ async function undoShopCheck(listId,idx){
     return;
   }
   list.items=items;
+  // v14: keep the Shopping tab page behind this modal in sync too. (Same
+  // gap as toggleShoppingItem, addShoppingItem, etc. — undoShopCheck wasn't
+  // named in the original audit but shares the identical root cause.)
+  renderMeals();
   renderShoppingModal(listId);
 }
 window.undoShopCheck=undoShopCheck;
@@ -4816,6 +5084,8 @@ async function saveMealPlan(isSilent=false){
       return;
     }
     A.mealPlan=data;
+    A._mealPlanDirty=false; // v14
+    clearMealPlanDraftLS(); // v14: successfully synced — discard the localStorage draft
     // v8: notify family members on explicit saves only — not on every 3-second auto-save
     if(!isSilent) writeNotif('meal','updated',`${getActorName()} updated the weekly menu`,'Meal Planner');
     const now=new Date();
@@ -4835,12 +5105,114 @@ window.saveMealPlan=saveMealPlan;
 // 3-second debounce: fires after the user stops typing in any planner cell.
 // Saves silently (no toast) — only the status indicator updates.
 function scheduleMealPlanAutoSave(){
+  A._mealPlanDirty=true;
   const status=document.getElementById('meal-plan-status');
   if(status){status.textContent='● Unsaved';status.style.color='#c4892a';}
+  // v14: snapshot to localStorage on every keystroke-triggered cycle, not just
+  // when the 3-second remote debounce completes — same draft-safety pattern
+  // as Notebook (see checkAndOfferMealDraft below), for the same reason: a
+  // backgrounded/discarded tab can beat the debounce timer to the punch.
+  saveMealPlanDraftLS();
   clearTimeout(A._mealPlanAutoSaveTimer);
   A._mealPlanAutoSaveTimer=setTimeout(()=>saveMealPlan(true),3000);
 }
 window.scheduleMealPlanAutoSave=scheduleMealPlanAutoSave;
+
+// ── MEAL PLANNER DRAFT SAFETY (v14) ───────────────────────────────────────────
+// Same pattern and same reasoning as Notebook's draft safety net above: the
+// grid's 3-second auto-save only writes to Supabase, so a backgrounded/
+// discarded tab can lose unsaved edits before that timer fires. Meal Planner
+// has no per-note "editor" to reopen — it's a single shared grid — so the
+// restore prompt simply switches to the Meals > Planner tab and refills it.
+
+const _mealDraftKey=()=>'ks_meal_draft_'+(A.family?.id||'anon');
+const _mealDraftMaxAge=2*60*60*1000; // discard drafts older than 2 hours
+
+function saveMealPlanDraftLS(){
+  if(!A.family) return;
+  const table=document.getElementById('meal-plan-table');
+  if(!table) return; // grid isn't on screen right now — nothing to draft
+  const plan_data={};
+  MEAL_PLAN_ROWS.forEach(row=>{
+    plan_data[row]={};
+    MEAL_PLAN_DAYS.forEach(day=>{
+      plan_data[row][day]=document.getElementById(`mp-${row}-${day}`)?.value||'';
+    });
+  });
+  const draft={timestamp:Date.now(),plan_data};
+  try{localStorage.setItem(_mealDraftKey(),JSON.stringify(draft));}catch(_){}
+}
+window.saveMealPlanDraftLS=saveMealPlanDraftLS;
+
+function clearMealPlanDraftLS(){
+  try{localStorage.removeItem(_mealDraftKey());}catch(_){}
+}
+window.clearMealPlanDraftLS=clearMealPlanDraftLS;
+
+// Checked once at app boot (see boot() below). Only offers restoration if the
+// draft is actually newer than the last saved plan — otherwise it's stale
+// leftover from a session that already completed normally.
+function checkAndOfferMealDraft(){
+  if(!A.family) return;
+  let draft;
+  try{
+    const raw=localStorage.getItem(_mealDraftKey());
+    if(!raw) return;
+    draft=JSON.parse(raw);
+  }catch(_){return;}
+  if(!draft||!draft.timestamp||Date.now()-draft.timestamp>_mealDraftMaxAge){
+    clearMealPlanDraftLS();return;
+  }
+  const savedAt=A.mealPlan?.updated_at?new Date(A.mealPlan.updated_at).getTime():0;
+  if(draft.timestamp<=savedAt){ clearMealPlanDraftLS(); return; }
+  const existing=document.getElementById('meal-draft-banner');
+  if(existing) existing.remove();
+  const banner=document.createElement('div');
+  banner.id='meal-draft-banner';
+  banner.style.cssText='position:fixed;bottom:72px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:448px;background:#1e1b16;color:#fff;border-radius:12px;padding:12px 14px;z-index:500;display:flex;align-items:center;justify-content:space-between;gap:10px;box-shadow:0 4px 20px rgba(0,0,0,.3);animation:fadeUp .3s ease';
+  const draftDate=new Date(draft.timestamp);
+  const tStr=draftDate.getHours().toString().padStart(2,'0')+':'+draftDate.getMinutes().toString().padStart(2,'0');
+  banner.innerHTML=`
+    <div style="min-width:0">
+      <div style="font-weight:700;font-size:13px">📝 Unfinished weekly menu edits</div>
+      <div style="font-size:11px;opacity:.75;margin-top:2px">Draft from ${tStr} — newer than what's currently saved</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-shrink:0">
+      <button onclick="document.getElementById('meal-draft-banner')?.remove();clearMealPlanDraftLS()" style="background:rgba(255,255,255,.15);border:none;border-radius:8px;color:#fff;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent">Discard</button>
+      <button onclick="document.getElementById('meal-draft-banner')?.remove();restoreMealPlanDraftLS()" style="background:#5e8b62;border:none;border-radius:8px;color:#fff;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent">Restore ✓</button>
+    </div>`;
+  document.body.appendChild(banner);
+  setTimeout(()=>document.getElementById('meal-draft-banner')?.remove(),15000); // auto-dismiss
+}
+window.checkAndOfferMealDraft=checkAndOfferMealDraft;
+
+// Switches to Meals > Planner (creating the grid in the DOM if needed) then
+// refills it from the draft once the grid textareas exist.
+function restoreMealPlanDraftLS(){
+  let draft;
+  try{
+    const raw=localStorage.getItem(_mealDraftKey());
+    if(!raw) return;
+    draft=JSON.parse(raw);
+  }catch(_){return;}
+  if(!draft) return;
+  A.mealsTab='planner';
+  goTo('meals');
+  setTimeout(()=>{
+    const pd=draft.plan_data||{};
+    MEAL_PLAN_ROWS.forEach(row=>{
+      MEAL_PLAN_DAYS.forEach(day=>{
+        const el=document.getElementById(`mp-${row}-${day}`);
+        if(el) el.value=pd[row]?.[day]||'';
+      });
+    });
+    A._mealPlanDirty=true;
+    const status=document.getElementById('meal-plan-status');
+    if(status){status.textContent='● Unsaved changes';status.style.color='#c4892a';}
+    toast('Draft restored ✓');
+  },100);
+}
+window.restoreMealPlanDraftLS=restoreMealPlanDraftLS;
 
 
 // ── INVENTORY PAGE ─────────────────────────────────────────────────────────────
@@ -4884,7 +5256,6 @@ function renderInventory(){
 
   document.getElementById('page-inventory').innerHTML=`
     <div class="page-header">
-      <div class="family-label">${getFamily()?.name||''}</div>
       <div class="page-title">Inventory</div>
     </div>
     <div class="tabs">${TABS.map(t=>`<button class="tab ${A.invTab===t.id?'active':''}" onclick="A.invTab='${t.id}';renderInventory()">${t.label}</button>`).join('')}</div>
@@ -5145,7 +5516,6 @@ function renderSettings(){
   const cu=A.user;
   document.getElementById('page-settings').innerHTML=`
     <div class="page-header">
-      <div class="family-label">${getFamily()?.name||''}</div>
       <div class="page-title">Settings</div>
     </div>
     ${cu?`<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:${T.sageLight};border-bottom:1px solid ${T.border}">
@@ -5479,9 +5849,12 @@ async function markEvComplete(evId) {
   const ev = A.events.find(e => e.id === evId);
   if (!ev) return;
   const completedAt = ev.completed_at ? null : new Date().toISOString();
-  const { error } = await sb.from('events')
+  // v14: wrapped in sbWrite() — this was the only save-type function in the app
+  // calling Supabase directly, which meant it had no timeout/retry safety net
+  // and could silently do nothing if the connection had gone idle.
+  const { error } = await sbWrite(() => sb.from('events')
     .update({ completed_at: completedAt })
-    .eq('id', evId);
+    .eq('id', evId));
   if (error) { toast('Error saving.', true); return; }
   A.events = A.events.map(e => e.id === evId ? {...e, completed_at: completedAt} : e);
   toast(completedAt ? 'Task marked as complete! ✅' : 'Marked as incomplete.');
