@@ -1,4 +1,4 @@
-<!-- Seamly v14 | STAGING | 12 Jul 2026 -->
+<!-- Seamly v15 | STAGING | 15 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -170,7 +170,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div class="auth-card">
     <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">Seamly</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v14 — Jul 2026</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v15 — Jul 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -465,6 +465,8 @@ let A={
   mealsTab:'planner',invTab:'treatments',noteRibbonOpen:true,
   showOB:false,obStep:0,obFlow:null,
   medSearch:'',
+  medSortCol:null,medSortDir:'asc', // v15: Inventory table column sort state
+  shopSearchAll:'', // v15: global "search across all shopping lists" query
   // v13 auto-save state
   _noteAutoSaveTimer:null,   // debounce timer handle for note auto-save
   _noteEditingId:null,       // ID of note being edited (updated after first auto-insert)
@@ -1120,8 +1122,10 @@ function renderCal(){
     <div class="page-header">
       <div class="page-title">Calendar <button class="btn btn-primary btn-sm" onclick="showPicker(null)">+ Add</button></div>
     </div>
-    <div style="padding:8px 16px 0;display:flex;gap:5px;flex-wrap:wrap">
-      ${['month','week','year'].map(v=>`<button onclick="A.calView='${v}';renderCal()" style="padding:4px 12px;border-radius:99px;border:1.5px solid ${A.calView===v?T.sage:T.border};background:${A.calView===v?T.sage:'#fff'};color:${A.calView===v?'#fff':T.muted};font-weight:700;font-size:12px;cursor:pointer;text-transform:capitalize">${v}</button>`).join('')}
+    <div style="padding:8px 16px 0;display:flex;gap:5px;flex-wrap:wrap;align-items:center">
+      <select class="sel" style="width:auto;font-size:12px;padding:4px 10px;border-radius:20px;flex-shrink:0;font-weight:700;color:${T.sage};border:1.5px solid ${T.sage};background:#fff" onchange="A.calView=this.value;renderCal()">
+        ${['month','week','year'].map(v=>`<option value="${v}"${A.calView===v?' selected':''}>${v.charAt(0).toUpperCase()+v.slice(1)} view</option>`).join('')}
+      </select>
       <button onclick="A.calDate=new Date();renderCal()" style="padding:4px 12px;border-radius:99px;border:1.5px solid ${T.border};background:#fff;color:${T.muted};font-weight:700;font-size:12px;cursor:pointer;margin-left:auto">Today</button>
     </div>
     <div style="padding:7px 16px 0;display:flex;gap:6px;overflow-x:auto">
@@ -3263,7 +3267,16 @@ function openNote(noteId){
         <select class="sel" id="ne-grp">
           <option value="">No group</option>
           <option value="__new__">+ New Group…</option>
-          ${groups.map(g=>`<option value="${g.id}"${note?.group_id===g.id?' selected':''}>${g.name}</option>`).join('')}
+          ${groups.map(g=>{
+            // v15: for a brand-new note (noteId is null), pre-select whichever
+            // group the user was currently viewing in Notebook when they hit
+            // "+ Note" (A.noteFGroup) — 'all'/'none' don't count as a real
+            // group. Editing an existing note still uses that note's own
+            // saved group_id, unaffected by whatever filter happens to be
+            // active right now.
+            const isSel = note ? note.group_id===g.id : (A.noteFGroup&&A.noteFGroup!=='all'&&A.noteFGroup!=='none'&&A.noteFGroup===g.id);
+            return `<option value="${g.id}"${isSel?' selected':''}>${g.name}</option>`;
+          }).join('')}
         </select></div>
       <div class="form-row" style="margin:0"><label class="lbl">Member</label>
         <select class="sel" id="ne-mem"><option value="">Family</option>${A.members.map(m=>`<option value="${m.id}"${note?.member_id===m.id?' selected':''}>${m.name}</option>`).join('')}</select></div>
@@ -3725,6 +3738,14 @@ function exportMedsXLSX() {
   const daysLeft = med => { const td=(med.member_ids||[]).length*(med.dose_per_day||1); if(!td)return null; return Math.floor((med.stock_today||0)/td); };
   const stockBase = med => med.stock_date ? new Date(med.stock_date+'T00:00:00') : new Date();
   const lastsUntil = med => { const d=daysLeft(med); if(d===null)return '—'; const r=new Date(stockBase(med)); r.setDate(r.getDate()+d); return fmt(r); };
+  // v15: "Updated Stock" is now a persisted, cumulative value (only set once
+  // an order has actually been confirmed) rather than a live preview.
+  const hasUpdated = med => med.updated_stock!==null && med.updated_stock!==undefined;
+  const updLastsUntil = med => {
+    if(!hasUpdated(med))return '—';
+    const td=(med.member_ids||[]).length*(med.dose_per_day||1); if(!td)return '—';
+    const r=new Date(stockBase(med)); r.setDate(r.getDate()+Math.floor(med.updated_stock/td)); return fmt(r);
+  };
   const totalOrder = dm.reduce((sum,m)=>sum+(parseInt(m.new_order_pkgs)||0)*(m.price_per_pkg||0),0);
   const grand = (totalOrder+(parseFloat(getFamily()?.transport_cost)||0)).toFixed(2);
   const memNames = med => getDM() && getMembers().filter(m=>(med.member_ids||[]).includes(m.id)).map(m=>m.name).join(', ');
@@ -3734,11 +3755,13 @@ function exportMedsXLSX() {
     med.stock_date?fmt(med.stock_date+'T00:00:00'):'—',
     lastsUntil(med), med.new_order_pkgs||0,
     med.new_order_pkgs?`${s}${((parseInt(med.new_order_pkgs)||0)*(med.price_per_pkg||0)).toFixed(2)}`:'—',
+    hasUpdated(med)?med.updated_stock:'—', updLastsUntil(med),
     med.last_ordered?fmt(med.last_ordered):'Never'
   ]);
   const headers = ['Medication','Members','Dose/day','Units/pkg',`Price/pkg (${s})`,
-    'In stock','Stock count date','Lasts until','New order (pkgs)',`Order cost (${s})`,'Last order received'];
-  const tableRows = [headers, ...rows, ['GRAND TOTAL','','','','','','','','',`${s}${grand}`,'']];
+    'In stock','Stock count date','Stock lasts until','New order (pkgs)',`Order cost (${s})`,
+    'Updated Stock','Updated stock lasts until','Last order received'];
+  const tableRows = [headers, ...rows, ['GRAND TOTAL','','','','','','','','',`${s}${grand}`,'','','']];
   const html = `<html><head><meta charset="UTF-8"></head><body>
     <h2>${getFamily()?.name||''} — Medication Order — ${fmt(new Date())}</h2>
     <table border="1" cellpadding="5" cellspacing="0">
@@ -3756,17 +3779,23 @@ function exportMedsCSV() {
   const daysLeft = med => { const td=(med.member_ids||[]).length*(med.dose_per_day||1); if(!td)return null; return Math.floor((med.stock_today||0)/td); };
   const stockBase = med => med.stock_date ? new Date(med.stock_date+'T00:00:00') : new Date();
   const lastsUntil = med => { const d=daysLeft(med); if(d===null)return '—'; const r=new Date(stockBase(med)); r.setDate(r.getDate()+d); return fmt(r); };
-  const header = ['Medication','Members','Dose/day','Units/pkg','Price/pkg','In stock','Stock count date','Lasts until','New order (pkgs)','Order cost','Updated until'];
+  // v15: "Updated Stock" is now a persisted, cumulative value (only set once
+  // an order has actually been confirmed) rather than a live preview.
+  const hasUpdated = med => med.updated_stock!==null && med.updated_stock!==undefined;
+  const updLastsUntil = med => {
+    if(!hasUpdated(med))return '—';
+    const td=(med.member_ids||[]).length*(med.dose_per_day||1); if(!td)return '—';
+    const r=new Date(stockBase(med)); r.setDate(r.getDate()+Math.floor(med.updated_stock/td)); return fmt(r);
+  };
+  const header = ['Medication','Members','Dose/day','Units/pkg','Price/pkg','In stock','Stock count date','Stock lasts until','New order (pkgs)','Order cost','Updated Stock','Updated stock lasts until','Last order received'];
   const rows = dm.map(med => {
     const memNames = A.members.filter(m=>(med.member_ids||[]).includes(m.id)).map(m=>m.name).join('+');
     const orderCost = med.new_order_pkgs ? `${s}${((parseInt(med.new_order_pkgs)||0)*med.price_per_pkg).toFixed(2)}` : '—';
-    const updStock = (med.stock_today||0)+((parseInt(med.new_order_pkgs)||0)*(med.units_per_pkg||0));
-    const updUntil = med.new_order_pkgs ? (() => { const td=(med.member_ids||[]).length*(med.dose_per_day||1); if(!td)return'—'; const r=new Date(stockBase(med)); r.setDate(r.getDate()+Math.floor(updStock/td)); return fmt(r); })() : '—';
-    return [med.name, memNames, med.dose_per_day, med.units_per_pkg, `${s}${(med.price_per_pkg||0).toFixed(2)}`, med.stock_today, med.stock_date?fmt(med.stock_date+'T00:00:00'):'—', lastsUntil(med), med.new_order_pkgs||'', orderCost, updUntil];
+    return [med.name, memNames, med.dose_per_day, med.units_per_pkg, `${s}${(med.price_per_pkg||0).toFixed(2)}`, med.stock_today, med.stock_date?fmt(med.stock_date+'T00:00:00'):'—', lastsUntil(med), med.new_order_pkgs||'', orderCost, hasUpdated(med)?med.updated_stock:'—', updLastsUntil(med), med.last_ordered?fmt(med.last_ordered):'—'];
   });
   const totalOrder = dm.reduce((sum,m)=>sum+(parseInt(m.new_order_pkgs)||0)*(m.price_per_pkg||0),0);
   const grand = (totalOrder+(parseFloat(A.family?.transport_cost)||0)).toFixed(2);
-  rows.push(['GRAND TOTAL','','','','','','','','','',`${s}${grand}`,'']);
+  rows.push(['GRAND TOTAL','','','','','','','','',`${s}${grand}`,'','','']);
   const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], {type:'text/csv'});
   const url = URL.createObjectURL(blob);
@@ -3795,19 +3824,102 @@ function copyOrderToClipboard() {
 window.copyOrderToClipboard = copyOrderToClipboard;
 
 function renderMeds(targetId){
-  const dm=getFilteredMeds(),s=symC();
+  let dm=getFilteredMeds(),s=symC();
   const daysLeft=med=>{const td=(med.member_ids||[]).length*(med.dose_per_day||1);if(!td)return null;return Math.floor((med.stock_today||0)/td);};
-  // "Lasts until" now counts forward from the date stock was last confirmed,
+  // "Stock lasts until" counts forward from the date stock was last confirmed,
   // not always from today. Falls back to today if no date is set yet.
   const stockBase=med=>med.stock_date?new Date(med.stock_date+'T00:00:00'):todayD();
-  const lastsUntil=med=>{const d=daysLeft(med);return d===null?'—':fmt(addDays(stockBase(med),d));};
-  const updStock=med=>(med.stock_today||0)+((parseInt(med.new_order_pkgs)||0)*(med.units_per_pkg||0));
-  const updUntil=med=>{const td=(med.member_ids||[]).length*(med.dose_per_day||1);if(!td||!med.new_order_pkgs)return'—';return fmt(addDays(stockBase(med),Math.floor(updStock(med)/td)));};
+  const lastsUntilDate=med=>{const d=daysLeft(med);return d===null?null:addDays(stockBase(med),d);};
+  const lastsUntil=med=>{const d=lastsUntilDate(med);return d?fmt(d):'—';};
   const orderPrice=med=>((parseInt(med.new_order_pkgs)||0)*(med.price_per_pkg||0)).toFixed(2);
+  // v15: "Updated Stock" is now a persisted, cumulative value (set only when
+  // an order is confirmed — see confirmOrder()), not a live preview of the
+  // currently-typed order. "Updated stock lasts until" counts forward from
+  // the SAME Stock count date as "Stock lasts until" (not from today).
+  const hasUpdated=med=>med.updated_stock!==null&&med.updated_stock!==undefined;
+  const updLastsUntilDate=med=>{
+    if(!hasUpdated(med))return null;
+    const td=(med.member_ids||[]).length*(med.dose_per_day||1);
+    if(!td)return null;
+    return addDays(stockBase(med),Math.floor(med.updated_stock/td));
+  };
+  const updLastsUntil=med=>{const d=updLastsUntilDate(med);return d?fmt(d):'—';};
   const expDays=d=>Math.floor((new Date(d)-new Date())/(1000*60*60*24));
   const expSt=d=>{const n=expDays(d);if(n<0)return'expired';if(n<30)return'critical';if(n<90)return'soon';return'ok';};
   const totalOrder=dm.reduce((sum,m)=>sum+(parseInt(m.new_order_pkgs)||0)*(m.price_per_pkg||0),0);
   const grand=(totalOrder+(parseFloat(A.family?.transport_cost)||0)).toFixed(2);
+
+  // ── COLUMN SORTING (v15) ────────────────────────────────────────────────
+  // Every column header is clickable: first click sorts ascending, a second
+  // click on the same column reverses it. A.medSortCol / A.medSortDir hold
+  // the active sort (see state object A near the top of the file) so it
+  // survives re-renders (search, edits, order confirmations) until changed.
+  // Rows with no value for the sorted column (e.g. "Updated Stock" before
+  // any order has ever been confirmed) always sort to the bottom, regardless
+  // of direction, rather than jumping to the top on descending sorts.
+  const sortGetters={
+    name:med=>(med.name||'').toLowerCase(),
+    members:med=>getMembers().filter(m=>(med.member_ids||[]).includes(m.id)).map(m=>m.name).sort().join(', ').toLowerCase()||null,
+    dose:med=>med.dose_per_day||0,
+    stock:med=>med.stock_today||0,
+    stockDate:med=>med.stock_date?new Date(med.stock_date+'T00:00:00').getTime():null,
+    lastsUntil:med=>{const d=lastsUntilDate(med);return d?d.getTime():null;},
+    pkgUnits:med=>med.units_per_pkg||0,
+    pkgPrice:med=>med.price_per_pkg||0,
+    newOrder:med=>parseInt(med.new_order_pkgs)||0,
+    orderCost:med=>parseFloat(orderPrice(med))||0,
+    updStock:med=>hasUpdated(med)?med.updated_stock:null,
+    updLastsUntil:med=>{const d=updLastsUntilDate(med);return d?d.getTime():null;},
+    lastOrdered:med=>med.last_ordered?new Date(med.last_ordered).getTime():null,
+  };
+  if(A.medSortCol&&sortGetters[A.medSortCol]){
+    const getter=sortGetters[A.medSortCol];
+    const dir=A.medSortDir==='desc'?-1:1;
+    dm=dm.slice().sort((a,b)=>{
+      const va=getter(a),vb=getter(b);
+      const aNull=(va===null||va===undefined||va==='');
+      const bNull=(vb===null||vb===undefined||vb==='');
+      if(aNull&&bNull)return 0;
+      if(aNull)return 1;   // nulls always last, regardless of sort direction
+      if(bNull)return -1;
+      if(typeof va==='string')return va.localeCompare(vb)*dir;
+      return (va-vb)*dir;
+    });
+  }
+  const sortArrow=col=>A.medSortCol===col?(A.medSortDir==='asc'?' ▲':' ▼'):'';
+  // Column definitions in final on-screen order, tagged with which of the 4
+  // grouped sections (grp) they belong to, so the header can render both the
+  // grouped label row and the per-column sortable row from one source list.
+  const medCols=[
+    {key:'name',label:'Medication',grp:1},
+    {key:'members',label:'Members',grp:1},
+    {key:'dose',label:'Dose/day',grp:1},
+    {key:'stock',label:'In stock',grp:2},
+    {key:'stockDate',label:'Stock count date',grp:2},
+    {key:'lastsUntil',label:'Stock lasts until',grp:2},
+    {key:'pkgUnits',label:'Pkg units',grp:3},
+    {key:'pkgPrice',label:'Pkg price',grp:3},
+    {key:'newOrder',label:'New order',grp:3},
+    {key:'orderCost',label:'Order cost',grp:3},
+    {key:'updStock',label:'Updated Stock',grp:4},
+    {key:'updLastsUntil',label:'Updated stock lasts until',grp:4},
+    {key:'lastOrdered',label:'Last order received',grp:4},
+    {key:null,label:'',grp:0},
+  ];
+  const medGroupLabels={1:'Meds Identification',2:'Current Stock',3:'New Order',4:'Updated Stock'};
+  const medGroupHeaderRow=(()=>{
+    let cells='',i=0;
+    while(i<medCols.length){
+      const grp=medCols[i].grp;
+      let span=0;
+      while(i<medCols.length&&medCols[i].grp===grp){span++;i++;}
+      cells+=`<th colspan="${span}" style="text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:${T.muted};background:${T.parchment};border-bottom:1px solid ${T.border};padding:5px 4px">${medGroupLabels[grp]||''}</th>`;
+    }
+    return cells;
+  })();
+  const medColHeaderRow=medCols.map(c=>c.key
+    ?`<th onclick="sortMeds('${c.key}')" style="cursor:pointer;user-select:none;white-space:nowrap" title="Click to sort">${c.label}${sortArrow(c.key)}</th>`
+    :`<th></th>`).join('');
 
   // ── TARGET CONTAINER (v7) ──────────────────────────────────────────────────
   // renderMeds() can render in two places:
@@ -3848,7 +3960,10 @@ function renderMeds(targetId){
       ${A.medSearch?`<div style="font-size:11px;color:${T.muted};margin-bottom:8px">Showing ${dm.length} of ${getDM().length} medication${getDM().length!==1?'s':''} — filter also applies to exports</div>`:''}
       <div style="overflow-x:auto;border-radius:13px;border:1px solid ${T.border};background:${T.surface}">
         <table class="tbl">
-          <thead><tr>${['Medication','Members','Dose/day','Pkg units','Pkg price','In stock','Stock count date','Lasts until','New order','Order cost','Updated until','Last order received',''].map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+          <thead>
+            <tr>${medGroupHeaderRow}</tr>
+            <tr>${medColHeaderRow}</tr>
+          </thead>
           <tbody>
             ${dm.map((med,idx)=>{
               const dl=daysLeft(med);
@@ -3858,8 +3973,6 @@ function renderMeds(targetId){
                 <td><div style="font-weight:700">${med.name}</div>${med.shared?`<span class="chip" style="background:${T.skyLight};color:${T.sky};font-size:10px">Shared</span>`:''}<div style="font-size:11px;color:${T.muted}">${med.note||''}</div></td>
                 <td><div style="display:flex;gap:3px">${rowMems.map(m=>av(m,20)).join('')}</div></td>
                 <td>${med.dose_per_day}</td>
-                <td>${med.units_per_pkg}</td>
-                <td>${s}${(med.price_per_pkg||0).toFixed(2)}</td>
                 <td style="font-weight:700;color:${st==='critical'?T.rose:st==='low'?T.honey:T.sage}">
                   ${med.stock_today}
                   ${st==='critical'?`<div style="font-size:10px;color:${T.rose}">⚠️ Low!</div>`:''}
@@ -3867,9 +3980,12 @@ function renderMeds(targetId){
                 </td>
                 <td style="font-size:11px;color:${T.muted}">${med.stock_date?fmt(med.stock_date+'T00:00:00'):'—'}</td>
                 <td style="color:${st==='critical'?T.rose:st==='low'?T.honey:T.muted}">${lastsUntil(med)}</td>
+                <td>${med.units_per_pkg}</td>
+                <td>${s}${(med.price_per_pkg||0).toFixed(2)}</td>
                 <td><input type="number" min="0" value="${med.new_order_pkgs||''}" placeholder="0" onfocus="if(this.value==='0')this.value=''" onchange="updateMedOrder('${med.id}',this.value)" style="width:55px;padding:4px 6px;border-radius:7px;border:1px solid ${T.border};font-size:13px;text-align:center"></td>
                 <td style="font-weight:600;color:${T.sage}">${med.new_order_pkgs&&med.new_order_pkgs!=='0'?`${s}${orderPrice(med)}`:'—'}</td>
-                <td style="font-weight:600;color:${T.sage};font-size:12px">${med.new_order_pkgs&&med.new_order_pkgs!=='0'?updUntil(med):'—'}</td>
+                <td style="font-weight:600;color:${T.sage}">${hasUpdated(med)?med.updated_stock:'—'}</td>
+                <td style="font-weight:600;color:${T.sage};font-size:12px">${hasUpdated(med)?updLastsUntil(med):'—'}</td>
                 <td style="font-size:11px;color:${T.muted}">${med.last_ordered?fmt(med.last_ordered):'—'}</td>
                 <td>
                   ${med.new_order_pkgs&&med.new_order_pkgs!=='0'?`<button onclick="confirmOrder('${med.id}')" style="background:${T.sageLight};border:1px solid ${T.sageMid};border-radius:7px;padding:3px 8px;font-size:11px;font-weight:700;color:${T.sage};cursor:pointer;white-space:nowrap">✓ Got it</button>`:''}
@@ -3887,7 +4003,7 @@ function renderMeds(targetId){
                   <span style="font-size:11px;color:${T.muted}">${s}</span>
                 </div>
               </td>
-              <td colspan="4" style="font-weight:800;color:${T.sage};font-size:16px">${s}${grand}</td>
+              <td colspan="5" style="font-weight:800;color:${T.sage};font-size:16px">${s}${grand}</td>
             </tr>
           </tbody>
         </table>
@@ -3903,6 +4019,20 @@ function renderMeds(targetId){
   // fallback shows the full header + currency selector too.
   target.innerHTML = (tid==='inv-meds-container') ? contentHtml : (headerHtml + contentHtml);
 }
+
+// v15: click handler for sortable Inventory/Meds table column headers.
+// Clicking a new column sorts ascending by default; clicking the same
+// column again flips the direction. See sortGetters inside renderMeds().
+function sortMeds(col){
+  if(A.medSortCol===col){
+    A.medSortDir=A.medSortDir==='asc'?'desc':'asc';
+  }else{
+    A.medSortCol=col;
+    A.medSortDir='asc';
+  }
+  renderMeds();
+}
+window.sortMeds=sortMeds;
 
 async function updateCurrency(code){
   if(!A.family)return;
@@ -3935,27 +4065,22 @@ window.updateMedOrder=updateMedOrder;
 async function confirmOrder(id){
   const med=A.dailyMeds.find(m=>m.id===id);if(!med)return;
 
-  // ── CORRECTED STOCK CALCULATION (v7) ─────────────────────────────────────
-  // `stock_today` is only accurate as of `stock_date` (the last time stock
-  // was physically counted). Time has passed since then, during which the
-  // family kept consuming doses. Before adding the new order, subtract
-  // everything consumed between stock_date and today — THEN add the newly
-  // arrived stock. stock_date is reset to today, the new "last counted" date.
-  const today=todayD();
-  const stockDate=med.stock_date?new Date(med.stock_date+'T00:00:00'):today;
-  const daysPassed=Math.max(0,Math.round((today-stockDate)/86400000));
-  const dailyUse=(med.member_ids||[]).length*(med.dose_per_day||1);
-  const consumed=daysPassed*dailyUse;
+  // ── v15: "In stock" IS NOW FROZEN ─────────────────────────────────────────
+  // Confirming an order no longer touches "In stock" (stock_today) or
+  // "Stock count date" (stock_date) at all — those only ever change when the
+  // user manually edits them (see saveEditDM()). Instead, "Updated Stock" is
+  // a cumulative running total: it starts from "In stock" the first time an
+  // order is confirmed, then keeps adding each subsequent order on top of
+  // itself. The old "subtract what's been consumed since the last count"
+  // adjustment has been removed per spec — this is now a simple sum.
   const ordered=(parseInt(med.new_order_pkgs)||0)*(med.units_per_pkg||0);
-  // Clamp at 0 — stock can't be negative even if the family ran out before
-  // the new order arrived.
-  const ns=Math.max(0,(med.stock_today||0)-consumed)+ordered;
+  const priorUpdated=(med.updated_stock===null||med.updated_stock===undefined)?(med.stock_today||0):med.updated_stock;
+  const newUpdated=priorUpdated+ordered;
 
   // v7: sbWrite() for idle-safety
   const{data,error}=await sbWrite(()=>sb.from('daily_meds').update({
-    stock_today:ns,
-    stock_date:toISOLocal(today), // new "last counted" reference: today
-    new_order_pkgs:0,
+    updated_stock:newUpdated,
+    new_order_pkgs:0,               // Group 3's "New order" qty clears after confirming
     last_ordered:new Date().toISOString()
   }).eq('id',id).select().single());
   if(error){toast('Error updating stock: '+(error.message||'please try again.'),true);return;}
@@ -4066,7 +4191,11 @@ function openEditDM(id){
       <div class="form-row" style="margin:0"><label class="lbl">Dose/day</label><input class="inp" type="number" id="dm-d" value="${med.dose_per_day||1}" onfocus="this.select()"></div>
       <div class="form-row" style="margin:0"><label class="lbl">Units/pkg</label><input class="inp" type="number" id="dm-u" value="${med.units_per_pkg||30}" onfocus="this.select()"></div>
       <div class="form-row" style="margin:0"><label class="lbl">Price/pkg</label><input class="inp" type="number" id="dm-p" value="${med.price_per_pkg||0}" step="0.01" onfocus="this.select()"></div>
-      <div class="form-row" style="margin:0"><label class="lbl">In stock</label><input class="inp" type="number" id="dm-s" value="${med.stock_today||0}" onfocus="this.select()"></div>
+      <div class="form-row" style="margin:0"><label class="lbl">In stock</label>
+        <input class="inp" type="number" id="dm-s" value="${med.stock_today||0}" data-orig="${med.stock_today||0}" onfocus="this.select()"
+          oninput="const _sd=document.getElementById('dm-sd');if(_sd)_sd.value=toISOLocal(new Date());const _w=document.getElementById('dm-s-warn');if(_w)_w.style.display=(this.value!=this.dataset.orig)?'block':'none';">
+        <div id="dm-s-warn" style="display:none;font-size:11px;color:${T.honey};margin-top:5px;background:${T.honeyLight};border-radius:7px;padding:5px 8px">⚠️ Changing "In stock" clears any pending order and Updated Stock history below — it becomes the new source of truth.</div>
+      </div>
     </div>
     <div class="grid2">
       <div class="form-row" style="margin:0"><label class="lbl">Stock count date</label><input class="inp" type="date" id="dm-sd" value="${med.stock_date||toISOLocal(new Date())}"></div>
@@ -4090,17 +4219,30 @@ async function saveEditDM(id){
     if(!name){toast('Please add a name.',true);return;}
     // v8: last order received — read date-only input and convert to local noon timestamp
     const loVal=document.getElementById('dm-lo')?.value;
+    const med=A.dailyMeds.find(m=>m.id===id);
+    const newStock=parseInt(document.getElementById('dm-s')?.value)||0;
+    // v15: "In stock" is the source of truth once manually edited — if the
+    // user actually changed it, wipe Group 3 (pending order) & Group 4
+    // (Updated Stock / Last order received) rather than keep stale numbers
+    // that no longer relate to the freshly-counted stock.
+    const stockChanged = med ? (newStock !== (med.stock_today||0)) : false;
     const data={
       name,member_ids:memberIds,
       dose_per_day:parseFloat(document.getElementById('dm-d')?.value)||1,
       units_per_pkg:parseInt(document.getElementById('dm-u')?.value)||30,
       price_per_pkg:parseFloat(document.getElementById('dm-p')?.value)||0,
-      stock_today:parseInt(document.getElementById('dm-s')?.value)||0,
+      stock_today:newStock,
       stock_date:document.getElementById('dm-sd')?.value||toISOLocal(new Date()),
       shared:memberIds.length>1,
       note:document.getElementById('dm-note')?.value||'',
-      last_ordered:loVal?loVal+'T12:00:00':null,
     };
+    if(stockChanged){
+      data.new_order_pkgs=0;
+      data.updated_stock=null;
+      data.last_ordered=null;
+    }else{
+      data.last_ordered=loVal?loVal+'T12:00:00':null;
+    }
     const{data:result,error}=await sbWrite(()=>sb.from('daily_meds').update(data).eq('id',id).select().single());
     if(error){toast('Error saving medication: '+(error.message||'please try again.'),true);console.error(error);return;}
     A.dailyMeds=A.dailyMeds.map(m=>m.id===id?result:m);
@@ -4570,11 +4712,52 @@ function renderShoppingTab(){
     </div>`;
   }
   const lists=A.shoppingLists||[];
-  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-    <div style="font-weight:700;font-size:14px">Shopping Lists</div>
-    <button class="btn btn-primary btn-sm" onclick="createShoppingList()">+ New List</button>
-  </div>
-  ${lists.length?lists.map(l=>{
+  const q=(A.shopSearchAll||'').toLowerCase().trim();
+
+  // v15: header row now includes a global search box (left of "+ New List")
+  // that searches item text across every list, not just this one.
+  const headerHtml=`<div style="margin-bottom:12px">
+    <div style="font-weight:700;font-size:14px;margin-bottom:8px">Shopping Lists</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div style="position:relative;flex:1;min-width:0">
+        <input class="inp" id="shop-search-all-inp" placeholder="🔍  Search all lists…" value="${A.shopSearchAll||''}"
+          style="padding-right:${A.shopSearchAll?'36px':'12px'}"
+          oninput="A.shopSearchAll=this.value;clearTimeout(A._ssT);A._ssT=setTimeout(renderMeals,300);document.getElementById('shop-search-all-x').style.display=this.value?'flex':'none'">
+        <button id="shop-search-all-x" onclick="A.shopSearchAll='';document.getElementById('shop-search-all-inp').value='';renderMeals();this.style.display='none'"
+          style="display:${A.shopSearchAll?'flex':'none'};position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:${T.muted};font-size:16px;cursor:pointer;width:24px;height:24px;align-items:center;justify-content:center;border-radius:50%">×</button>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="createShoppingList()" style="flex-shrink:0">+ New List</button>
+    </div>
+  </div>`;
+
+  // v15: while a global search query is active, show matching items flattened
+  // across every list (tagged with which list + checked state) instead of
+  // the normal list-of-lists cards — answers "is X on any list, and is it
+  // already checked?" without opening each list one by one.
+  if(q){
+    const matches=[];
+    lists.forEach(l=>{
+      (l.items||[]).forEach(item=>{
+        if((item.text||'').toLowerCase().includes(q)) matches.push({listId:l.id,listName:l.name,item});
+      });
+    });
+    const resultsHtml=matches.length?matches.map(m=>`
+      <div class="card" style="padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="openShoppingList('${m.listId}')">
+        <span style="font-size:16px;flex-shrink:0">${m.item.done?'✅':'⬜'}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:${m.item.done?T.muted:T.ink};text-decoration:${m.item.done?'line-through':'none'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${m.item.text||''}</div>
+          <div style="font-size:11px;color:${T.muted}">in "${m.listName}"</div>
+        </div>
+      </div>`).join(''):`
+      <div style="text-align:center;padding:20px;color:${T.muted}">
+        <div style="font-size:32px;margin-bottom:8px">🔍</div>
+        <div style="font-weight:700;margin-bottom:6px">No matches</div>
+        <div style="font-size:12px">No items across any list match your search.</div>
+      </div>`;
+    return headerHtml+`<div style="font-size:11px;color:${T.muted};margin-bottom:8px">${matches.length} match${matches.length!==1?'es':''} across all lists</div>`+resultsHtml;
+  }
+
+  return headerHtml+(lists.length?lists.map(l=>{
     const items=l.items||[];
     const left=items.filter(i=>!i.done).length;
     const done=items.length-left;
@@ -4592,7 +4775,7 @@ function renderShoppingTab(){
     <div style="font-size:32px;margin-bottom:8px">🛒</div>
     <div style="font-weight:700;margin-bottom:6px">No shopping lists yet</div>
     <button class="btn btn-primary" onclick="createShoppingList()">Create your first list</button>
-  </div>`}`;
+  </div>`);
 }
 window.renderShoppingTab=renderShoppingTab;
 
@@ -4728,6 +4911,7 @@ window.saveShoppingListName=saveShoppingListName;
 // ── SHOPPING LIST MODAL ───────────────────────────────────────────────────────
 function openShoppingList(id){
   if(A._shopHideDone===undefined)A._shopHideDone=false;
+  A._shopSearchQ=''; // v15: start each list with a clean per-list search box
   renderShoppingModal(id);
 }
 window.openShoppingList=openShoppingList;
@@ -4742,8 +4926,10 @@ function renderShoppingModal(id){
   const items=list.items||[];
   const doneCount=items.filter(i=>i.done).length;
   const hideDone=A._shopHideDone;
+  const searchQ=(A._shopSearchQ||'').toLowerCase().trim();
   const itemRow=(item,idx)=>{
     if(hideDone&&item.done)return'';
+    if(searchQ&&!(item.text||'').toLowerCase().includes(searchQ))return'';
     // v9: item text is now an editable input instead of a read-only span,
     // styled to visually match the old span (borderless, transparent,
     // strikethrough preserved when done). Saves silently on blur/Enter via
@@ -4759,14 +4945,27 @@ function renderShoppingModal(id){
     </div>`;
   };
   const rows=items.map((item,idx)=>itemRow(item,idx)).join('');
-  const visibleCount=hideDone?items.filter(i=>!i.done).length:items.length;
+  // v15: visible count (for the empty-state message below) now accounts for
+  // both the "Hide completed" toggle AND the per-list search filter.
+  const visibleCount=items.filter(i=>(!hideDone||!i.done)&&(!searchQ||(i.text||'').toLowerCase().includes(searchQ))).length;
+  const emptyMsg = items.length===0
+    ? 'No items yet — add your first item below'
+    : (searchQ ? `No items match "${A._shopSearchQ}"` : 'All items completed — toggle above to view');
   showModal(`🛒 ${list.name}`,`
     <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:${T.muted};margin-bottom:10px;cursor:pointer">
       <input type="checkbox" ${hideDone?'checked':''} onchange="A._shopHideDone=this.checked;renderShoppingModal('${id}')">
       👁 Hide completed (${doneCount})
     </label>
+    ${items.length>4?`
+    <div style="position:relative;margin-bottom:10px">
+      <input class="inp" id="shop-search-list-inp" placeholder="🔍  Search this list…" value="${A._shopSearchQ||''}"
+        style="padding-right:${A._shopSearchQ?'36px':'12px'}"
+        oninput="A._shopSearchQ=this.value;clearTimeout(A._slT);A._slT=setTimeout(()=>renderShoppingModal('${id}'),250)">
+      <button id="shop-search-list-x" onclick="A._shopSearchQ='';renderShoppingModal('${id}')"
+        style="display:${A._shopSearchQ?'flex':'none'};position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:${T.muted};font-size:16px;cursor:pointer;width:24px;height:24px;align-items:center;justify-content:center;border-radius:50%">×</button>
+    </div>`:''}
     <div id="shop-items-${id}">
-      ${visibleCount?rows:`<div style="text-align:center;color:${T.muted};font-size:12px;padding:10px 0">${items.length?'All items completed — toggle above to view':'No items yet — add your first item below'}</div>`}
+      ${visibleCount?rows:`<div style="text-align:center;color:${T.muted};font-size:12px;padding:10px 0">${emptyMsg}</div>`}
     </div>
     <div style="display:flex;gap:8px;margin-top:10px">
       <input class="inp" id="shop-new-item" placeholder="Add item…" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addShoppingItem('${id}');}">
@@ -6148,10 +6347,22 @@ function openProfileMenu() {
   const initial = (cu?.user_metadata?.name || cu?.email || 'U')[0].toUpperCase();
   const name = cu?.user_metadata?.name || 'My Account';
   const email = cu?.email || '';
-  // Helper: one tappable row (icon + label + chevron)
-  const row = (icon, label, onclick, isLast) => `
+  // v15: mirror refreshNotifBadge()'s unread calculation so the Notifications
+  // row inside this menu shows the same red dot as the outer profile button.
+  // Previously only #profile-dot (the button itself) reflected unread state —
+  // opening the menu showed no indicator on the Notifications row itself.
+  const prefs = getNotifPrefs();
+  const lastRead = parseInt(localStorage.getItem('ks_notif_last_read_' + (A.user?.id || '')) || '0');
+  const hasUnread = _notifications.some(n => {
+    const prefKey = n.category === 'member' ? 'notif_member_join' : 'notif_' + n.category;
+    if (prefs[prefKey] === false) return false;
+    return new Date(n.created_at).getTime() > lastRead;
+  });
+  // Helper: one tappable row (icon + label + chevron); showDot adds a small
+  // red unread indicator on the icon, same visual language as #profile-dot.
+  const row = (icon, label, onclick, isLast, showDot) => `
     <button type="button" onclick="${onclick}" style="display:flex;align-items:center;gap:12px;width:100%;padding:13px 4px;background:none;border:none;${isLast?'':`border-bottom:1px solid ${T.border};`}cursor:pointer;text-align:left;font-family:inherit;-webkit-tap-highlight-color:transparent">
-      <span style="font-size:19px;width:24px;text-align:center;flex-shrink:0">${icon}</span>
+      <span style="font-size:19px;width:24px;text-align:center;flex-shrink:0;position:relative">${icon}${showDot?`<span style="position:absolute;top:-1px;right:1px;background:var(--rose);border-radius:99px;width:8px;height:8px;box-sizing:border-box"></span>`:''}</span>
       <span style="flex:1;font-size:14px;font-weight:600;color:${T.ink}">${label}</span>
       <span style="color:${T.muted};font-size:15px">›</span>
     </button>`;
@@ -6164,7 +6375,7 @@ function openProfileMenu() {
       </div>
     </div>
     <div style="display:flex;flex-direction:column">
-      ${row('🔔','Notifications',"closeModal();toggleNotifPanel();")}
+      ${row('🔔','Notifications',"closeModal();toggleNotifPanel();",false,hasUnread)}
       ${row('⚙️','Settings',"closeModal();goTo('settings');")}
       ${row('🚪','Sign out',"closeModal();doSignOut();",true)}
     </div>`);
@@ -6199,18 +6410,6 @@ function renderNotifPanel() {
           <button class="modal-close" onclick="toggleNotifPanel()">×</button>
         </div>
         <div class="modal-body">
-          ${alerts.length ? `
-            <div style="font-size:10px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Alerts</div>
-            ${alerts.map(a => `
-              <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:11px;background:${a.color}18;border-left:3px solid ${a.color};margin-bottom:8px">
-                <span style="font-size:18px;flex-shrink:0;margin-top:1px">${a.icon}</span>
-                <div>
-                  <div style="font-weight:700;font-size:13px;color:${T.ink}">${a.title}</div>
-                  <div style="font-size:12px;color:${T.muted};margin-top:2px">${a.body}</div>
-                </div>
-              </div>`).join('')}
-            <div style="height:1px;background:${T.border};margin:14px 0 12px"></div>
-          ` : ''}
           <div style="font-size:10px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Family Activity</div>
           ${filtered.length ? filtered.map(n => `
             <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:11px;background:${T.parchment};margin-bottom:8px">
@@ -6226,6 +6425,18 @@ function renderNotifPanel() {
               <div style="font-size:13px;font-weight:600;margin-bottom:4px">No activity yet</div>
               <div style="font-size:12px">Changes made by other family members will appear here.</div>
             </div>`}
+          ${alerts.length ? `
+            <div style="height:1px;background:${T.border};margin:14px 0 12px"></div>
+            <div style="font-size:10px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Alerts</div>
+            ${alerts.map(a => `
+              <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:11px;background:${a.color}18;border-left:3px solid ${a.color};margin-bottom:8px">
+                <span style="font-size:18px;flex-shrink:0;margin-top:1px">${a.icon}</span>
+                <div>
+                  <div style="font-weight:700;font-size:13px;color:${T.ink}">${a.title}</div>
+                  <div style="font-size:12px;color:${T.muted};margin-top:2px">${a.body}</div>
+                </div>
+              </div>`).join('')}
+          ` : ''}
           <div style="background:${T.honeyLight};border-radius:10px;padding:12px 14px;margin-top:${hasContent ? '16' : '8'}px">
             <div style="font-size:12px;color:${T.honey};font-weight:700;margin-bottom:4px">📱 Push notifications — coming soon</div>
             <div style="font-size:11px;color:${T.muted};line-height:1.5">Get device alerts for events, reminders, and family activity. Manage your preferences in <button onclick="toggleNotifPanel();goTo('settings');A.settingsTab='notifs';renderSettings()" style="background:none;border:none;color:${T.sage};font-weight:700;cursor:pointer;font-size:11px;padding:0;text-decoration:underline">Settings → Notifications</button>.</div>
