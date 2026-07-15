@@ -3907,19 +3907,31 @@ function renderMeds(targetId){
     {key:null,label:'',grp:0},
   ];
   const medGroupLabels={1:'Meds Identification',2:'Current Stock',3:'New Order',4:'Updated Stock'};
+  // v15.1: alternating tint per group + a visible divider line between
+  // groups, on BOTH header rows (group label row and column label row) —
+  // previously every group cell shared one flat background with no
+  // separator, making it hard to tell where one group ends and the next
+  // begins (reported by Roxana while testing on staging).
+  const medGroupTint={0:'#fff',1:T.parchment,2:'#fff',3:T.parchment,4:'#fff'};
   const medGroupHeaderRow=(()=>{
     let cells='',i=0;
     while(i<medCols.length){
       const grp=medCols[i].grp;
+      const isFirst=(i===0);
       let span=0;
       while(i<medCols.length&&medCols[i].grp===grp){span++;i++;}
-      cells+=`<th colspan="${span}" style="text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:${T.muted};background:${T.parchment};border-bottom:1px solid ${T.border};padding:5px 4px">${medGroupLabels[grp]||''}</th>`;
+      cells+=`<th colspan="${span}" style="text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:${T.muted};background:${medGroupTint[grp]||T.parchment};border-bottom:1px solid ${T.border};${isFirst?'':`border-left:2px solid ${T.border};`}padding:7px 10px">${medGroupLabels[grp]||''}</th>`;
     }
     return cells;
   })();
-  const medColHeaderRow=medCols.map(c=>c.key
-    ?`<th onclick="sortMeds('${c.key}')" style="cursor:pointer;user-select:none;white-space:nowrap" title="Click to sort">${c.label}${sortArrow(c.key)}</th>`
-    :`<th></th>`).join('');
+  const medColHeaderRow=medCols.map((c,i)=>{
+    const isGroupStart=i>0&&medCols[i].grp!==medCols[i-1].grp;
+    const bg=medGroupTint[c.grp]!==undefined?medGroupTint[c.grp]:'#fff';
+    const borderLeft=isGroupStart?`border-left:2px solid ${T.border};`:'';
+    return c.key
+      ?`<th onclick="sortMeds('${c.key}')" style="cursor:pointer;user-select:none;white-space:nowrap;background:${bg};${borderLeft}padding:6px 8px" title="Click to sort">${c.label}${sortArrow(c.key)}</th>`
+      :`<th style="background:${bg}"></th>`;
+  }).join('');
 
   // ── TARGET CONTAINER (v7) ──────────────────────────────────────────────────
   // renderMeds() can render in two places:
