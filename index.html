@@ -1,4 +1,4 @@
-<!-- Seamly v16 | PROD | 16 Jul 2026 -->
+<!-- Seamly v16.1 | PROD | 16 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3751,7 +3751,10 @@ function exportMedsXLSX() {
   const simUntil = med => {
     if(!med.new_order_pkgs||med.new_order_pkgs==='0')return '—';
     const td=(med.member_ids||[]).length*(med.dose_per_day||1); if(!td)return '—';
-    const simStock=(med.stock_today||0)+((parseInt(med.new_order_pkgs)||0)*(med.units_per_pkg||0));
+    // v16.1 fix: stack the new order on top of updated_stock (if a prior
+    // order has already been confirmed) instead of the stale original
+    // stock_today count — matches the on-screen table's corrected logic.
+    const simStock=(hasUpdated(med)?med.updated_stock:(med.stock_today||0))+((parseInt(med.new_order_pkgs)||0)*(med.units_per_pkg||0));
     const r=new Date(stockBase(med)); r.setDate(r.getDate()+Math.floor(simStock/td)); return fmt(r);
   };
   const totalOrder = dm.reduce((sum,m)=>sum+(parseInt(m.new_order_pkgs)||0)*(m.price_per_pkg||0),0);
@@ -3801,7 +3804,10 @@ function exportMedsCSV() {
   const simUntil = med => {
     if(!med.new_order_pkgs||med.new_order_pkgs==='0')return '—';
     const td=(med.member_ids||[]).length*(med.dose_per_day||1); if(!td)return '—';
-    const simStock=(med.stock_today||0)+((parseInt(med.new_order_pkgs)||0)*(med.units_per_pkg||0));
+    // v16.1 fix: stack the new order on top of updated_stock (if a prior
+    // order has already been confirmed) instead of the stale original
+    // stock_today count — matches the on-screen table's corrected logic.
+    const simStock=(hasUpdated(med)?med.updated_stock:(med.stock_today||0))+((parseInt(med.new_order_pkgs)||0)*(med.units_per_pkg||0));
     const r=new Date(stockBase(med)); r.setDate(r.getDate()+Math.floor(simStock/td)); return fmt(r);
   };
   const header = ['Medication','Members','Dose/day','Units/pkg','Price/pkg','In stock','Stock count date','Stock lasts until','New order (pkgs)','Order cost','If ordered, lasts until','Updated Stock','Updated stock lasts until','Last order received'];
@@ -3867,7 +3873,7 @@ function renderMeds(targetId){
   // "1 pkg vs 2 pkgs" before deciding, without needing to confirm an order
   // first. Counts forward from the same Stock count date anchor as the
   // other "lasts until" columns, for consistency.
-  const simStock=med=>(med.stock_today||0)+((parseInt(med.new_order_pkgs)||0)*(med.units_per_pkg||0));
+  const simStock=med=>(hasUpdated(med)?med.updated_stock:(med.stock_today||0))+((parseInt(med.new_order_pkgs)||0)*(med.units_per_pkg||0));
   const simUntilDate=med=>{
     if(!med.new_order_pkgs||med.new_order_pkgs==='0')return null;
     const td=(med.member_ids||[]).length*(med.dose_per_day||1);
@@ -3939,7 +3945,7 @@ function renderMeds(targetId){
     {key:'lastOrdered',label:'Last order received',grp:4},
     {key:null,label:'',grp:0},
   ];
-  const medGroupLabels={1:'Meds Identification',2:'Current Stock',3:'New Order',4:'Updated Stock'};
+  const medGroupLabels={1:'Meds Identification',2:'Initial Stock',3:'New Order',4:'Updated Stock'};
   // v16: collapsible column groups, Excel-outline-style. State is SESSION-ONLY
   // (lives on A.medCollapsedGroups, not the database) — it resets to fully
   // expanded on every page reload, a deliberate simplicity trade-off Roxana
