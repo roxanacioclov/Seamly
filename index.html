@@ -1,4 +1,4 @@
-<!-- Seamly v15 | STAGING | 15 Jul 2026 -->
+<!-- Seamly v16 | STAGING | 16 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3746,6 +3746,14 @@ function exportMedsXLSX() {
     const td=(med.member_ids||[]).length*(med.dose_per_day||1); if(!td)return '—';
     const r=new Date(stockBase(med)); r.setDate(r.getDate()+Math.floor(med.updated_stock/td)); return fmt(r);
   };
+  // v16: live "if ordered" preview — pure math off the currently-typed New
+  // order value, never touches the persisted updated_stock field.
+  const simUntil = med => {
+    if(!med.new_order_pkgs||med.new_order_pkgs==='0')return '—';
+    const td=(med.member_ids||[]).length*(med.dose_per_day||1); if(!td)return '—';
+    const simStock=(med.stock_today||0)+((parseInt(med.new_order_pkgs)||0)*(med.units_per_pkg||0));
+    const r=new Date(stockBase(med)); r.setDate(r.getDate()+Math.floor(simStock/td)); return fmt(r);
+  };
   const totalOrder = dm.reduce((sum,m)=>sum+(parseInt(m.new_order_pkgs)||0)*(m.price_per_pkg||0),0);
   const grand = (totalOrder+(parseFloat(getFamily()?.transport_cost)||0)).toFixed(2);
   const memNames = med => getDM() && getMembers().filter(m=>(med.member_ids||[]).includes(m.id)).map(m=>m.name).join(', ');
@@ -3755,13 +3763,14 @@ function exportMedsXLSX() {
     med.stock_date?fmt(med.stock_date+'T00:00:00'):'—',
     lastsUntil(med), med.new_order_pkgs||0,
     med.new_order_pkgs?`${s}${((parseInt(med.new_order_pkgs)||0)*(med.price_per_pkg||0)).toFixed(2)}`:'—',
+    simUntil(med),
     hasUpdated(med)?med.updated_stock:'—', updLastsUntil(med),
     med.last_ordered?fmt(med.last_ordered):'Never'
   ]);
   const headers = ['Medication','Members','Dose/day','Units/pkg',`Price/pkg (${s})`,
     'In stock','Stock count date','Stock lasts until','New order (pkgs)',`Order cost (${s})`,
-    'Updated Stock','Updated stock lasts until','Last order received'];
-  const tableRows = [headers, ...rows, ['GRAND TOTAL','','','','','','','','',`${s}${grand}`,'','','']];
+    'If ordered, lasts until','Updated Stock','Updated stock lasts until','Last order received'];
+  const tableRows = [headers, ...rows, ['GRAND TOTAL','','','','','','','','',`${s}${grand}`,'','','','']];
   const html = `<html><head><meta charset="UTF-8"></head><body>
     <h2>${getFamily()?.name||''} — Medication Order — ${fmt(new Date())}</h2>
     <table border="1" cellpadding="5" cellspacing="0">
@@ -3787,15 +3796,23 @@ function exportMedsCSV() {
     const td=(med.member_ids||[]).length*(med.dose_per_day||1); if(!td)return '—';
     const r=new Date(stockBase(med)); r.setDate(r.getDate()+Math.floor(med.updated_stock/td)); return fmt(r);
   };
-  const header = ['Medication','Members','Dose/day','Units/pkg','Price/pkg','In stock','Stock count date','Stock lasts until','New order (pkgs)','Order cost','Updated Stock','Updated stock lasts until','Last order received'];
+  // v16: live "if ordered" preview — pure math off the currently-typed New
+  // order value, never touches the persisted updated_stock field.
+  const simUntil = med => {
+    if(!med.new_order_pkgs||med.new_order_pkgs==='0')return '—';
+    const td=(med.member_ids||[]).length*(med.dose_per_day||1); if(!td)return '—';
+    const simStock=(med.stock_today||0)+((parseInt(med.new_order_pkgs)||0)*(med.units_per_pkg||0));
+    const r=new Date(stockBase(med)); r.setDate(r.getDate()+Math.floor(simStock/td)); return fmt(r);
+  };
+  const header = ['Medication','Members','Dose/day','Units/pkg','Price/pkg','In stock','Stock count date','Stock lasts until','New order (pkgs)','Order cost','If ordered, lasts until','Updated Stock','Updated stock lasts until','Last order received'];
   const rows = dm.map(med => {
     const memNames = A.members.filter(m=>(med.member_ids||[]).includes(m.id)).map(m=>m.name).join('+');
     const orderCost = med.new_order_pkgs ? `${s}${((parseInt(med.new_order_pkgs)||0)*med.price_per_pkg).toFixed(2)}` : '—';
-    return [med.name, memNames, med.dose_per_day, med.units_per_pkg, `${s}${(med.price_per_pkg||0).toFixed(2)}`, med.stock_today, med.stock_date?fmt(med.stock_date+'T00:00:00'):'—', lastsUntil(med), med.new_order_pkgs||'', orderCost, hasUpdated(med)?med.updated_stock:'—', updLastsUntil(med), med.last_ordered?fmt(med.last_ordered):'—'];
+    return [med.name, memNames, med.dose_per_day, med.units_per_pkg, `${s}${(med.price_per_pkg||0).toFixed(2)}`, med.stock_today, med.stock_date?fmt(med.stock_date+'T00:00:00'):'—', lastsUntil(med), med.new_order_pkgs||'', orderCost, simUntil(med), hasUpdated(med)?med.updated_stock:'—', updLastsUntil(med), med.last_ordered?fmt(med.last_ordered):'—'];
   });
   const totalOrder = dm.reduce((sum,m)=>sum+(parseInt(m.new_order_pkgs)||0)*(m.price_per_pkg||0),0);
   const grand = (totalOrder+(parseFloat(A.family?.transport_cost)||0)).toFixed(2);
-  rows.push(['GRAND TOTAL','','','','','','','','',`${s}${grand}`,'','','']);
+  rows.push(['GRAND TOTAL','','','','','','','','',`${s}${grand}`,'','','','']);
   const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], {type:'text/csv'});
   const url = URL.createObjectURL(blob);
@@ -3844,6 +3861,20 @@ function renderMeds(targetId){
     return addDays(stockBase(med),Math.floor(med.updated_stock/td));
   };
   const updLastsUntil=med=>{const d=updLastsUntilDate(med);return d?fmt(d):'—';};
+  // v16: "If ordered, lasts until" is a PURE LIVE PREVIEW — it never touches
+  // the persisted updated_stock field. It recalculates instantly from
+  // whatever is currently typed in "New order", so Roxana can compare
+  // "1 pkg vs 2 pkgs" before deciding, without needing to confirm an order
+  // first. Counts forward from the same Stock count date anchor as the
+  // other "lasts until" columns, for consistency.
+  const simStock=med=>(med.stock_today||0)+((parseInt(med.new_order_pkgs)||0)*(med.units_per_pkg||0));
+  const simUntilDate=med=>{
+    if(!med.new_order_pkgs||med.new_order_pkgs==='0')return null;
+    const td=(med.member_ids||[]).length*(med.dose_per_day||1);
+    if(!td)return null;
+    return addDays(stockBase(med),Math.floor(simStock(med)/td));
+  };
+  const simUntil=med=>{const d=simUntilDate(med);return d?fmt(d):'—';};
   const expDays=d=>Math.floor((new Date(d)-new Date())/(1000*60*60*24));
   const expSt=d=>{const n=expDays(d);if(n<0)return'expired';if(n<30)return'critical';if(n<90)return'soon';return'ok';};
   const totalOrder=dm.reduce((sum,m)=>sum+(parseInt(m.new_order_pkgs)||0)*(m.price_per_pkg||0),0);
@@ -3868,6 +3899,7 @@ function renderMeds(targetId){
     pkgPrice:med=>med.price_per_pkg||0,
     newOrder:med=>parseInt(med.new_order_pkgs)||0,
     orderCost:med=>parseFloat(orderPrice(med))||0,
+    simUntil:med=>{const d=simUntilDate(med);return d?d.getTime():null;},
     updStock:med=>hasUpdated(med)?med.updated_stock:null,
     updLastsUntil:med=>{const d=updLastsUntilDate(med);return d?d.getTime():null;},
     lastOrdered:med=>med.last_ordered?new Date(med.last_ordered).getTime():null,
@@ -3901,12 +3933,42 @@ function renderMeds(targetId){
     {key:'pkgPrice',label:'Pkg price',grp:3},
     {key:'newOrder',label:'New order',grp:3},
     {key:'orderCost',label:'Order cost',grp:3},
+    {key:'simUntil',label:'If ordered, lasts until',grp:3},
     {key:'updStock',label:'Updated Stock',grp:4},
     {key:'updLastsUntil',label:'Updated stock lasts until',grp:4},
     {key:'lastOrdered',label:'Last order received',grp:4},
     {key:null,label:'',grp:0},
   ];
   const medGroupLabels={1:'Meds Identification',2:'Current Stock',3:'New Order',4:'Updated Stock'};
+  // v16: collapsible column groups, Excel-outline-style. State is SESSION-ONLY
+  // (lives on A.medCollapsedGroups, not the database) — it resets to fully
+  // expanded on every page reload, a deliberate simplicity trade-off Roxana
+  // agreed to. Group 0 (the trailing action-buttons column) is never
+  // collapsible — it has no label and only ever holds one column anyway.
+  A.medCollapsedGroups=A.medCollapsedGroups||{};
+  const isCollapsed=grp=>grp!==0&&!!A.medCollapsedGroups[grp];
+  // How many <th>/<td> cells a group actually occupies right now — 1 if
+  // collapsed (a single "⋯" placeholder), otherwise its real column count.
+  // Used to keep the group-header row, column-header row, every data row,
+  // and the Grand Total footer row all in sync with each other.
+  const visibleColsInGroup=grp=>isCollapsed(grp)?1:medCols.filter(c=>c.grp===grp).length;
+  // Takes an array of <td> strings in the SAME order as medCols and merges
+  // any collapsed group's cells down to a single "⋯" placeholder — keeps
+  // every data row's cell count in sync with the header rows above it.
+  const collapseRowCells=cellsArr=>{
+    let out='',i=0;
+    while(i<medCols.length){
+      const grp=medCols[i].grp;
+      if(isCollapsed(grp)){
+        out+=`<td style="text-align:center;color:${T.muted}">⋯</td>`;
+        while(i<medCols.length&&medCols[i].grp===grp)i++;
+      }else{
+        out+=cellsArr[i];
+        i++;
+      }
+    }
+    return out;
+  };
   // v15.1: alternating tint per group + a visible divider line between
   // groups, on BOTH header rows (group label row and column label row) —
   // previously every group cell shared one flat background with no
@@ -3920,18 +3982,40 @@ function renderMeds(targetId){
       const isFirst=(i===0);
       let span=0;
       while(i<medCols.length&&medCols[i].grp===grp){span++;i++;}
-      cells+=`<th colspan="${span}" style="text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:${T.muted};background:${medGroupTint[grp]||T.parchment};border-bottom:1px solid ${T.border};${isFirst?'':`border-left:2px solid ${T.border};`}padding:7px 10px">${medGroupLabels[grp]||''}</th>`;
+      const collapsed=isCollapsed(grp);
+      const displaySpan=collapsed?1:span;
+      // Group 0 (action column) has no label and is never toggleable.
+      const toggleable=grp!==0;
+      const arrow=toggleable?(collapsed?'▸ ':'▾ '):'';
+      const onclick=toggleable?` onclick="toggleMedGroup(${grp})"`:'';
+      const cursor=toggleable?'cursor:pointer;':'';
+      const title=toggleable?` title="Click to ${collapsed?'expand':'collapse'} ${medGroupLabels[grp]||''}"`:'';
+      cells+=`<th colspan="${displaySpan}"${onclick}${title} style="text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:${T.muted};background:${medGroupTint[grp]||T.parchment};border-bottom:1px solid ${T.border};${isFirst?'':`border-left:2px solid ${T.border};`}padding:7px 10px;${cursor}user-select:none">${arrow}${medGroupLabels[grp]||''}</th>`;
     }
     return cells;
   })();
-  const medColHeaderRow=medCols.map((c,i)=>{
-    const isGroupStart=i>0&&medCols[i].grp!==medCols[i-1].grp;
-    const bg=medGroupTint[c.grp]!==undefined?medGroupTint[c.grp]:'#fff';
-    const borderLeft=isGroupStart?`border-left:2px solid ${T.border};`:'';
-    return c.key
-      ?`<th onclick="sortMeds('${c.key}')" style="cursor:pointer;user-select:none;white-space:nowrap;background:${bg};${borderLeft}padding:6px 8px" title="Click to sort">${c.label}${sortArrow(c.key)}</th>`
-      :`<th style="background:${bg}"></th>`;
-  }).join('');
+  const medColHeaderRow=(()=>{
+    let cells='',i=0;
+    while(i<medCols.length){
+      const grp=medCols[i].grp;
+      const isGroupStart=i===0||medCols[i-1].grp!==grp;
+      const bg=medGroupTint[grp]!==undefined?medGroupTint[grp]:'#fff';
+      const borderLeft=isGroupStart?`border-left:2px solid ${T.border};`:'';
+      if(isCollapsed(grp)){
+        // Whole group collapsed → one placeholder cell, then skip past every
+        // column that belongs to this group so counts stay in sync.
+        cells+=`<th onclick="toggleMedGroup(${grp})" title="Click to expand ${medGroupLabels[grp]||''}" style="cursor:pointer;user-select:none;text-align:center;color:${T.muted};background:${bg};${borderLeft}padding:6px 8px">⋯</th>`;
+        while(i<medCols.length&&medCols[i].grp===grp)i++;
+      }else{
+        const c=medCols[i];
+        cells+=c.key
+          ?`<th onclick="sortMeds('${c.key}')" style="cursor:pointer;user-select:none;white-space:nowrap;background:${bg};${borderLeft}padding:6px 8px" title="Click to sort">${c.label}${sortArrow(c.key)}</th>`
+          :`<th style="background:${bg}"></th>`;
+        i++;
+      }
+    }
+    return cells;
+  })();
 
   // ── TARGET CONTAINER (v7) ──────────────────────────────────────────────────
   // renderMeds() can render in two places:
@@ -3981,33 +4065,37 @@ function renderMeds(targetId){
               const dl=daysLeft(med);
               const st=dl===null?'ok':dl<=7?'critical':dl<=14?'low':'ok';
               const rowMems=getMembers().filter(m=>(med.member_ids||[]).includes(m.id));
-              return`<tr>
-                <td><div style="font-weight:700">${med.name}</div>${med.shared?`<span class="chip" style="background:${T.skyLight};color:${T.sky};font-size:10px">Shared</span>`:''}<div style="font-size:11px;color:${T.muted}">${med.note||''}</div></td>
-                <td><div style="display:flex;gap:3px">${rowMems.map(m=>av(m,20)).join('')}</div></td>
-                <td>${med.dose_per_day}</td>
-                <td style="font-weight:700;color:${st==='critical'?T.rose:st==='low'?T.honey:T.sage}">
+              // One entry per medCols column, in the exact same order, so
+              // collapseRowCells() can merge any collapsed group correctly.
+              const cellsArr=[
+                `<td><div style="font-weight:700">${med.name}</div>${med.shared?`<span class="chip" style="background:${T.skyLight};color:${T.sky};font-size:10px">Shared</span>`:''}<div style="font-size:11px;color:${T.muted}">${med.note||''}</div></td>`,
+                `<td><div style="display:flex;gap:3px">${rowMems.map(m=>av(m,20)).join('')}</div></td>`,
+                `<td>${med.dose_per_day}</td>`,
+                `<td style="font-weight:700;color:${st==='critical'?T.rose:st==='low'?T.honey:T.sage}">
                   ${med.stock_today}
                   ${st==='critical'?`<div style="font-size:10px;color:${T.rose}">⚠️ Low!</div>`:''}
                   ${st==='low'?`<div style="font-size:10px;color:${T.honey}">Soon</div>`:''}
-                </td>
-                <td style="font-size:11px;color:${T.muted}">${med.stock_date?fmt(med.stock_date+'T00:00:00'):'—'}</td>
-                <td style="color:${st==='critical'?T.rose:st==='low'?T.honey:T.muted}">${lastsUntil(med)}</td>
-                <td>${med.units_per_pkg}</td>
-                <td>${s}${(med.price_per_pkg||0).toFixed(2)}</td>
-                <td><input type="number" min="0" value="${med.new_order_pkgs||''}" placeholder="0" onfocus="if(this.value==='0')this.value=''" onchange="updateMedOrder('${med.id}',this.value)" style="width:55px;padding:4px 6px;border-radius:7px;border:1px solid ${T.border};font-size:13px;text-align:center"></td>
-                <td style="font-weight:600;color:${T.sage}">${med.new_order_pkgs&&med.new_order_pkgs!=='0'?`${s}${orderPrice(med)}`:'—'}</td>
-                <td style="font-weight:600;color:${T.sage}">${hasUpdated(med)?med.updated_stock:'—'}</td>
-                <td style="font-weight:600;color:${T.sage};font-size:12px">${hasUpdated(med)?updLastsUntil(med):'—'}</td>
-                <td style="font-size:11px;color:${T.muted}">${med.last_ordered?fmt(med.last_ordered):'—'}</td>
-                <td>
+                </td>`,
+                `<td style="font-size:11px;color:${T.muted}">${med.stock_date?fmt(med.stock_date+'T00:00:00'):'—'}</td>`,
+                `<td style="color:${st==='critical'?T.rose:st==='low'?T.honey:T.muted}">${lastsUntil(med)}</td>`,
+                `<td>${med.units_per_pkg}</td>`,
+                `<td>${s}${(med.price_per_pkg||0).toFixed(2)}</td>`,
+                `<td><input type="number" min="0" value="${med.new_order_pkgs||''}" placeholder="0" onfocus="if(this.value==='0')this.value=''" onchange="updateMedOrder('${med.id}',this.value)" style="width:55px;padding:4px 6px;border-radius:7px;border:1px solid ${T.border};font-size:13px;text-align:center"></td>`,
+                `<td style="font-weight:600;color:${T.sage}">${med.new_order_pkgs&&med.new_order_pkgs!=='0'?`${s}${orderPrice(med)}`:'—'}</td>`,
+                `<td style="font-weight:600;color:${T.sky};font-size:12px">${simUntil(med)}</td>`,
+                `<td style="font-weight:600;color:${T.sage}">${hasUpdated(med)?med.updated_stock:'—'}</td>`,
+                `<td style="font-weight:600;color:${T.sage};font-size:12px">${hasUpdated(med)?updLastsUntil(med):'—'}</td>`,
+                `<td style="font-size:11px;color:${T.muted}">${med.last_ordered?fmt(med.last_ordered):'—'}</td>`,
+                `<td>
                   ${med.new_order_pkgs&&med.new_order_pkgs!=='0'?`<button onclick="confirmOrder('${med.id}')" style="background:${T.sageLight};border:1px solid ${T.sageMid};border-radius:7px;padding:3px 8px;font-size:11px;font-weight:700;color:${T.sage};cursor:pointer;white-space:nowrap">✓ Got it</button>`:''}
                   <button onclick="openEditDM('${med.id}')" style="background:${T.parchment};border:1px solid ${T.border};border-radius:7px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;color:${T.muted};margin-left:4px">✏️</button>
                   <button onclick="delDM('${med.id}')" style="background:none;border:none;color:${T.muted};cursor:pointer;font-size:14px;margin-left:4px">🗑</button>
-                </td>
-              </tr>`;
+                </td>`,
+              ];
+              return`<tr>${collapseRowCells(cellsArr)}</tr>`;
             }).join('')}
             <tr style="background:${T.parchment}">
-              <td colspan="8" style="font-weight:800;color:${T.ink}">
+              <td colspan="${visibleColsInGroup(1)+visibleColsInGroup(2)+visibleColsInGroup(3)}" style="font-weight:800;color:${T.ink}">
                 Grand Total
                 <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
                   <span style="font-size:11px;color:${T.muted};font-weight:600">+ Transport:</span>
@@ -4015,7 +4103,7 @@ function renderMeds(targetId){
                   <span style="font-size:11px;color:${T.muted}">${s}</span>
                 </div>
               </td>
-              <td colspan="5" style="font-weight:800;color:${T.sage};font-size:16px">${s}${grand}</td>
+              <td colspan="${visibleColsInGroup(4)+visibleColsInGroup(0)}" style="font-weight:800;color:${T.sage};font-size:16px">${s}${grand}</td>
             </tr>
           </tbody>
         </table>
@@ -4045,6 +4133,19 @@ function sortMeds(col){
   renderMeds();
 }
 window.sortMeds=sortMeds;
+
+
+// v16: click handler for the Meds table's collapsible group headers
+// (Excel-outline style). Toggles A.medCollapsedGroups[grp] and re-renders.
+// Session-only — not persisted to the database, so it resets to fully
+// expanded on reload. Group 0 (action column) never gets a toggle, so this
+// is never called with grp=0 from the UI.
+function toggleMedGroup(grp){
+  A.medCollapsedGroups=A.medCollapsedGroups||{};
+  A.medCollapsedGroups[grp]=!A.medCollapsedGroups[grp];
+  renderMeds();
+}
+window.toggleMedGroup=toggleMedGroup;
 
 async function updateCurrency(code){
   if(!A.family)return;
@@ -4597,7 +4698,19 @@ function renderHome(){
   // Notebook notes with open checklist items (no date — sorted after calendar items)
   const todoNotes = getNotes()
     .filter(n => n.checklist?.length > 0 && n.checklist.some(c => !c.done));
-  const hasToDo = todoCalendar.length > 0 || todoNotes.length > 0;
+  // v16: urgent, not-yet-bought shopping items — flattened across every
+  // list, tagged with which list each came from + its index within that
+  // list's items array (needed to check it off directly from Home via the
+  // same toggleShoppingItem() the shopping list itself uses). Shown FIRST
+  // in Other Actions, above Calendar/Notebook items, since these were
+  // explicitly flagged urgent by a family member.
+  const todoShopping = [];
+  (A.shoppingLists||[]).forEach(l=>{
+    (l.items||[]).forEach((item,idx)=>{
+      if(item.urgent && !item.done) todoShopping.push({listId:l.id,listName:l.name,idx,item});
+    });
+  });
+  const hasToDo = todoShopping.length > 0 || todoCalendar.length > 0 || todoNotes.length > 0;
 
   // ── EVENT CARD (v7: sky border, member label) ──────────────────────────────
   // showDate: when true, prefix subtitle with compact "Mon 4/6 · " date label
@@ -4647,7 +4760,16 @@ function renderHome(){
 
       ${hasToDo ? `
       <div style="font-weight:800;font-size:14px;color:${T.ink};margin:14px 0 4px">Other Actions</div>
-      <div style="font-size:11px;color:${T.muted};margin-bottom:8px;line-height:1.5">Tasks and notes with open action items due within the next 7 days, or already overdue, that aren't already shown above.</div>
+      <div style="font-size:11px;color:${T.muted};margin-bottom:8px;line-height:1.5">Tasks and notes with open action items due within the next 7 days, or already overdue, plus any items flagged urgent on your shopping lists — all shown here so nothing gets missed.</div>
+      ${todoShopping.map(({listId,listName,idx,item}) => {
+        return `<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:10px;background:#fff;border-left:3px solid ${T.rose};margin-bottom:6px">
+          <input type="checkbox" onchange="toggleShoppingItem('${listId}',${idx},this.checked)" style="flex-shrink:0;width:18px;height:18px;cursor:pointer">
+          <div style="flex:1;min-width:0;cursor:pointer" onclick="openShoppingList('${listId}')">
+            <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🛒 ${item.text||''}</div>
+            <div style="font-size:11px;color:${T.muted}">Shopping item · ${listName}</div>
+          </div>
+        </div>`;
+      }).join('')}
       ${todoCalendar.map(e => {
         const isTask = e.type === 'task';
         const isOverdue = new Date(e.date) < today;
@@ -4683,6 +4805,7 @@ function renderHome(){
         <span style="font-size:10px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.04em">Color guide</span>
         <span style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:${T.muted}"><span style="width:10px;height:10px;border-radius:2px;background:${T.sky};flex-shrink:0;display:inline-block"></span>Calendar item</span>
         <span style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:${T.muted}"><span style="width:10px;height:10px;border-radius:2px;background:${T.sage};flex-shrink:0;display:inline-block"></span>Notebook note</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:${T.muted}"><span style="width:10px;height:10px;border-radius:2px;background:${T.rose};flex-shrink:0;display:inline-block"></span>Shopping item</span>
       </div>
 
     </div>`;
@@ -4749,8 +4872,8 @@ function renderShoppingTab(){
   if(q){
     const matches=[];
     lists.forEach(l=>{
-      (l.items||[]).forEach(item=>{
-        if((item.text||'').toLowerCase().includes(q)) matches.push({listId:l.id,listName:l.name,item});
+      (l.items||[]).forEach((item,idx)=>{
+        if((item.text||'').toLowerCase().includes(q)) matches.push({listId:l.id,listName:l.name,item,idx});
       });
     });
     const resultsHtml=matches.length?matches.map(m=>`
@@ -4760,6 +4883,7 @@ function renderShoppingTab(){
           <div style="font-size:13px;font-weight:600;color:${m.item.done?T.muted:T.ink};text-decoration:${m.item.done?'line-through':'none'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${m.item.text||''}</div>
           <div style="font-size:11px;color:${T.muted}">in "${m.listName}"</div>
         </div>
+        <button onclick="event.stopPropagation();toggleItemUrgent('${m.listId}',${m.idx})" title="${m.item.urgent?'Remove urgent flag':'Mark urgent — shows on Home Page'}" style="background:none;border:none;font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0;color:${m.item.urgent?T.rose:'#c8bfb0'}">${m.item.urgent?'★':'☆'}</button>
       </div>`).join(''):`
       <div style="text-align:center;padding:20px;color:${T.muted}">
         <div style="font-size:32px;margin-bottom:8px">🔍</div>
@@ -4949,6 +5073,7 @@ function renderShoppingModal(id){
     return`<div class="shop-item-row" draggable="true" data-idx="${idx}" style="display:flex;align-items:center;gap:8px;margin-bottom:6px;background:#fff;border:1px solid ${T.border};border-radius:9px;padding:6px 8px">
       <span class="drag-handle" style="cursor:grab;color:#c8bfb0;font-size:14px;flex-shrink:0;user-select:none;touch-action:none">⠿</span>
       <input type="checkbox" ${item.done?'checked':''} onchange="toggleShoppingItem('${id}',${idx},this.checked)">
+      <button onclick="toggleItemUrgent('${id}',${idx})" title="${item.urgent?'Remove urgent flag':'Mark urgent — shows on Home Page'}" style="background:none;border:none;font-size:15px;cursor:pointer;padding:2px 4px;flex-shrink:0;color:${item.urgent?T.rose:'#c8bfb0'}">${item.urgent?'★':'☆'}</button>
       <input type="text" value="${(item.text||'').replace(/"/g,'&quot;')}"
         style="flex:1;min-width:0;font-size:13px;border:none;background:transparent;padding:2px 0;font-family:inherit;color:${item.done?T.muted:T.ink};text-decoration:${item.done?'line-through':'none'}"
         onblur="updateShoppingItemText('${id}',${idx},this.value)"
@@ -5165,9 +5290,45 @@ async function toggleShoppingItem(listId,idx,checked){
   if(checked) showShopUndoToast(listId,idx);
   // v14: keep the Shopping tab page behind this modal in sync too.
   renderMeals();
-  renderShoppingModal(listId);
+  // v16: this function is now also called from the Home Page's "Other
+  // Actions" urgent-item checkbox, where no shopping-list modal is open. Only
+  // re-render the modal if it's actually showing THIS list right now —
+  // otherwise this would unexpectedly pop the shopping modal open over
+  // whatever page the person is actually looking at.
+  if(document.getElementById('shop-items-'+listId)) renderShoppingModal(listId);
+  renderHome();
 }
 window.toggleShoppingItem=toggleShoppingItem;
+
+
+// v16: toggles the "urgent" flag on a shopping list item. Urgent + not-yet-
+// bought items surface at the top of the Home Page "Other Actions" section
+// (see renderHome()) so critical purchases can't get lost in a long list.
+// Notifies the family only when an item is newly flagged urgent — not when
+// un-flagging or checking it off, matching how checking an item off already
+// doesn't notify either.
+async function toggleItemUrgent(listId,idx){
+  const list=A.shoppingLists.find(l=>l.id===listId);
+  if(!list)return;
+  const items=[...(list.items||[])];
+  if(!items[idx])return;
+  const newUrgent=!items[idx].urgent;
+  items[idx]={...items[idx],urgent:newUrgent};
+  const{error}=await sbWrite(()=>sb.from('shopping_lists').update({items}).eq('id',listId));
+  if(error){toast('Error saving — please try again.',true);console.error(error);return;}
+  list.items=items;
+  if(newUrgent){
+    // v8-style family notification, reusing the existing "Shopping list
+    // items added" activity preference rather than introducing a new one.
+    writeNotif('shopping','updated',`${getActorName()} flagged an item as urgent`,items[idx].text||'');
+  }
+  renderMeals();
+  // Same guard as toggleShoppingItem — only refresh the modal if it's the
+  // one currently open, so this never force-opens a modal unexpectedly.
+  if(document.getElementById('shop-items-'+listId)) renderShoppingModal(listId);
+  renderHome();
+}
+window.toggleItemUrgent=toggleItemUrgent;
 
 // Undo toast — clickable, unlike the standard non-interactive .toast style
 function showShopUndoToast(listId,idx){
