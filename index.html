@@ -1,4 +1,4 @@
-<!-- Seamly v17 | STAGING | 28 Jul 2026 -->
+<!-- Seamly v18 | STAGING | 28 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -179,7 +179,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div class="auth-card">
     <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">Seamly</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v15 — Jul 2026</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v18 — 28 Jul 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -230,6 +230,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
+      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v18</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sample-btn" onclick="A.family?toggleSampleMode():goTo('settings')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:var(--honey-light);color:var(--honey);border:1px solid var(--honey)44;cursor:pointer;display:none">📋 Sample</button>
@@ -269,6 +270,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
+      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v18</span>
     </div>
     <button class="nav-btn" data-page="home" onclick="goTo('home')">
       <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0">
@@ -493,6 +495,33 @@ let A={
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 const fmt=d=>{if(!d)return'';const x=new Date(d);const _mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return`${String(x.getDate()).padStart(2,'0')}/${_mn[x.getMonth()]}/${x.getFullYear()}`;};
+
+// v18: shared "Last edited" formatter — used by Events (this pass), and future
+// Notes/Shopping Lists/Meal Planner passes (v19/v20), so the wording and date
+// math live in exactly one place.
+// - timestamp: ISO string or null. Returns '' if null (caller renders nothing).
+// - name: the editor's display name (may be null/blank — omitted if so).
+// - scope: 'occurrence' | 'series' | null/undefined (plain "Last edited...").
+function formatLastEdited(timestamp, name, scope){
+  if(!timestamp) return '';
+  const then=new Date(timestamp);
+  const diffMs=Date.now()-then.getTime();
+  const diffMin=Math.floor(diffMs/60000);
+  let whenStr;
+  if(diffMs<0||diffMin<1) whenStr='just now';
+  else if(diffMin<60) whenStr=`${diffMin} minute${diffMin!==1?'s':''} ago`;
+  else if(diffMin<24*60){
+    const h=Math.floor(diffMin/60);
+    whenStr=`${h} hour${h!==1?'s':''} ago`;
+  } else {
+    whenStr=fmt(timestamp);
+  }
+  const prefix=scope==='occurrence'?'This occurrence last edited'
+    :scope==='series'?'Full recurrence last edited'
+    :'Last edited';
+  return `${prefix} ${whenStr}${name?' by '+name:''}`;
+}
+window.formatLastEdited=formatLastEdited;
 const toISO=d=>d?new Date(d).toISOString().split('T')[0]:'';
 const todayD=()=>{const d=new Date();d.setHours(0,0,0,0);return d;};
 const addDays=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r;};
@@ -1612,7 +1641,13 @@ function openEvForm(type, evId, dateTs, duplicateId) {
   const dupEv = duplicateId ? A.events.find(e=>e.id===duplicateId) : null;
   // If health override set (from type switcher), use it
   const healthOverride = (type === 'health' && A._healthOverride) ? A._healthOverride : null;
-  const source = healthOverride || dupEv || ev; // source for pre-filling fields
+  // v18 (Event Type Switcher): if a cross-type switch was just confirmed,
+  // this holds the converted common-field values (title, date, participants,
+  // tags, description, actions, links, etc.) built from whatever was on
+  // screen before the switch — takes priority over the DB row or duplicate
+  // source, since it reflects the user's just-confirmed, possibly-unsaved edits.
+  const typeSwitchSource = A._pendingTypeSwitchSource || null;
+  const source = typeSwitchSource || healthOverride || dupEv || ev; // source for pre-filling fields
   const cfg = ET[type];
 
   // DATE/TIME DEFAULTS
@@ -1857,6 +1892,8 @@ function openEvForm(type, evId, dateTs, duplicateId) {
         <select class="sel" id="ef-mem"><option value="">Anyone</option>${A.members.map(m=>`<option value="${m.id}"${source?.member_id===m.id?' selected':''}>${m.name}</option>`).join('')}</select></div>
       <div class="form-row"><label class="lbl">Title</label>
         <div style="position:relative"><input class="inp" id="ef-title" value="${source?.title||''}" placeholder="Add a title…"></div></div>
+      <div class="form-row"><label class="lbl">Location</label>
+        <div style="position:relative"><input class="inp" id="ef-loc" value="${source?.location||''}" placeholder="Where?"></div></div>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:10px;cursor:pointer">
         <input type="checkbox" id="ef-allday" ${isAllDay?'checked':''} onchange="toggleAllDay(this.checked)"> All day (no specific time)
       </label>
@@ -1872,7 +1909,24 @@ function openEvForm(type, evId, dateTs, duplicateId) {
         <button type="button" onclick="addChecklistRow('ef-actions')" style="font-size:12px;color:${T.sage};background:none;border:1px dashed ${T.sageMid};border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:600;margin-top:4px">+ Add item</button>
       </div>
       <div class="form-row"><label class="lbl">Tags</label>${tagButtons()}</div>
-      <div class="form-row"><label class="lbl">Description</label><textarea class="inp" id="ef-desc" rows="2" placeholder="Any notes…" style="resize:none">${source?.description||''}</textarea></div>`;
+      <div class="form-row"><label class="lbl">Description</label><textarea class="inp" id="ef-desc" rows="2" placeholder="Any notes…" style="resize:none">${source?.description||''}</textarea></div>
+      ${attachmentField()}`;
+  }
+
+  // v18 (Event Type Switcher): a dropdown to switch this event between
+  // Task / Social Event / Health Event, available both for brand-new
+  // (unsaved) events and existing (saved) ones being edited. Wellness is
+  // deliberately excluded — it's a per-day per-member log, not a general
+  // switchable event type. Placed at the very top of the form.
+  if (type === 'task' || type === 'social' || type === 'health') {
+    const typeSwitcherHtml = `
+      <div class="form-row"><label class="lbl">Event Type</label>
+        <select class="sel" id="ef-type-switch" onchange="confirmTypeSwitch(this.value,'${type}','${evId||''}',${dateTs||'null'})">
+          <option value="task"${type==='task'?' selected':''}>Task</option>
+          <option value="social"${type==='social'?' selected':''}>Social Event</option>
+          <option value="health"${type==='health'?' selected':''}>Health Event</option>
+        </select></div>`;
+    fields = typeSwitcherHtml + fields;
   }
 
   const isDup = !!duplicateId;
@@ -1897,11 +1951,19 @@ function openEvForm(type, evId, dateTs, duplicateId) {
 
   // Clear any pending health reload data
   delete A._pendingHealthData;
+  // v18: clear the pending type-switch source now that it's been consumed
+  delete A._pendingTypeSwitchSource;
 
   // Post-render setup
   setTimeout(() => {
     // v13: track event type and start periodic draft saving every 5 seconds
     A._evDraftType = type;
+    // v18 (Draft Safety Fix C1): also track which existing event (if any) is
+    // being edited, so a draft saved from this form knows to restore back
+    // into THIS event rather than always opening a blank new-event form.
+    // null for a genuinely new event or a duplicate (both correctly treated
+    // as "new" on restore).
+    A._evDraftEditingId = evId || null;
     clearInterval(A._evDraftInterval);
     A._evDraftInterval = setInterval(saveEvDraft, 5000);
     // v13: if a draft was queued by restoreEvDraft(), populate the form fields now.
@@ -1947,7 +2009,12 @@ function openEvForm(type, evId, dateTs, duplicateId) {
         if(rEl){rEl.value=_dr.fields['ef-recend-type'];updateRecurrenceEndType(rEl.value);}
       }
       if(_dr.fields?.['ef-rec']&&_dr.fields['ef-rec']!=='None') updateRecurrenceEnd(_dr.fields['ef-rec']);
-      toast('Draft restored ✓');
+      // v18: type-switch Cancel reuses this exact restore mechanism to put
+      // the original form back exactly as it was — but that's not really a
+      // "draft restored" event from the user's point of view, so it sets
+      // this flag to suppress the toast just for that one case.
+      if (A._suppressDraftRestoreToast) { delete A._suppressDraftRestoreToast; }
+      else { toast('Draft restored ✓'); }
     }
     // Autocomplete
     if (document.getElementById('ef-title')) buildAutocomplete('ef-title', type, 'title');
@@ -2020,6 +2087,198 @@ function openEvFormWithType(type, evId, dateTs, forceApptType) {
   openEvFormHealth(forceApptType, evId, dateTs);
 }
 window.openEvFormWithType = openEvFormWithType;
+
+// ── EVENT TYPE SWITCHER (v18) ─────────────────────────────────────────────────
+// Lets a user change an event's type (Task / Social / Health) directly from
+// the create/edit popup, instead of discarding it and starting over. Same
+// database row/id is kept — this is an UPDATE, not delete+recreate.
+
+// Captures every currently-rendered form field, in the same shape as the
+// localStorage draft system ({fields, participants, tags}). Used so that
+// cancelling a type switch can restore the exact in-progress form the user
+// had, untouched, with the dropdown reverted to the original type. Kept as
+// its own small function (rather than reusing saveEvDraft()'s internals) to
+// keep this feature self-contained and avoid touching that function again
+// this sprint.
+function _captureEvFormFields(){
+  const fieldIds=[
+    'ef-title','ef-date','ef-enddate','ef-allday',
+    'ef-loc','ef-social-type','ef-desc','ef-mem','ef-rec',
+    'ef-recend-type','ef-recend-n','ef-recend-d',
+    'ef-wt','ef-ht','ef-hyd','ef-ex','ef-act','ef-actm','ef-mood','ef-en','ef-sl','ef-wcomment',
+    'ef-apt','ef-doctor','ef-specialty','ef-cost','ef-cost-cur',
+    'ef-symptoms','ef-cure','ef-recby','ef-considerations','ef-private'
+  ];
+  const fields={};
+  fieldIds.forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    fields[id]=el.type==='checkbox'?el.checked:el.value;
+  });
+  const stimeVal=getTimeVal('ef-stime');
+  if(stimeVal) fields['ef-stime']=stimeVal;
+  const etimeVal=getTimeVal('ef-etime');
+  if(etimeVal) fields['ef-etime']=etimeVal;
+  const participants=Array.from(document.querySelectorAll('#ef-parts button[data-sel="true"]')).map(b=>b.dataset.mid).filter(Boolean);
+  const tags=Array.from(document.querySelectorAll('#ef-tags button[data-sel="true"]')).map(b=>b.dataset.tag).filter(Boolean);
+  return { fields, participants, tags };
+}
+
+// Fired by the "Event Type" dropdown's onchange. Shows the confirmation
+// modal (spec-confirmed wording) before anything actually changes.
+function confirmTypeSwitch(newType, oldType, evId, dateTs){
+  if(!newType || newType===oldType) return;
+  // Snapshot the current form exactly as-is, so Cancel can put it back
+  // untouched (dropdown included) — see cancelTypeSwitch().
+  A._typeSwitchCancelSnapshot = _captureEvFormFields();
+
+  const existingEv = evId ? A.events.find(e=>e.id===evId) : null;
+  const isFullSeriesEdit = !!A._editSeriesMode;
+  const isSingleOccurrenceOfSeries = !!(existingEv && existingEv.series_id && !isFullSeriesEdit);
+
+  const oldLabel = ET[oldType]?.label || oldType;
+  const newLabel = ET[newType]?.label || newType;
+  let extraLine = '';
+  if (isFullSeriesEdit) {
+    extraLine = `<div style="font-size:12px;color:${T.muted};margin-top:10px">This will change the type for the entire recurring series.</div>`;
+  } else if (isSingleOccurrenceOfSeries) {
+    extraLine = `<div style="font-size:12px;color:${T.muted};margin-top:10px">This occurrence will be detached from its recurring series.</div>`;
+  }
+
+  showModal('Change event type?', `
+    <div style="text-align:center;padding:6px 0 4px">
+      <div style="font-size:13px;color:${T.ink};line-height:1.55">
+        Switching to <b>${newLabel}</b> will clear details specific to <b>${oldLabel}</b> — like medical info, dosage, or event-specific fields. Title, date, time, assigned family members, tags, description, location, and attachments will be kept.
+      </div>
+      ${extraLine}
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button class="btn btn-secondary btn-full" onclick="cancelTypeSwitch('${oldType}','${evId||''}',${dateTs||'null'})">Cancel</button>
+        <button class="btn btn-primary btn-full" onclick="switchEventType('${newType}','${oldType}','${evId||''}',${dateTs||'null'})">Change Type</button>
+      </div>
+    </div>`);
+}
+window.confirmTypeSwitch = confirmTypeSwitch;
+
+// Cancel: reopen the same type, restoring the exact snapshot captured above
+// (reusing the existing draft-restore field-application mechanism inside
+// openEvForm(), with its toast suppressed for this case).
+function cancelTypeSwitch(oldType, evId, dateTs){
+  const snap = A._typeSwitchCancelSnapshot;
+  delete A._typeSwitchCancelSnapshot;
+  _closeModalDOM();
+  A._evDraftType = oldType;
+  if (snap) {
+    A._evDraftRestore = snap;
+    A._suppressDraftRestoreToast = true;
+  }
+  openEvForm(oldType, evId||null, dateTs);
+}
+window.cancelTypeSwitch = cancelTypeSwitch;
+
+// Confirm: build a converted "pseudo-source" object holding the common
+// fields (per spec §3.1–§3.4), mapped from whatever was live on screen
+// before the switch (not the stale DB row — the user's unsaved edits win),
+// then reload the form as the new type using that as its prefill source.
+function switchEventType(newType, oldType, evId, dateTs){
+  if(!newType || newType===oldType){ _closeModalDOM(); return; }
+  const existingEv = evId ? A.events.find(e=>e.id===evId) : null;
+  const isFullSeriesEdit = !!A._editSeriesMode;
+  const isSingleOccurrenceOfSeries = !!(existingEv && existingEv.series_id && !isFullSeriesEdit);
+
+  const src = {};
+
+  // Title (§3.1 — always mapped)
+  src.title = document.getElementById('ef-title')?.value || '';
+
+  // Date / time / all-day (§3.3)
+  const dateEl = document.getElementById('ef-date');
+  const allDayEl = document.getElementById('ef-allday');
+  // Health Treatment/Illness render no ef-allday checkbox at all — those
+  // sub-types are always date-only/all-day, so absence of the checkbox
+  // means "was all-day" for mapping purposes.
+  src.all_day = allDayEl ? allDayEl.checked : true;
+  const dateV = dateEl?.value || '';
+  const stimeV = getTimeVal('ef-stime') || '12:00';
+  src.date = dateV ? localDT(dateV, src.all_day ? '12:00' : stimeV) : new Date().toISOString();
+
+  // End date (§3.3) — only meaningful if the TARGET type uses one (Social /
+  // Health-Appointment). Dropped entirely for Task, which has none.
+  if (newType === 'task') {
+    src.end_date = null;
+  } else {
+    const endDateEl = document.getElementById('ef-enddate');
+    const endDateV = endDateEl?.value || dateV;
+    if (src.all_day) {
+      src.end_date = endDateV ? localDT(endDateV, '12:00') : null;
+    } else {
+      let endTimeV = endDateEl ? (getTimeVal('ef-etime') || '') : '';
+      if (!endTimeV) {
+        // Source had no end time of its own (e.g. Task -> Social) — default
+        // to start time + 1 hour, per spec.
+        const [h,m] = stimeV.split(':').map(Number);
+        endTimeV = `${String(Math.min(h+1,23)).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+      }
+      src.end_date = endDateV ? localDT(endDateV, endTimeV) : null;
+    }
+  }
+
+  // Location, Description, Tags, Actions, Attachments (§3.1 — always mapped)
+  src.location = document.getElementById('ef-loc')?.value || null;
+  src.description = document.getElementById('ef-desc')?.value || null;
+  src.tags = Array.from(document.querySelectorAll('#ef-tags button[data-sel="true"]')).map(b=>b.dataset.tag).filter(Boolean);
+  src.actions = document.getElementById('ef-actions') ? getChecklist('ef-actions') : [];
+  src.links = document.getElementById('ef-links') ? getLinks() : [];
+
+  // Assignee conversion (§3.2)
+  if (newType === 'task') {
+    if (oldType === 'task') {
+      src.member_id = document.getElementById('ef-mem')?.value || null;
+    } else {
+      const partBtns = Array.from(document.querySelectorAll('#ef-parts button[data-sel="true"]'));
+      const isFamily = partBtns.some(b=>b.dataset.mid==='__family__');
+      const memberIds = partBtns.filter(b=>b.dataset.mid!=='__family__').map(b=>b.dataset.mid).filter(Boolean);
+      // Exactly one participant (and not "entire family") carries over;
+      // multiple participants or "entire family" -> Task left unassigned
+      // ("Anyone"), per confirmed interim behavior.
+      src.member_id = (!isFamily && memberIds.length===1) ? memberIds[0] : null;
+    }
+    src.participants = [];
+    src.participants_all_family = false;
+  } else {
+    if (oldType === 'task') {
+      const mid = document.getElementById('ef-mem')?.value || '';
+      src.participants = mid ? [mid] : [];
+      src.participants_all_family = false;
+    } else {
+      const partBtns = Array.from(document.querySelectorAll('#ef-parts button[data-sel="true"]'));
+      src.participants_all_family = partBtns.some(b=>b.dataset.mid==='__family__');
+      src.participants = partBtns.filter(b=>b.dataset.mid!=='__family__').map(b=>b.dataset.mid).filter(Boolean);
+    }
+    src.member_id = null;
+  }
+
+  // Recurrence (§3.5) — only carried over when editing the FULL series.
+  // A single-occurrence type switch on a recurring event detaches that
+  // occurrence entirely (handled at save time via A._detachSeriesOnSave,
+  // matching the app's existing single-occurrence-edit behavior).
+  if (isFullSeriesEdit) {
+    src.recurrence = document.getElementById('ef-rec')?.value || 'None';
+    src.recurrence_end_type = document.getElementById('ef-recend-type')?.value || 'count';
+    src.recurrence_end_count = parseInt(document.getElementById('ef-recend-n')?.value) || null;
+    src.recurrence_end_date = document.getElementById('ef-recend-d')?.value || null;
+  } else {
+    src.recurrence = 'None';
+    src.recurrence_end_type = null;
+    src.recurrence_end_count = null;
+    src.recurrence_end_date = null;
+  }
+  A._detachSeriesOnSave = isSingleOccurrenceOfSeries;
+
+  A._pendingTypeSwitchSource = src;
+  _closeModalDOM();
+  openEvForm(newType, evId||null, dateTs);
+}
+window.switchEventType = switchEventType;
 
 function toggleAllDay(checked) {
   const rows = ['ef-stime-row','ef-etime-row'];
@@ -2294,6 +2553,10 @@ async function saveEv(type, evId, dateTs) {
       }
       data.end_date = null;
       data.member_id = document.getElementById('ef-mem')?.value || null;
+      // v18 (Event Type Switcher §3.4): Task gains Location + Attachments,
+      // so these aren't lost when converting Social/Health -> Task.
+      data.location = document.getElementById('ef-loc')?.value || null;
+      data.links = getLinks();
       data.actions = getChecklist('ef-actions');
       data.tags = Array.from(document.querySelectorAll('#ef-tags button[data-sel="true"]')).map(b=>b.dataset.tag).filter(Boolean);
       data.description = document.getElementById('ef-desc')?.value || null;
@@ -2423,6 +2686,63 @@ async function saveEv(type, evId, dateTs) {
       }
     }
 
+    // v18: stamp "last edited" metadata on every create AND edit.
+    data.updated_at = new Date().toISOString();
+    data.updated_by_name = getActorName();
+    // updated_scope only means anything for recurring events being edited:
+    // - editing the full series (editSeriesId set)     -> 'series'
+    // - editing a single occurrence of an existing series -> 'occurrence'
+    // - a brand-new event/series, or a plain non-recurring edit -> null
+    //   (no scope to show until the first real edit decision is made)
+    if (evId) {
+      const _existEvForScope = A.events.find(e => e.id === evId);
+      if (editSeriesId) data.updated_scope = 'series';
+      else if (_existEvForScope?.series_id) data.updated_scope = 'occurrence';
+      else data.updated_scope = null;
+    } else {
+      data.updated_scope = null;
+    }
+
+    // v18 (Event Type Switcher §3.6): when an edit changes an event's type,
+    // explicitly clear every field exclusive to the OLD type. This is
+    // necessary because cleanData() further down only ever writes keys that
+    // are actually present on `data` — and each type-branch above only ever
+    // sets ITS OWN fields — so without this, something like `doctor` or
+    // `cost` left over from a Health event would silently survive in the
+    // database after switching to Task/Social (cleanData() would simply
+    // omit it from the UPDATE payload rather than clearing it).
+    if (evId) {
+      const _origType = A.events.find(e => e.id === evId)?.type;
+      if (_origType && _origType !== type) {
+        const TYPE_EXCLUSIVE_NULL_FIELDS = [
+          'social_type','doctor','specialty','cost','cost_currency',
+          'administration','recommended_by','considerations','symptoms','cure',
+          'appt_type','weight','height','hydration','exercised','activity',
+          'activity_mins','mood','energy','sleep','member_id'
+        ];
+        TYPE_EXCLUSIVE_NULL_FIELDS.forEach(f => { if (data[f] === undefined) data[f] = null; });
+        // Array/boolean columns need their proper "empty" value, not null
+        if (data.participants === undefined) data.participants = [];
+        if (data.participants_all_family === undefined) data.participants_all_family = false;
+      }
+    }
+
+    // v18 (Event Type Switcher §3.5): a single-occurrence type switch on a
+    // recurring event detaches that occurrence from its series entirely —
+    // same as the app's existing single-occurrence-edit behavior for any
+    // other field change. (Full-series type switches carry the recurrence
+    // pattern to the new type instead — no special handling needed here,
+    // since that path already flows through the normal editSeriesId logic
+    // below, siblings' `type` column included.)
+    if (A._detachSeriesOnSave) {
+      data.series_id = null;
+      data.recurrence = 'None';
+      data.recurrence_end_type = null;
+      data.recurrence_end_count = null;
+      data.recurrence_end_date = null;
+    }
+    delete A._detachSeriesOnSave;
+
     // v14: generateRecurrences() must ONLY ever run when creating a brand-new
     // event. Previously it ran unconditionally on every save — including
     // edits — which always stamped a fresh series_id onto the edited row
@@ -2441,7 +2761,8 @@ async function saveEv(type, evId, dateTs) {
         'weight','height','hydration','exercised','activity','activity_mins','mood','energy','sleep',
         'social_type','actions','doctor','specialty','cost','cost_currency',
         'symptoms','cure','recommended_by','administration','considerations','links','series_id',
-        'is_private','created_by_user_id']; // v8: privacy fields
+        'is_private','created_by_user_id', // v8: privacy fields
+        'updated_at','updated_by_name','updated_scope']; // v18: last-edited timestamps
       const clean = {};
       allowed.forEach(k => { if (obj[k] !== undefined) clean[k] = obj[k]; });
       return clean;
@@ -2699,6 +3020,9 @@ function saveEvDraft(){
     type:A._evDraftType||'social',
     apptType:document.getElementById('ef-apt')?.value||null,
     timestamp:Date.now(),
+    // v18 (Draft Safety Fix C1): which real event this draft belongs to, if
+    // any. null means it's a brand-new (unsaved) event.
+    editingEventId:A._evDraftEditingId||null,
     fields,participants,tags,
   };
   try{localStorage.setItem(_evDraftKey(),JSON.stringify(draft));}catch(_){}
@@ -2762,10 +3086,20 @@ function restoreEvDraft(){
     draft=JSON.parse(raw);
   }catch(_){return;}
   if(!draft) return;
-  // Queue the draft data, then open a fresh form — restoration happens inside openEvForm's setTimeout
+  // v18 (Draft Safety Fix C1): reopen the SAME existing event this draft was
+  // edited from, instead of always opening a blank new-event form (which
+  // previously caused Save to create a duplicate rather than update the
+  // original). Defensive fallback: if the event no longer exists (e.g. it
+  // was deleted by another family member while this draft sat unsaved),
+  // fall back to treating it as a new entry rather than trying to update a
+  // row that isn't there.
+  const targetEvId = (draft.editingEventId && A.events.some(e=>e.id===draft.editingEventId))
+    ? draft.editingEventId
+    : null;
+  // Queue the draft data, then open the form — restoration happens inside openEvForm's setTimeout
   A._evDraftType=draft.type;
   A._evDraftRestore=draft;
-  openEvForm(draft.type,null,null);
+  openEvForm(draft.type,targetEvId,null);
 }
 window.restoreEvDraft=restoreEvDraft;
 
@@ -2870,6 +3204,12 @@ function viewEv(id) {
   body += `<div id="ev-completion-banner">${ev.completed_at
     ? `<div style="display:inline-flex;align-items:center;gap:6px;background:${T.sageLight};color:${T.sage};border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;margin-bottom:10px">✅ Completed ${fmt(ev.completed_at)} at ${evFmtTime(ev.completed_at)}</div>`
     : ''}</div>`;
+  // v18: "Last edited" line — renders nothing for events with no edit history yet
+  // (updated_at is NULL until the record's next post-v18 save), per spec.
+  const _lastEditedStr = formatLastEdited(ev.updated_at, ev.updated_by_name, ev.updated_scope);
+  if (_lastEditedStr) {
+    body += `<div style="font-size:11px;color:${T.muted};margin-bottom:10px">${_lastEditedStr}</div>`;
+  }
 
   if (ev.type === 'wellness') {
     body += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px">
@@ -6066,6 +6406,12 @@ async function saveFamName(){
     const sBtn=document.getElementById('sample-btn');
     if(sBtn) sBtn.style.display='none';
     if(isSampleMode()) toggleSampleMode();
+    // v18: create the default 'free' subscription row for this new family.
+    // Fire-and-forget — the enforcement logic that reads this table lands in
+    // a later pass, but the row needs to exist from day one so no family is
+    // ever missing one. A failure here doesn't block family creation.
+    sb.from('family_subscription').insert({family_id:data.id,plan_name:'free'})
+      .then(({error})=>{ if(error) console.error('family_subscription row creation failed', error); });
     toast('Family created! ✅');
     renderSettings();
     return;
