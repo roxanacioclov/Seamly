@@ -1,4 +1,4 @@
-<!-- Seamly v16.1 | STAGING | 16 Jul 2026 -->
+<!-- Seamly v17 | STAGING | 28 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -82,6 +82,15 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
 .tbl th{padding:8px 7px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;text-align:left;border-bottom:1px solid var(--border);background:var(--parchment);white-space:nowrap}
 .tbl td{padding:8px 7px;font-size:13px;color:var(--ink);border-bottom:1px solid var(--border);vertical-align:middle}
 .tbl tr:nth-child(even) td{background:#faf8f466}
+/* v17: sticky (frozen) table headers — applies to both the Meds table (two
+   stacked header rows: group labels + column labels) and the Meal Planner
+   table (single header row) since both share the .tbl class. The second
+   header row needs its own offset so it lands directly under the first
+   instead of overlapping it. Offset is an estimate based on current header
+   padding/font-size — verify visually on staging and adjust if header text
+   height ever changes (e.g. a future font-size tweak). */
+.tbl thead tr:first-child th{position:sticky;top:0;z-index:3}
+.tbl thead tr:nth-child(2) th{position:sticky;top:33px;z-index:2}
 .note-card{border-radius:13px;padding:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.05);transition:transform .15s;overflow:hidden;word-break:break-word}
 .note-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .note-card:active{transform:scale(.97)}
@@ -835,10 +844,20 @@ async function initApp(user){
   if(A.showOB)renderOB();
   // v13: check for an unfinished event form draft saved before a page reload
   // Delay 1.5s so the home page renders first before showing the banner
-  setTimeout(checkAndOfferEvDraft,1500);
   // v14: same check for Notebook and Meal Planner drafts
-  setTimeout(checkAndOfferNoteDraft,1500);
-  setTimeout(checkAndOfferMealDraft,1500);
+  // v17 fix: only run these checks once per actual app session, not on every
+  // re-run of initApp() — the Supabase auth listener can silently re-fire a
+  // SIGNED_IN event in the background (e.g. connection retry after the phone
+  // locks/unlocks), which was re-triggering these same three checks over and
+  // over and re-showing banners that were already dismissed. Reuses the same
+  // guard pattern as A._appInitialized just above. Also run sequentially
+  // (see _runDraftChecksSequentially below) so at most one restore banner is
+  // ever visible on screen at once, instead of multiple overlapping banners
+  // rendering on top of each other.
+  if(!A._draftChecksDone){
+    A._draftChecksDone=true;
+    setTimeout(()=>_runDraftChecksSequentially([checkAndOfferEvDraft,checkAndOfferNoteDraft,checkAndOfferMealDraft]),1500);
+  }
 }
 
 // v14: global background-flush safety net for in-progress Notebook and Meal
@@ -893,7 +912,21 @@ function showModal(title,body){
 // DOM-only close — safe to call before running another function
 function _closeModalDOM(){
   // v13: cancel any pending auto-save timers so they don't fire into a closed modal
-  if(A._evDraftInterval){clearInterval(A._evDraftInterval);A._evDraftInterval=null;}
+  // v17 fix: a deliberate close (✕, tap-outside, back button) previously only
+  // stopped these timers — it never cleared the localStorage draft itself, so
+  // the draft sat there and got offered again on the next restore check even
+  // though the user had clearly chosen not to keep it. This only affects
+  // deliberate closes; it has no effect on the crash/reload/backgrounding
+  // scenario the draft system exists to protect, since that scenario never
+  // calls this function at all.
+  if(A._evDraftInterval){
+    clearInterval(A._evDraftInterval);
+    A._evDraftInterval=null;
+    clearEvDraft();
+  }
+  if(document.getElementById('ne-editor')){
+    clearNoteDraftLS();
+  }
   clearTimeout(A._noteAutoSaveTimer);
   A._noteAutoSaveTimer=null;
   document.getElementById('modal-root').innerHTML='';
@@ -2601,6 +2634,26 @@ function generateRecurrences(data) {
   return events;
 }
 
+// ── DRAFT-CHECK SEQUENCING (v17) ────────────────────────────────────────────
+// Runs the event/note/meal draft-restore checks one at a time instead of all
+// at once, so at most one restore banner is ever visible on screen. Each
+// checkAndOffer*Draft() function returns the DOM id of the banner it just
+// displayed (or nothing, if there was no draft worth offering). We poll for
+// that banner's removal — Discard/Restore tap, or its own 15s auto-dismiss —
+// before moving on to the next check in the queue.
+function _runDraftChecksSequentially(queue){
+  if(!queue.length) return;
+  const [check,...rest]=queue;
+  const bannerId=check();
+  if(!bannerId){ _runDraftChecksSequentially(rest); return; }
+  const poll=setInterval(()=>{
+    if(!document.getElementById(bannerId)){
+      clearInterval(poll);
+      _runDraftChecksSequentially(rest);
+    }
+  },300);
+}
+
 // ── EVENT FORM DRAFT (v13) ────────────────────────────────────────────────────
 // Protects against iOS Safari silently reloading tabs and destroying unsaved event
 // form data. A draft is written to localStorage every 5 seconds while any event
@@ -2612,6 +2665,11 @@ const _evDraftMaxAge=2*60*60*1000; // discard drafts older than 2 hours
 
 function saveEvDraft(){
   if(!A.user||!A.family) return;
+  // v17 fix: don't bother saving a draft that's essentially blank — no title
+  // means there's nothing meaningful worth protecting, so nothing gets
+  // written, and therefore nothing will ever get offered for restore later.
+  const _titleEl=document.getElementById('ef-title');
+  if(!_titleEl||!_titleEl.value||!_titleEl.value.trim()) return;
   // Collect all possible form field values that exist in the DOM right now.
   // ef-stime/ef-etime are excluded here — v13's custom time picker made them
   // hour/minute select pairs rather than single inputs, so they're captured
@@ -2665,6 +2723,12 @@ function checkAndOfferEvDraft(){
   if(!draft||!draft.timestamp||Date.now()-draft.timestamp>_evDraftMaxAge){
     clearEvDraft();return;
   }
+  // v17 defensive backstop: silently discard a near-blank draft instead of
+  // offering it — covers any old blank draft already sitting in localStorage
+  // from before saveEvDraft()'s title check above existed.
+  if(!draft.fields?.['ef-title']||!draft.fields['ef-title'].trim()){
+    clearEvDraft();return;
+  }
   // Show a non-intrusive restoration banner at the bottom of the screen
   const existing=document.getElementById('ev-draft-banner');
   if(existing) existing.remove();
@@ -2686,6 +2750,7 @@ function checkAndOfferEvDraft(){
     </div>`;
   document.body.appendChild(banner);
   setTimeout(()=>document.getElementById('ev-draft-banner')?.remove(),15000); // auto-dismiss
+  return 'ev-draft-banner'; // v17: tells the sequencing orchestrator a banner is now showing
 }
 window.checkAndOfferEvDraft=checkAndOfferEvDraft;
 
@@ -3065,9 +3130,14 @@ function renderNB(){
     </div>
     <!-- Search bar — full width above the split layout -->
     <div style="padding:8px 16px 6px">
-      <input class="inp" id="nb-search-inp" placeholder="🔍  Search notes…" value="${A.noteSearch}"
-        oninput="A.noteSearch=this.value;clearTimeout(A._nT);A._nT=setTimeout(()=>renderNB(),350)"
-        onkeydown="if(event.key==='Enter'){clearTimeout(A._nT);renderNB();}">
+      <div style="position:relative">
+        <input class="inp" id="nb-search-inp" placeholder="🔍  Search notes…" value="${A.noteSearch}"
+          style="padding-right:${A.noteSearch?'36px':'12px'}"
+          oninput="A.noteSearch=this.value;clearTimeout(A._nT);A._nT=setTimeout(()=>{renderNB();const si=document.getElementById('nb-search-inp');if(si){si.focus();si.setSelectionRange(si.value.length,si.value.length);}},350);document.getElementById('nb-search-x').style.display=this.value?'flex':'none'"
+          onkeydown="if(event.key==='Enter'){clearTimeout(A._nT);renderNB();this.blur();}">
+        <button id="nb-search-x" onclick="A.noteSearch='';document.getElementById('nb-search-inp').value='';renderNB();this.style.display='none'"
+          style="display:${A.noteSearch?'flex':'none'};position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:${T.muted};font-size:16px;cursor:pointer;width:24px;height:24px;align-items:center;justify-content:center;border-radius:50%">×</button>
+      </div>
     </div>
     <!-- Body: ribbon (left) + notes grid (right) -->
     <div style="display:flex;align-items:flex-start">
@@ -3462,6 +3532,16 @@ async function saveNote(noteId){
   showSavingToast();
   let _saveOk=false;
   try{
+    // v17 fix (Notebook note duplication bug): resolve the ACTUAL current note
+    // id, falling back to whatever id the background 4-second auto-save has
+    // already created for this note (A._noteEditingId). Without this, a new
+    // note's Save button — rendered once at modal-open time with an empty
+    // noteId baked into its onclick — would always take the insert branch
+    // below, creating a duplicate row even after auto-save had already
+    // inserted the "real" one. Every use of noteId below this line now uses
+    // effectiveId instead, so a manual Save always lands on whatever row
+    // auto-save already created.
+    const effectiveId = noteId || A._noteEditingId || '';
     const checklist=[];
     document.querySelectorAll('#ne-cl > div').forEach((row,i)=>{
       const cb=row.querySelector('input[type="checkbox"]');
@@ -3476,7 +3556,7 @@ async function saveNote(noteId){
     // If the toggle is not shown (non-creator editing a shared note), preserve
     // the existing is_private value so it is never accidentally cleared.
     const _notePrivToggle = document.getElementById('ne-private');
-    const _existNote = noteId ? A.notes.find(n => n.id === noteId) : null;
+    const _existNote = effectiveId ? A.notes.find(n => n.id === effectiveId) : null;
     const data={
       family_id:A.family.id,
       title:document.getElementById('ne-t')?.value||'',
@@ -3489,24 +3569,24 @@ async function saveNote(noteId){
       is_private: _notePrivToggle ? _notePrivToggle.checked : (_existNote?.is_private || false),
     };
     // Set created_by_user_id only when creating a new note — never overwrite on edits.
-    if (!noteId) data.created_by_user_id = A.user?.id || null;
+    if (!effectiveId) data.created_by_user_id = A.user?.id || null;
     // v7: sbWrite() for idle-safety
     let res;
-    if(noteId)res=await sbWrite(()=>sb.from('notes').update(data).eq('id',noteId).select().single());
+    if(effectiveId)res=await sbWrite(()=>sb.from('notes').update(data).eq('id',effectiveId).select().single());
     else res=await sbWrite(()=>sb.from('notes').insert(data).select().single());
     if(res.error){toast('Error saving note: '+(res.error.message||'please try again.'),true);console.error(res.error);return;}
     const savedNote = res.data;
-    if(noteId)A.notes=A.notes.map(n=>n.id===noteId?savedNote:n);
+    if(effectiveId)A.notes=A.notes.map(n=>n.id===effectiveId?savedNote:n);
     else A.notes.push(savedNote);
     _saveOk=true;
     A._noteDirty=false; // v13: mark note as clean after explicit manual save
     clearNoteDraftLS(); // v14: saved successfully — discard the localStorage draft
     // v8: notify other family members
-    writeNotif('note', noteId ? 'updated' : 'created',
-      noteId ? `${getActorName()} updated a note` : `${getActorName()} added a new note`,
+    writeNotif('note', effectiveId ? 'updated' : 'created',
+      effectiveId ? `${getActorName()} updated a note` : `${getActorName()} added a new note`,
       data.title || 'Untitled'
     );
-    closeModal();toast(noteId?'Note updated!':'Note saved!');renderNB();
+    closeModal();toast(effectiveId?'Note updated!':'Note saved!');renderNB();
   }catch(e){
     console.error('saveNote error', e);
     toast('Something went wrong — please try again.', true);
@@ -3651,6 +3731,13 @@ function saveNoteDraftLS(){
   if(!A.user||!A.family) return;
   const editorEl=document.getElementById('ne-editor');
   if(!editorEl) return; // note editor isn't open right now — nothing to draft
+  // v17 fix: skip saving a draft that's essentially blank — both title and
+  // body content must be empty for this to be considered "nothing worth
+  // protecting" (checking content with its HTML tags stripped out, so an
+  // empty formatted paragraph like "<p></p>" doesn't count as content).
+  const _titleVal=document.getElementById('ne-t')?.value||'';
+  const _contentVal=(editorEl.innerHTML||'').replace(/<[^>]*>/g,'').trim();
+  if(!_titleVal.trim()&&!_contentVal) return;
   const checklist=[];
   document.querySelectorAll('#ne-cl > div').forEach((row,i)=>{
     const cb=row.querySelector('input[type="checkbox"]');
@@ -3694,6 +3781,14 @@ function checkAndOfferNoteDraft(){
   if(!draft||!draft.timestamp||Date.now()-draft.timestamp>_noteDraftMaxAge){
     clearNoteDraftLS();return;
   }
+  // v17 defensive backstop: silently discard a near-blank draft instead of
+  // offering it — covers any old blank draft already sitting in localStorage
+  // from before saveNoteDraftLS()'s blank-content check above existed.
+  const _draftTitle=(draft.fields?.title||'').trim();
+  const _draftContent=(draft.fields?.content||'').replace(/<[^>]*>/g,'').trim();
+  if(!_draftTitle&&!_draftContent){
+    clearNoteDraftLS();return;
+  }
   const existing=document.getElementById('note-draft-banner');
   if(existing) existing.remove();
   const banner=document.createElement('div');
@@ -3713,6 +3808,7 @@ function checkAndOfferNoteDraft(){
     </div>`;
   document.body.appendChild(banner);
   setTimeout(()=>document.getElementById('note-draft-banner')?.remove(),15000); // auto-dismiss
+  return 'note-draft-banner'; // v17: tells the sequencing orchestrator a banner is now showing
 }
 window.checkAndOfferNoteDraft=checkAndOfferNoteDraft;
 
@@ -3732,6 +3828,35 @@ function restoreNoteDraftLS(){
 window.restoreNoteDraftLS=restoreNoteDraftLS;
 
 // ── MEDS ──────────────────────────────────────────────────────────────────────
+
+// v17 fix (Meds alert clarity + stock sync): single source of truth for how
+// many days of supply a medication has left "as of right now" — used by BOTH
+// the Meds table's warning badge/coloring (renderMeds()) and the low-stock
+// notification alert (computeAlerts()), so they can never disagree with each
+// other again. Uses updated_stock (the real current stock once at least one
+// order has been confirmed) instead of the frozen stock_today whenever it's
+// available, falling back to stock_today only when no order has ever been
+// confirmed yet. Depletes that base stock forward by the days elapsed since
+// stock_date, same anchor already used elsewhere in this module.
+function effMedDaysLeft(med){
+  const dailyDose=(med.member_ids||[]).length*(med.dose_per_day||1);
+  if(!dailyDose) return null;
+  const hasUpd = med.updated_stock!==null && med.updated_stock!==undefined;
+  const baseStock = hasUpd ? med.updated_stock : (med.stock_today||0);
+  const stockBase = med.stock_date ? new Date(med.stock_date+'T00:00:00') : todayD();
+  const daysPassed = Math.max(0, Math.round((todayD() - stockBase) / 86400000));
+  const currentStock = Math.max(0, baseStock - daysPassed*dailyDose);
+  return Math.floor(currentStock/dailyDose);
+}
+// Status buckets unchanged from before this fix: critical (≤7 days), low (≤14 days), ok.
+function effMedStatus(med){
+  const d=effMedDaysLeft(med);
+  if(d===null) return 'ok';
+  if(d<=7) return 'critical';
+  if(d<=14) return 'low';
+  return 'ok';
+}
+
 function exportMedsXLSX() {
   // Export as HTML that Excel can open natively - no library needed
   const dm = getFilteredMeds(), s = symC();
@@ -4068,19 +4193,23 @@ function renderMeds(targetId){
           </thead>
           <tbody>
             ${dm.map((med,idx)=>{
-              const dl=daysLeft(med);
-              const st=dl===null?'ok':dl<=7?'critical':dl<=14?'low':'ok';
+              // v17 fix: badge/coloring now driven by the shared effective-status
+              // helper (updated_stock-aware) instead of the old stock_today-only
+              // "dl" calc — this is what makes the badge agree with the low-stock
+              // notification alert. "Stock lasts until" / "Updated stock lasts
+              // until" display columns below keep their own separate, unchanged
+              // display logic — only the warning trigger is consolidated.
+              const st=effMedStatus(med);
+              const medHasUpdated=hasUpdated(med);
               const rowMems=getMembers().filter(m=>(med.member_ids||[]).includes(m.id));
               // One entry per medCols column, in the exact same order, so
               // collapseRowCells() can merge any collapsed group correctly.
               const cellsArr=[
-                `<td><div style="font-weight:700">${med.name}</div>${med.shared?`<span class="chip" style="background:${T.skyLight};color:${T.sky};font-size:10px">Shared</span>`:''}<div style="font-size:11px;color:${T.muted}">${med.note||''}</div></td>`,
+                `<td><div style="display:flex;align-items:center;gap:5px"><span style="font-weight:700">${med.name}</span>${st==='critical'?`<span title="Low stock" style="font-size:12px;color:${T.rose}">⚠️</span>`:st==='low'?`<span title="Stock running low" style="font-size:12px;color:${T.honey}">⚠️</span>`:''}</div>${med.shared?`<span class="chip" style="background:${T.skyLight};color:${T.sky};font-size:10px">Shared</span>`:''}<div style="font-size:11px;color:${T.muted}">${med.note||''}</div></td>`,
                 `<td><div style="display:flex;gap:3px">${rowMems.map(m=>av(m,20)).join('')}</div></td>`,
                 `<td>${med.dose_per_day}</td>`,
-                `<td style="font-weight:700;color:${st==='critical'?T.rose:st==='low'?T.honey:T.sage}">
+                `<td style="font-weight:700;color:${medHasUpdated?T.muted:(st==='critical'?T.rose:st==='low'?T.honey:T.sage)}">
                   ${med.stock_today}
-                  ${st==='critical'?`<div style="font-size:10px;color:${T.rose}">⚠️ Low!</div>`:''}
-                  ${st==='low'?`<div style="font-size:10px;color:${T.honey}">Soon</div>`:''}
                 </td>`,
                 `<td style="font-size:11px;color:${T.muted}">${med.stock_date?fmt(med.stock_date+'T00:00:00'):'—'}</td>`,
                 `<td style="color:${st==='critical'?T.rose:st==='low'?T.honey:T.muted}">${lastsUntil(med)}</td>`,
@@ -4089,8 +4218,8 @@ function renderMeds(targetId){
                 `<td><input type="number" min="0" value="${med.new_order_pkgs||''}" placeholder="0" onfocus="if(this.value==='0')this.value=''" onchange="updateMedOrder('${med.id}',this.value)" style="width:55px;padding:4px 6px;border-radius:7px;border:1px solid ${T.border};font-size:13px;text-align:center"></td>`,
                 `<td style="font-weight:600;color:${T.sage}">${med.new_order_pkgs&&med.new_order_pkgs!=='0'?`${s}${orderPrice(med)}`:'—'}</td>`,
                 `<td style="font-weight:600;color:${T.sky};font-size:12px">${simUntil(med)}</td>`,
-                `<td style="font-weight:600;color:${T.sage}">${hasUpdated(med)?med.updated_stock:'—'}</td>`,
-                `<td style="font-weight:600;color:${T.sage};font-size:12px">${hasUpdated(med)?updLastsUntil(med):'—'}</td>`,
+                `<td style="font-weight:600;color:${medHasUpdated?(st==='critical'?T.rose:st==='low'?T.honey:T.sage):T.muted}">${medHasUpdated?med.updated_stock:'—'}</td>`,
+                `<td style="font-weight:600;color:${T.sage};font-size:12px">${medHasUpdated?updLastsUntil(med):'—'}</td>`,
                 `<td style="font-size:11px;color:${T.muted}">${med.last_ordered?fmt(med.last_ordered):'—'}</td>`,
                 `<td>
                   ${med.new_order_pkgs&&med.new_order_pkgs!=='0'?`<button onclick="confirmOrder('${med.id}')" style="background:${T.sageLight};border:1px solid ${T.sageMid};border-radius:7px;padding:3px 8px;font-size:11px;font-weight:700;color:${T.sage};cursor:pointer;white-space:nowrap">✓ Got it</button>`:''}
@@ -4139,7 +4268,6 @@ function sortMeds(col){
   renderMeds();
 }
 window.sortMeds=sortMeds;
-
 
 // v16: click handler for the Meds table's collapsible group headers
 // (Excel-outline style). Toggles A.medCollapsedGroups[grp] and re-renders.
@@ -4863,7 +4991,8 @@ function renderShoppingTab(){
       <div style="position:relative;flex:1;min-width:0">
         <input class="inp" id="shop-search-all-inp" placeholder="🔍  Search all lists…" value="${A.shopSearchAll||''}"
           style="padding-right:${A.shopSearchAll?'36px':'12px'}"
-          oninput="A.shopSearchAll=this.value;clearTimeout(A._ssT);A._ssT=setTimeout(renderMeals,300);document.getElementById('shop-search-all-x').style.display=this.value?'flex':'none'">
+          oninput="A.shopSearchAll=this.value;clearTimeout(A._ssT);A._ssT=setTimeout(()=>{renderMeals();const si=document.getElementById('shop-search-all-inp');if(si){si.focus();si.setSelectionRange(si.value.length,si.value.length);}},300);document.getElementById('shop-search-all-x').style.display=this.value?'flex':'none'"
+          onkeydown="if(event.key==='Enter'){clearTimeout(A._ssT);renderMeals();this.blur();}">
         <button id="shop-search-all-x" onclick="A.shopSearchAll='';document.getElementById('shop-search-all-inp').value='';renderMeals();this.style.display='none'"
           style="display:${A.shopSearchAll?'flex':'none'};position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:${T.muted};font-size:16px;cursor:pointer;width:24px;height:24px;align-items:center;justify-content:center;border-radius:50%">×</button>
       </div>
@@ -5103,7 +5232,8 @@ function renderShoppingModal(id){
     <div style="position:relative;margin-bottom:10px">
       <input class="inp" id="shop-search-list-inp" placeholder="🔍  Search this list…" value="${A._shopSearchQ||''}"
         style="padding-right:${A._shopSearchQ?'36px':'12px'}"
-        oninput="A._shopSearchQ=this.value;clearTimeout(A._slT);A._slT=setTimeout(()=>renderShoppingModal('${id}'),250)">
+        oninput="A._shopSearchQ=this.value;clearTimeout(A._slT);A._slT=setTimeout(()=>{renderShoppingModal('${id}');const si=document.getElementById('shop-search-list-inp');if(si){si.focus();si.setSelectionRange(si.value.length,si.value.length);}},250)"
+        onkeydown="if(event.key==='Enter'){clearTimeout(A._slT);renderShoppingModal('${id}');this.blur();}">
       <button id="shop-search-list-x" onclick="A._shopSearchQ='';renderShoppingModal('${id}')"
         style="display:${A._shopSearchQ?'flex':'none'};position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:${T.muted};font-size:16px;cursor:pointer;width:24px;height:24px;align-items:center;justify-content:center;border-radius:50%">×</button>
     </div>`:''}
@@ -5305,7 +5435,6 @@ async function toggleShoppingItem(listId,idx,checked){
   renderHome();
 }
 window.toggleShoppingItem=toggleShoppingItem;
-
 
 // v16: toggles the "urgent" flag on a shopping list item. Urgent + not-yet-
 // bought items surface at the top of the Home Page "Other Actions" section
@@ -5561,6 +5690,7 @@ function checkAndOfferMealDraft(){
     </div>`;
   document.body.appendChild(banner);
   setTimeout(()=>document.getElementById('meal-draft-banner')?.remove(),15000); // auto-dismiss
+  return 'meal-draft-banner'; // v17: tells the sequencing orchestrator a banner is now showing
 }
 window.checkAndOfferMealDraft=checkAndOfferMealDraft;
 
@@ -6395,14 +6525,16 @@ function computeAlerts() {
   const now = new Date();
 
   // Low stock medications (≤ 7 days of supply remaining)
+  // v17 fix: now reads via the shared effMedDaysLeft() helper (also used by
+  // the Meds table badge in renderMeds()) which is updated_stock-aware —
+  // falls back to stock_today only when no order has ever been confirmed.
+  // Previously this block only ever read stock_today, which never changes
+  // after an order is confirmed (see confirmOrder()), so the alert kept
+  // firing forever after ordering even once updated_stock was healthy.
   if (prefs.alert_low_stock !== false) {
     getDM().forEach(med => {
-      const dailyDose = (med.member_ids || []).length * (med.dose_per_day || 1);
-      if (!dailyDose) return;
-      const stockBase = med.stock_date ? new Date(med.stock_date + 'T00:00:00') : today;
-      const daysPassed = Math.max(0, Math.round((today - stockBase) / 86400000));
-      const currentStock = Math.max(0, (med.stock_today || 0) - daysPassed * dailyDose);
-      const daysLeft = Math.floor(currentStock / dailyDose);
+      const daysLeft = effMedDaysLeft(med);
+      if (daysLeft === null) return;
       if (daysLeft <= 7) {
         const memberNames = A.members
           .filter(m => (med.member_ids || []).includes(m.id))
