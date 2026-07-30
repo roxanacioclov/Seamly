@@ -179,7 +179,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div class="auth-card">
     <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">Seamly</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v18 — 28 Jul 2026</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v18.2 — 28 Jul 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -230,7 +230,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v18</span>
+      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v18.2</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sample-btn" onclick="A.family?toggleSampleMode():goTo('settings')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:var(--honey-light);color:var(--honey);border:1px solid var(--honey)44;cursor:pointer;display:none">📋 Sample</button>
@@ -270,7 +270,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v18</span>
+      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v18.2</span>
     </div>
     <button class="nav-btn" data-page="home" onclick="goTo('home')">
       <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0">
@@ -2121,16 +2121,28 @@ function _captureEvFormFields(){
   if(etimeVal) fields['ef-etime']=etimeVal;
   const participants=Array.from(document.querySelectorAll('#ef-parts button[data-sel="true"]')).map(b=>b.dataset.mid).filter(Boolean);
   const tags=Array.from(document.querySelectorAll('#ef-tags button[data-sel="true"]')).map(b=>b.dataset.tag).filter(Boolean);
-  return { fields, participants, tags };
+  // v18.2 fix: also capture Actions/checklist and Attachments live, right
+  // now, while the form's DOM still exists. This matters because the Type
+  // Switcher's confirmation modal replaces this form's entire DOM before
+  // either Cancel or Confirm is clicked — anything not captured here is
+  // gone by the time those handlers run.
+  const actions = document.getElementById('ef-actions') ? getChecklist('ef-actions') : [];
+  const links = document.getElementById('ef-links') ? getLinks() : [];
+  return { fields, participants, tags, actions, links };
 }
 
 // Fired by the "Event Type" dropdown's onchange. Shows the confirmation
-// modal (spec-confirmed wording) before anything actually changes.
+// modal before anything actually changes.
 function confirmTypeSwitch(newType, oldType, evId, dateTs){
   if(!newType || newType===oldType) return;
-  // Snapshot the current form exactly as-is, so Cancel can put it back
-  // untouched (dropdown included) — see cancelTypeSwitch().
-  A._typeSwitchCancelSnapshot = _captureEvFormFields();
+  // v18.2 fix: capture the FULL current form state — once, right now,
+  // before showModal() below replaces this form's DOM. Both Cancel and
+  // Confirm read from this same snapshot afterward; neither can safely read
+  // live DOM anymore once the confirmation modal is showing. (This was the
+  // root cause of the "fields get cleared" bug reported after Pass C —
+  // switchEventType() was reading document.getElementById(...) for fields
+  // that had already been removed from the page by the time it ran.)
+  A._typeSwitchSnapshot = _captureEvFormFields();
 
   const existingEv = evId ? A.events.find(e=>e.id===evId) : null;
   const isFullSeriesEdit = !!A._editSeriesMode;
@@ -2145,10 +2157,26 @@ function confirmTypeSwitch(newType, oldType, evId, dateTs){
     extraLine = `<div style="font-size:12px;color:${T.muted};margin-top:10px">This occurrence will be detached from its recurring series.</div>`;
   }
 
+  // v18.2 fix: the original modal wording was a fixed, generic sentence
+  // that always mentioned "medical info, dosage" regardless of which types
+  // were actually involved — confusing for e.g. a Task -> Social switch,
+  // which has nothing medical to lose. Now describes what's ACTUALLY
+  // exclusive to the type being switched away from. Task has no
+  // type-exclusive fields at all (everything on a Task is a common field),
+  // so switching away from Task has nothing extra to call out.
+  const EXCLUSIVE_DESC = {
+    social: 'the event category',
+    health: 'medical info like doctor, cost, symptoms, or treatment details',
+  };
+  const clearedDesc = EXCLUSIVE_DESC[oldType] || null;
+  const bodyText = clearedDesc
+    ? `Switching to <b>${newLabel}</b> will clear ${clearedDesc} — specific to <b>${oldLabel}</b>. Title, date, time, assigned family members, tags, description, location, and attachments will be kept.`
+    : `Switching to <b>${newLabel}</b> — title, date, time, assigned family members, tags, description, location, and attachments will be kept. ${oldLabel} has no other details to lose.`;
+
   showModal('Change event type?', `
     <div style="text-align:center;padding:6px 0 4px">
       <div style="font-size:13px;color:${T.ink};line-height:1.55">
-        Switching to <b>${newLabel}</b> will clear details specific to <b>${oldLabel}</b> — like medical info, dosage, or event-specific fields. Title, date, time, assigned family members, tags, description, location, and attachments will be kept.
+        ${bodyText}
       </div>
       ${extraLine}
       <div style="display:flex;gap:10px;margin-top:18px">
@@ -2163,8 +2191,8 @@ window.confirmTypeSwitch = confirmTypeSwitch;
 // (reusing the existing draft-restore field-application mechanism inside
 // openEvForm(), with its toast suppressed for this case).
 function cancelTypeSwitch(oldType, evId, dateTs){
-  const snap = A._typeSwitchCancelSnapshot;
-  delete A._typeSwitchCancelSnapshot;
+  const snap = A._typeSwitchSnapshot;
+  delete A._typeSwitchSnapshot;
   _closeModalDOM();
   A._evDraftType = oldType;
   if (snap) {
@@ -2176,29 +2204,30 @@ function cancelTypeSwitch(oldType, evId, dateTs){
 window.cancelTypeSwitch = cancelTypeSwitch;
 
 // Confirm: build a converted "pseudo-source" object holding the common
-// fields (per spec §3.1–§3.4), mapped from whatever was live on screen
-// before the switch (not the stale DB row — the user's unsaved edits win),
-// then reload the form as the new type using that as its prefill source.
+// fields (per spec §3.1–§3.4), mapped from the snapshot captured in
+// confirmTypeSwitch() (NOT live DOM — see the fix note there), then reload
+// the form as the new type using that as its prefill source.
 function switchEventType(newType, oldType, evId, dateTs){
   if(!newType || newType===oldType){ _closeModalDOM(); return; }
   const existingEv = evId ? A.events.find(e=>e.id===evId) : null;
   const isFullSeriesEdit = !!A._editSeriesMode;
   const isSingleOccurrenceOfSeries = !!(existingEv && existingEv.series_id && !isFullSeriesEdit);
 
+  const snap = A._typeSwitchSnapshot || { fields:{}, participants:[], tags:[], actions:[], links:[] };
+  const f = snap.fields || {};
+
   const src = {};
 
   // Title (§3.1 — always mapped)
-  src.title = document.getElementById('ef-title')?.value || '';
+  src.title = f['ef-title'] || '';
 
   // Date / time / all-day (§3.3)
-  const dateEl = document.getElementById('ef-date');
-  const allDayEl = document.getElementById('ef-allday');
   // Health Treatment/Illness render no ef-allday checkbox at all — those
   // sub-types are always date-only/all-day, so absence of the checkbox
   // means "was all-day" for mapping purposes.
-  src.all_day = allDayEl ? allDayEl.checked : true;
-  const dateV = dateEl?.value || '';
-  const stimeV = getTimeVal('ef-stime') || '12:00';
+  src.all_day = ('ef-allday' in f) ? !!f['ef-allday'] : true;
+  const dateV = f['ef-date'] || '';
+  const stimeV = f['ef-stime'] || '12:00';
   src.date = dateV ? localDT(dateV, src.all_day ? '12:00' : stimeV) : new Date().toISOString();
 
   // End date (§3.3) — only meaningful if the TARGET type uses one (Social /
@@ -2206,12 +2235,11 @@ function switchEventType(newType, oldType, evId, dateTs){
   if (newType === 'task') {
     src.end_date = null;
   } else {
-    const endDateEl = document.getElementById('ef-enddate');
-    const endDateV = endDateEl?.value || dateV;
+    const endDateV = f['ef-enddate'] || dateV;
     if (src.all_day) {
       src.end_date = endDateV ? localDT(endDateV, '12:00') : null;
     } else {
-      let endTimeV = endDateEl ? (getTimeVal('ef-etime') || '') : '';
+      let endTimeV = f['ef-etime'] || '';
       if (!endTimeV) {
         // Source had no end time of its own (e.g. Task -> Social) — default
         // to start time + 1 hour, per spec.
@@ -2223,20 +2251,20 @@ function switchEventType(newType, oldType, evId, dateTs){
   }
 
   // Location, Description, Tags, Actions, Attachments (§3.1 — always mapped)
-  src.location = document.getElementById('ef-loc')?.value || null;
-  src.description = document.getElementById('ef-desc')?.value || null;
-  src.tags = Array.from(document.querySelectorAll('#ef-tags button[data-sel="true"]')).map(b=>b.dataset.tag).filter(Boolean);
-  src.actions = document.getElementById('ef-actions') ? getChecklist('ef-actions') : [];
-  src.links = document.getElementById('ef-links') ? getLinks() : [];
+  src.location = f['ef-loc'] || null;
+  src.description = f['ef-desc'] || null;
+  src.tags = snap.tags || [];
+  src.actions = snap.actions || [];
+  src.links = snap.links || [];
 
   // Assignee conversion (§3.2)
   if (newType === 'task') {
     if (oldType === 'task') {
-      src.member_id = document.getElementById('ef-mem')?.value || null;
+      src.member_id = f['ef-mem'] || null;
     } else {
-      const partBtns = Array.from(document.querySelectorAll('#ef-parts button[data-sel="true"]'));
-      const isFamily = partBtns.some(b=>b.dataset.mid==='__family__');
-      const memberIds = partBtns.filter(b=>b.dataset.mid!=='__family__').map(b=>b.dataset.mid).filter(Boolean);
+      const parts = snap.participants || [];
+      const isFamily = parts.includes('__family__');
+      const memberIds = parts.filter(p=>p!=='__family__');
       // Exactly one participant (and not "entire family") carries over;
       // multiple participants or "entire family" -> Task left unassigned
       // ("Anyone"), per confirmed interim behavior.
@@ -2246,13 +2274,13 @@ function switchEventType(newType, oldType, evId, dateTs){
     src.participants_all_family = false;
   } else {
     if (oldType === 'task') {
-      const mid = document.getElementById('ef-mem')?.value || '';
+      const mid = f['ef-mem'] || '';
       src.participants = mid ? [mid] : [];
       src.participants_all_family = false;
     } else {
-      const partBtns = Array.from(document.querySelectorAll('#ef-parts button[data-sel="true"]'));
-      src.participants_all_family = partBtns.some(b=>b.dataset.mid==='__family__');
-      src.participants = partBtns.filter(b=>b.dataset.mid!=='__family__').map(b=>b.dataset.mid).filter(Boolean);
+      const parts = snap.participants || [];
+      src.participants_all_family = parts.includes('__family__');
+      src.participants = parts.filter(p=>p!=='__family__');
     }
     src.member_id = null;
   }
@@ -2262,10 +2290,10 @@ function switchEventType(newType, oldType, evId, dateTs){
   // occurrence entirely (handled at save time via A._detachSeriesOnSave,
   // matching the app's existing single-occurrence-edit behavior).
   if (isFullSeriesEdit) {
-    src.recurrence = document.getElementById('ef-rec')?.value || 'None';
-    src.recurrence_end_type = document.getElementById('ef-recend-type')?.value || 'count';
-    src.recurrence_end_count = parseInt(document.getElementById('ef-recend-n')?.value) || null;
-    src.recurrence_end_date = document.getElementById('ef-recend-d')?.value || null;
+    src.recurrence = f['ef-rec'] || 'None';
+    src.recurrence_end_type = f['ef-recend-type'] || 'count';
+    src.recurrence_end_count = parseInt(f['ef-recend-n']) || null;
+    src.recurrence_end_date = f['ef-recend-d'] || null;
   } else {
     src.recurrence = 'None';
     src.recurrence_end_type = null;
@@ -2275,6 +2303,7 @@ function switchEventType(newType, oldType, evId, dateTs){
   A._detachSeriesOnSave = isSingleOccurrenceOfSeries;
 
   A._pendingTypeSwitchSource = src;
+  delete A._typeSwitchSnapshot;
   _closeModalDOM();
   openEvForm(newType, evId||null, dateTs);
 }
