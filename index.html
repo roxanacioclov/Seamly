@@ -179,7 +179,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div class="auth-card">
     <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">Seamly</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v18.4 — 28 Jul 2026</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v18.5 — 28 Jul 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -230,7 +230,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v18.4</span>
+      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v18.5</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sample-btn" onclick="A.family?toggleSampleMode():goTo('settings')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:var(--honey-light);color:var(--honey);border:1px solid var(--honey)44;cursor:pointer;display:none">📋 Sample</button>
@@ -270,7 +270,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v18.4</span>
+      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v18.5</span>
     </div>
     <button class="nav-btn" data-page="home" onclick="goTo('home')">
       <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0">
@@ -789,7 +789,24 @@ async function cleanupOldMealsGroups(){
 async function initApp(user){
   A.user=user;
   document.getElementById('loading-screen').style.display='none';
-  try{await loadAll();}catch(e){console.error('Load error',e);}
+  // v18 fix: only fully refetch all app data on the TRUE first load of this
+  // session. initApp() can silently re-run in the background whenever
+  // Supabase's client recovers from a flaky connection (a "SIGNED_IN" event
+  // quietly re-fires — see the A._draftChecksDone note further down, which
+  // already worked around a related symptom of this same re-fire). If
+  // loadAll() ran again at that point, its fetch could resolve AFTER a local
+  // change (a save, an edit, a delete) had already correctly updated the
+  // screen — and blindly overwrite it with a stale snapshot taken before
+  // that change existed. This was the root cause of events appearing to
+  // "vanish" after a slow save/delete and then reappearing on their own.
+  // Every create/edit/delete in the app already keeps A.events (and
+  // everything else) in sync locally as it happens, so there's no need to
+  // re-fetch everything from scratch on these silent reconnects — only on
+  // the genuine first load. A._appInitialized is the same flag already used
+  // just below for this exact distinction.
+  if (!A._appInitialized) {
+    try{await loadAll();}catch(e){console.error('Load error',e);}
+  }
 
   // Seed Medical group if family exists and group doesn't yet
   if(A.family && !A.noteGroups.find(g=>g.name==='🏥 Medical Reference')){
@@ -1707,12 +1724,6 @@ function openEvForm(type, evId, dateTs, duplicateId) {
     return;
   }
   const ev = evId ? A.events.find(e=>e.id===evId) : null;
-  // v18 Pass E: don't open an edit form on an event that's still saving in
-  // the background (optimistic UI) — its real ID might not exist yet or is
-  // about to be swapped in. Internal reloads (type switch etc.) are exempt,
-  // same reasoning as the limit check above — they're not a fresh "open to
-  // edit" action initiated by the user right now.
-  if (ev?._pending && !_isInternalReload) { toast('Still saving — one moment…'); return; }
   const dupEv = duplicateId ? A.events.find(e=>e.id===duplicateId) : null;
   // If health override set (from type switcher), use it
   const healthOverride = (type === 'health' && A._healthOverride) ? A._healthOverride : null;
@@ -1887,7 +1898,7 @@ function openEvForm(type, evId, dateTs, duplicateId) {
     if (hType === 'Appointment') {
       fields = `
         <div class="form-row"><label class="lbl">Health Event Type</label>
-          <select class="sel" id="ef-apt" onchange="reloadHealthForm(this.value,'${evId||''}',${dateTs||'null'})">
+          <select class="sel" id="ef-apt" onchange="confirmHealthSubTypeSwitch(this.value,'${hType}','${evId||''}',${dateTs||'null'})">
             ${['Appointment','Treatment','Illness'].map(t=>`<option${hType===t?' selected':''}>${t}</option>`).join('')}
           </select></div>
         <div class="form-row"><label class="lbl">Participants</label>${partButtons()}</div>
@@ -1921,7 +1932,7 @@ function openEvForm(type, evId, dateTs, duplicateId) {
     } else if (hType === 'Treatment') {
       fields = `
         <div class="form-row"><label class="lbl">Health Event Type</label>
-          <select class="sel" id="ef-apt" onchange="reloadHealthForm(this.value,'${evId||''}',${dateTs||'null'})">
+          <select class="sel" id="ef-apt" onchange="confirmHealthSubTypeSwitch(this.value,'${hType}','${evId||''}',${dateTs||'null'})">
             ${['Appointment','Treatment','Illness'].map(t=>`<option${hType===t?' selected':''}>${t}</option>`).join('')}
           </select></div>
         <div class="form-row"><label class="lbl">Participants</label>${partButtons()}</div>
@@ -1944,7 +1955,7 @@ function openEvForm(type, evId, dateTs, duplicateId) {
     } else { // Illness
       fields = `
         <div class="form-row"><label class="lbl">Health Event Type</label>
-          <select class="sel" id="ef-apt" onchange="reloadHealthForm(this.value,'${evId||''}',${dateTs||'null'})">
+          <select class="sel" id="ef-apt" onchange="confirmHealthSubTypeSwitch(this.value,'${hType}','${evId||''}',${dateTs||'null'})">
             ${['Appointment','Treatment','Illness'].map(t=>`<option${hType===t?' selected':''}>${t}</option>`).join('')}
           </select></div>
         <div class="form-row"><label class="lbl">Participants</label>${partButtons()}</div>
@@ -2140,8 +2151,25 @@ function reloadHealthForm(newType, evId, dateTs) {
   const title = document.getElementById('ef-title')?.value || '';
   const loc = document.getElementById('ef-loc')?.value || '';
   const desc = document.getElementById('ef-desc')?.value || '';
+  // v18 fix: Participants, Tags, Actions, and Attachments are common to
+  // every Health sub-type (Appointment/Treatment/Illness all render them) —
+  // but were never captured here, only title/location/description/dates.
+  // That meant switching sub-type silently lost them, since the fallback
+  // (the underlying `ev`, if any) doesn't reflect a not-yet-saved switch.
+  const partBtns = Array.from(document.querySelectorAll('#ef-parts button[data-sel="true"]'));
+  const participants_all_family = partBtns.some(b=>b.dataset.mid==='__family__');
+  const participants = partBtns.filter(b=>b.dataset.mid!=='__family__').map(b=>b.dataset.mid).filter(Boolean);
+  const tags = Array.from(document.querySelectorAll('#ef-tags button[data-sel="true"]')).map(b=>b.dataset.tag).filter(Boolean);
   A._pendingHealthData = { title, location: loc, description: desc,
+    participants, participants_all_family, tags,
     _curDate: curDate, _curEndDate: curEndDate, _curSTime: curSTime, _curETime: curETime };
+  // Only include actions/links if the CURRENT sub-type actually renders them
+  // (only Appointment does) — omitting the key entirely when it doesn't,
+  // rather than setting it to undefined, so the merge in openEvFormHealth()
+  // falls through to the underlying event's real saved value instead of
+  // clobbering it with undefined.
+  if (document.getElementById('ef-actions')) A._pendingHealthData.actions = getChecklist('ef-actions');
+  if (document.getElementById('ef-links')) A._pendingHealthData.links = getLinks();
   openEvFormHealth(newType, evId, dateTs);
 }
 window.reloadHealthForm = reloadHealthForm;
@@ -2157,6 +2185,130 @@ function openEvFormHealth(apptType, evId, dateTs) {
   delete A._healthOverride;
 }
 window.openEvFormHealth = openEvFormHealth;
+
+// ── HEALTH SUB-TYPE SWITCH CONFIRMATION (v18 fix) ─────────────────────────────
+// Appointment / Treatment / Illness have genuinely different fields (Doctor/
+// Specialty/Cost only on Appointment; Administration/Recommended By/
+// Considerations only on Treatment; Symptoms/Cure only on Illness) — so
+// switching between them can silently clear real data, the same problem the
+// top-level Task/Social/Health switcher already solves. This mirrors that
+// same pattern one level down. (Social's own sub-type — event category —
+// doesn't need this: every Social sub-type renders identical fields, so
+// nothing is ever lost switching between them.)
+function confirmHealthSubTypeSwitch(newSubType, oldSubType, evId, dateTs){
+  if(!newSubType || newSubType===oldSubType) return;
+  // Capture the full form NOW, before the confirmation modal (if shown)
+  // replaces this form's DOM — same reasoning as the top-level switcher's
+  // v18.2 fix. Both Cancel and the actual switch read from this snapshot.
+  const snapshot = _captureEvFormFields();
+  A._healthSubTypeSwitchSnapshot = snapshot;
+
+  // Skip the confirmation entirely for a genuinely blank, brand-new event —
+  // nothing to lose, so just switch. Same reasoning as the top-level switcher.
+  if (!evId) {
+    const f = snapshot.fields || {};
+    const textFieldsBlank = ['ef-title','ef-loc','ef-desc',
+      'ef-doctor','ef-specialty','ef-cost','ef-symptoms','ef-cure',
+      'ef-recby','ef-considerations'].every(id => !(f[id]??'').toString().trim());
+    const isFormBlank = textFieldsBlank
+      && !(snapshot.participants||[]).length
+      && !(snapshot.tags||[]).length
+      && !(snapshot.actions||[]).length
+      && !(snapshot.links||[]).length;
+    if (isFormBlank) { _confirmedHealthSubTypeSwitch(newSubType, evId, dateTs); return; }
+  }
+
+  // Only mention fields actually filled in that are exclusive to the
+  // sub-type being switched away from — same short, specific wording style
+  // as the top-level switcher.
+  const f = snapshot.fields || {};
+  const filledLabels = [];
+  if (oldSubType === 'Appointment') {
+    if ((f['ef-doctor']??'').toString().trim()) filledLabels.push('Doctor');
+    if ((f['ef-specialty']??'').toString().trim()) filledLabels.push('Specialty');
+    if ((f['ef-cost']??'').toString().trim()) filledLabels.push('Cost');
+  } else if (oldSubType === 'Treatment') {
+    if ((f['ef-recby']??'').toString().trim()) filledLabels.push('Recommended By');
+    if ((f['ef-considerations']??'').toString().trim()) filledLabels.push('Considerations');
+    // Administration rows are a dynamic row-list (like Actions/Attachments),
+    // not a simple field in the snapshot — check the live DOM directly,
+    // right now, before it's replaced.
+    if (document.getElementById('ef-admin') && getAdminRows('ef-admin').length) {
+      filledLabels.push('Administration/Dosage');
+    }
+  } else if (oldSubType === 'Illness') {
+    if ((f['ef-symptoms']??'').toString().trim()) filledLabels.push('Symptoms');
+    if ((f['ef-cure']??'').toString().trim()) filledLabels.push('Cure/Treatment');
+  }
+
+  const bodyText = filledLabels.length
+    ? `Switch to <b>${newSubType}</b>? This will clear: <b>${filledLabels.join(', ')}</b>.`
+    : `Switch this event to <b>${newSubType}</b>? Your entered details will carry over.`;
+
+  // Register a cancel handler so closing this modal ANY way (✕, tap-outside,
+  // back button) returns to the form instead of losing it — same fix as the
+  // top-level switcher.
+  A._modalCancelHandler = () => cancelHealthSubTypeSwitch(oldSubType, evId, dateTs);
+
+  showModal('Change Health Sub-Type', `
+    <div style="text-align:center;padding:6px 0 4px">
+      <div style="font-size:13px;color:${T.ink};line-height:1.5">${bodyText}</div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn btn-secondary btn-full" onclick="cancelHealthSubTypeSwitch('${oldSubType}','${evId||''}',${dateTs||'null'})">Cancel</button>
+        <button class="btn btn-primary btn-full" onclick="_confirmedHealthSubTypeSwitch('${newSubType}','${evId||''}',${dateTs||'null'})">Change Type</button>
+      </div>
+    </div>`);
+}
+window.confirmHealthSubTypeSwitch = confirmHealthSubTypeSwitch;
+
+// Cancel: reopen the SAME sub-type, restoring the exact snapshot captured
+// above via the existing draft-restore field-application mechanism.
+function cancelHealthSubTypeSwitch(oldSubType, evId, dateTs){
+  A._modalCancelHandler = null;
+  const snap = A._healthSubTypeSwitchSnapshot;
+  delete A._healthSubTypeSwitchSnapshot;
+  _closeModalDOM();
+  A._evDraftType = 'health';
+  if (snap) {
+    A._evDraftRestore = snap;
+    A._suppressDraftRestoreToast = true;
+  }
+  openEvFormHealth(oldSubType, evId||null, dateTs);
+}
+window.cancelHealthSubTypeSwitch = cancelHealthSubTypeSwitch;
+
+// Confirm: build the pending-override object from the ALREADY-captured
+// snapshot (not live DOM — by the time this runs, the confirmation modal
+// has already replaced the form, same lesson as the top-level switcher).
+function _confirmedHealthSubTypeSwitch(newSubType, evId, dateTs){
+  A._modalCancelHandler = null;
+  const snap = A._healthSubTypeSwitchSnapshot || { fields:{}, participants:[], tags:[], actions:[], links:[] };
+  delete A._healthSubTypeSwitchSnapshot;
+  const f = snap.fields || {};
+  const isFamily = (snap.participants||[]).includes('__family__');
+  const memberIds = (snap.participants||[]).filter(p=>p!=='__family__');
+  A._pendingHealthData = {
+    title: f['ef-title'] || '',
+    location: f['ef-loc'] || '',
+    description: f['ef-desc'] || '',
+    participants: memberIds,
+    participants_all_family: isFamily,
+    tags: snap.tags || [],
+    _curDate: f['ef-date'] || '',
+    _curEndDate: f['ef-enddate'] || '',
+    _curSTime: f['ef-stime'] || '',
+    _curETime: f['ef-etime'] || '',
+  };
+  // Only include actions/links if something was actually captured — omit
+  // the key entirely otherwise (rather than an empty array) so a later
+  // merge against a real saved event's data doesn't clobber it. See the
+  // matching note in reloadHealthForm().
+  if (snap.actions && snap.actions.length) A._pendingHealthData.actions = snap.actions;
+  if (snap.links && snap.links.length) A._pendingHealthData.links = snap.links;
+  _closeModalDOM();
+  openEvFormHealth(newSubType, evId||null, dateTs);
+}
+window._confirmedHealthSubTypeSwitch = _confirmedHealthSubTypeSwitch;
 
 function openEvFormWithType(type, evId, dateTs, forceApptType) {
   openEvFormHealth(forceApptType, evId, dateTs);
@@ -2218,6 +2370,30 @@ function confirmTypeSwitch(newType, oldType, evId, dateTs){
   // switchEventType() was reading document.getElementById(...) for fields
   // that had already been removed from the page by the time it ran.)
   A._typeSwitchSnapshot = _captureEvFormFields();
+
+  // v18 fix: if this is a brand-new (never-saved) event and truly nothing
+  // has been entered anywhere in the form yet, there's no "migration"
+  // happening at all — the user is just picking a different starting point
+  // before they've begun. Skip the confirmation entirely and switch right
+  // away. (Only applies to unsaved events — evId existing means a title was
+  // already required to save it originally, and there's real saved state
+  // like recurrence/series membership worth still confirming about.)
+  if (!evId) {
+    const f = A._typeSwitchSnapshot.fields || {};
+    const snap = A._typeSwitchSnapshot;
+    const textFieldsBlank = ['ef-title','ef-loc','ef-desc','ef-social-type',
+      'ef-doctor','ef-specialty','ef-cost','ef-symptoms','ef-cure',
+      'ef-recby','ef-considerations'].every(id => !(f[id]??'').toString().trim());
+    const isFormBlank = textFieldsBlank
+      && !(snap.participants||[]).length
+      && !(snap.tags||[]).length
+      && !(snap.actions||[]).length
+      && !(snap.links||[]).length;
+    if (isFormBlank) {
+      switchEventType(newType, oldType, evId, dateTs);
+      return;
+    }
+  }
 
   const existingEv = evId ? A.events.find(e=>e.id===evId) : null;
   const isFullSeriesEdit = !!A._editSeriesMode;
@@ -2575,16 +2751,13 @@ window.addTag = addTag;
 // Wraps any Supabase operation with timeout + one automatic retry
 // Fixes silent failures caused by stale HTTP/2 connections
 async function sbWrite(operation) {
-  // v18 Pass E (Part 1): was 7000ms. Now keeps listening to the SAME
-  // in-flight request up to 25s total before giving up on it and attempting
-  // one fresh-client retry. Previously abandoned the original request at 7s
-  // and immediately fired a second one — which (a) discarded whatever the
-  // first request eventually returned, wasted, and (b) on a slow-but-working
-  // connection, needlessly risked a duplicate insert from two requests both
-  // eventually succeeding. This is the shared reliability fix every save in
-  // the app benefits from immediately (events, notes, meds, shopping, meal
-  // plan) — Part 2 below layers optimistic UI on top of it for saveEv() only.
-  const TIMEOUT_MS = 25000;
+  // v18 revert: back to 7000ms, per Roxana's testing feedback — the 25s
+  // change (from the now-reverted Pass E) meant waiting a long time on every
+  // slow save before even getting a retry, which felt worse in practice than
+  // the faster-to-retry original. Worth investigating separately why saves
+  // were slow enough to hit this at all — that's a more useful fix than the
+  // timeout number itself.
+  const TIMEOUT_MS = 7000;
   const withTimeout = (fn) => Promise.race([
     fn(),
     new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS))
@@ -2631,15 +2804,6 @@ window.localDT = localDT;
 
 async function saveEv(type, evId, dateTs) {
   if (!A.family) { toast('Set up your family first.', true); return; }
-  // v18 Pass E: don't act on an event that's still saving in the background
-  // from a previous optimistic save (shouldn't normally be reachable, since
-  // the pending-guards on edit/duplicate/delete/complete already stop the
-  // user from getting back into this form for a pending event — but this is
-  // a cheap, harmless extra safety net).
-  if (evId) {
-    const _existForPending = A.events.find(e => e.id === evId);
-    if (_existForPending?._pending) { toast('Still saving — one moment…'); return; }
-  }
   const _saveBtn = document.querySelector('.modal-body button.btn-primary');
   if (_saveBtn) {
     _saveBtn.disabled = true;
@@ -2647,10 +2811,7 @@ async function saveEv(type, evId, dateTs) {
     _saveBtn.textContent = 'Saving…';
     _saveBtn.style.opacity = '0.7';
   }
-  // v18 Pass E: no more showSavingToast()/hideSavingToast() here — the whole
-  // point of optimistic UI is the screen updates instantly, so there's
-  // nothing left for a "saving…" spinner to cover. (Still used elsewhere in
-  // the app for saves that remain wait-then-refresh this sprint.)
+  showSavingToast();
   let _saveOk = false;
   // For series editing (Change IV):
   const editSeriesId = A._editSeriesMode || null;
@@ -2918,181 +3079,131 @@ async function saveEv(type, evId, dateTs) {
     const cleanedData = cleanData(data);
     const cleanedRecurrences = eventsToSave.map(cleanData);
 
-    // Small shared helper: sync any new tags to family.tags, same as before —
-    // used by both the edit and create background paths below.
-    const _syncFamilyTags = () => {
-      if (data.tags?.length && A.family) {
-        const existingTags = A.family.tags || [];
-        const newTags = data.tags.filter(t => !existingTags.includes(t));
-        if (newTags.length) {
-          const merged = [...new Set([...existingTags, ...newTags])];
-          sb.from('families').update({tags:merged}).eq('id',A.family.id).select().single()
-            .then(({data:fd})=>{ if(fd) A.family=fd; });
+    let savedFirst = null;
+    if (evId) {
+      const {family_id:_, ...updateData} = cleanedData;
+      const res = await sbWrite(() => sb.from('events').update(updateData).eq('id', evId).select().single());
+      if (res.error) {
+        console.error('Update error', res.error);
+        toast('Error saving: ' + (res.error.message||'unknown'), true);
+        return;
+      }
+      A.events = A.events.map(e => e.id===evId ? res.data : e);
+      savedFirst = res.data;
+
+      // v14: "Edit full recurrence" — extended to apply EVERY edited field to
+      // every sibling occurrence (not just a fixed subset), including
+      // all_day, time-of-day, and a calendar-date shift. Date/end_date differ
+      // per sibling (each keeps its own day unless the whole series is being
+      // shifted), so this is a per-row update rather than one blanket UPDATE.
+      if (editSeriesId) {
+        const siblings = A.events.filter(e => e.series_id === editSeriesId && e.id !== evId);
+        if (siblings.length) {
+          // Everything except identity/date fields applies identically to
+          // every occurrence. Date/end_date get their own per-occurrence
+          // handling below (day-delta + time-of-day), so they're excluded here.
+          const EXCLUDE_FROM_SHARED = new Set(['family_id','date','end_date','series_id','created_by_user_id','id']);
+          const sharedUpdate = {};
+          Object.keys(cleanedData).forEach(k => { if (!EXCLUDE_FROM_SHARED.has(k)) sharedUpdate[k] = cleanedData[k]; });
+
+          // Calendar-day delta between the edited occurrence's ORIGINAL date
+          // (captured at the top of this function, before the user's edits)
+          // and its NEW date — applied to every sibling so the whole series
+          // shifts together while preserving relative spacing. A pure
+          // time-of-day change (no date change) produces a delta of 0, so
+          // siblings keep their own day and only pick up the new time.
+          const origDateOnly = _origEvForDelta ? new Date(_origEvForDelta.date) : new Date(cleanedData.date);
+          origDateOnly.setHours(0,0,0,0);
+          const newDateOnly = new Date(cleanedData.date);
+          newDateOnly.setHours(0,0,0,0);
+          const dayDeltaMs = newDateOnly - origDateOnly;
+          const newDateObj = new Date(cleanedData.date);
+          const newEndDateObj = cleanedData.end_date ? new Date(cleanedData.end_date) : null;
+
+          const siblingUpdates = siblings.map(sib => {
+            const shiftedDate = new Date(new Date(sib.date).getTime() + dayDeltaMs);
+            if (cleanedData.all_day) shiftedDate.setHours(12,0,0,0);
+            else shiftedDate.setHours(newDateObj.getHours(), newDateObj.getMinutes(), 0, 0);
+            let shiftedEndDateIso = null;
+            if (sib.end_date) {
+              const shiftedEnd = new Date(new Date(sib.end_date).getTime() + dayDeltaMs);
+              if (cleanedData.all_day) shiftedEnd.setHours(12,0,0,0);
+              else if (newEndDateObj) shiftedEnd.setHours(newEndDateObj.getHours(), newEndDateObj.getMinutes(), 0, 0);
+              shiftedEndDateIso = shiftedEnd.toISOString();
+            }
+            return { id: sib.id, payload: { ...sharedUpdate, date: shiftedDate.toISOString(), end_date: shiftedEndDateIso } };
+          });
+
+          // v10 (UX hardening) carried forward: sbWrite() + explicit error
+          // handling on every sibling write — the primary event above already
+          // saved successfully, so a failure here warns rather than blocks.
+          const results = await Promise.all(siblingUpdates.map(u =>
+            sbWrite(() => sb.from('events').update(u.payload).eq('id', u.id).select().single())
+          ));
+          const failed = results.filter(r => r.error);
+          if (failed.length) {
+            toast(`Entry saved, but ${failed.length} of ${siblings.length} other occurrence${siblings.length!==1?'s':''} failed to update — please try again.`, true);
+            console.error('Series sibling update errors', failed.map(f => f.error));
+          }
+          const succeeded = results.filter(r => !r.error && r.data);
+          if (succeeded.length) {
+            const byId = {};
+            succeeded.forEach(r => { byId[r.data.id] = r.data; });
+            A.events = A.events.map(e => byId[e.id] ? byId[e.id] : e);
+            A._seriesUpdateMsg = `Series updated! ✅ (${succeeded.length + 1} occurrence${succeeded.length+1!==1?'s':''})`;
+          }
         }
       }
-    };
-
-    // v18 Pass E: OPTIMISTIC UI. Everything below applies the change to the
-    // screen FIRST — before the server has confirmed anything — then sends
-    // the real write to Supabase in the background. How long that
-    // background write takes no longer matters to the user; it only
-    // matters in the rare case it genuinely fails, at which point the
-    // optimistic change is quietly undone and the user is told clearly.
-    _saveOk = true; // form validation passed; from here on we're committing
-    clearEvDraft(); // event confirmed (locally) — discard the localStorage draft
-    _closeModalDOM();
-
-    if (evId) {
-      // ---- EDITING AN EXISTING EVENT ----
-      const origEvSnapshot = A.events.find(e => e.id === evId);
-      const { family_id:_, ...updateData } = cleanedData;
-      const optimisticEv = { ...origEvSnapshot, ...updateData };
-      A.events = A.events.map(e => e.id === evId ? optimisticEv : e);
-      toast(evId && editSeriesId ? 'Series updated! ✅' : 'Entry updated! ✅');
-      renderCal();
-      renderHome();
-
-      // Background: the real update, plus (if editing the full series) the
-      // sibling-occurrence updates — same logic as before, just moved to run
-      // after the primary save rather than the user waiting on any of it.
-      (async () => {
-        try {
-          const res = await sbWrite(() => sb.from('events').update(updateData).eq('id', evId).select().single());
-          if (res.error || !res.data) {
-            console.error('Update error', res.error);
-            // Roll back to the original values and tell the user clearly.
-            A.events = A.events.map(e => e.id === evId ? origEvSnapshot : e);
-            renderCal(); renderHome();
-            toast(`Your update to '${optimisticEv.title||ET[type]?.label||'this event'}' couldn't be saved — please try again.`, true);
-            return;
-          }
-          // Quietly replace with the server-confirmed version (covers any
-          // server-side defaults/normalization) — no visible change in the
-          // normal case, since it should match what's already on screen.
-          A.events = A.events.map(e => e.id === evId ? res.data : e);
-          _syncFamilyTags();
-          // Notification now fires here — only once the save has actually
-          // succeeded, so family members are never notified about a change
-          // that didn't really save.
-          if (!data.is_private) {
-            const _notifTitle = data.title || ET[type]?.label || '';
-            writeNotif('event', 'updated', `${getActorName()} updated an event`, _notifTitle);
-          }
-
-          // v14: "Edit full recurrence" — extended to apply EVERY edited
-          // field to every sibling occurrence (not just a fixed subset),
-          // including all_day, time-of-day, and a calendar-date shift.
-          // Date/end_date differ per sibling (each keeps its own day unless
-          // the whole series is being shifted), so this is a per-row update.
-          // This part is NOT optimistic — sibling rows only update locally
-          // once their own write is confirmed, same as before Pass E.
-          if (editSeriesId) {
-            const siblings = A.events.filter(e => e.series_id === editSeriesId && e.id !== evId);
-            if (siblings.length) {
-              const EXCLUDE_FROM_SHARED = new Set(['family_id','date','end_date','series_id','created_by_user_id','id']);
-              const sharedUpdate = {};
-              Object.keys(cleanedData).forEach(k => { if (!EXCLUDE_FROM_SHARED.has(k)) sharedUpdate[k] = cleanedData[k]; });
-
-              const origDateOnly = _origEvForDelta ? new Date(_origEvForDelta.date) : new Date(cleanedData.date);
-              origDateOnly.setHours(0,0,0,0);
-              const newDateOnly = new Date(cleanedData.date);
-              newDateOnly.setHours(0,0,0,0);
-              const dayDeltaMs = newDateOnly - origDateOnly;
-              const newDateObj = new Date(cleanedData.date);
-              const newEndDateObj = cleanedData.end_date ? new Date(cleanedData.end_date) : null;
-
-              const siblingUpdates = siblings.map(sib => {
-                const shiftedDate = new Date(new Date(sib.date).getTime() + dayDeltaMs);
-                if (cleanedData.all_day) shiftedDate.setHours(12,0,0,0);
-                else shiftedDate.setHours(newDateObj.getHours(), newDateObj.getMinutes(), 0, 0);
-                let shiftedEndDateIso = null;
-                if (sib.end_date) {
-                  const shiftedEnd = new Date(new Date(sib.end_date).getTime() + dayDeltaMs);
-                  if (cleanedData.all_day) shiftedEnd.setHours(12,0,0,0);
-                  else if (newEndDateObj) shiftedEnd.setHours(newEndDateObj.getHours(), newEndDateObj.getMinutes(), 0, 0);
-                  shiftedEndDateIso = shiftedEnd.toISOString();
-                }
-                return { id: sib.id, payload: { ...sharedUpdate, date: shiftedDate.toISOString(), end_date: shiftedEndDateIso } };
-              });
-
-              const results = await Promise.all(siblingUpdates.map(u =>
-                sbWrite(() => sb.from('events').update(u.payload).eq('id', u.id).select().single())
-              ));
-              const failed = results.filter(r => r.error);
-              if (failed.length) {
-                toast(`Entry saved, but ${failed.length} of ${siblings.length} other occurrence${siblings.length!==1?'s':''} failed to update — please try again.`, true);
-                console.error('Series sibling update errors', failed.map(f => f.error));
-              }
-              const succeeded = results.filter(r => !r.error && r.data);
-              if (succeeded.length) {
-                const byId = {};
-                succeeded.forEach(r => { byId[r.data.id] = r.data; });
-                A.events = A.events.map(e => byId[e.id] ? byId[e.id] : e);
-                renderCal(); renderHome();
-              }
-            }
-          }
-        } catch (bgErr) {
-          console.error('saveEv background update error', bgErr);
-          A.events = A.events.map(e => e.id === evId ? origEvSnapshot : e);
-          renderCal(); renderHome();
-          toast(`Your update to '${optimisticEv.title||ET[type]?.label||'this event'}' couldn't be saved — please try again.`, true);
-        }
-      })();
-
     } else {
-      // ---- CREATING A NEW EVENT (including a recurring series) ----
-      // New events don't have a real database ID yet, so each occurrence
-      // gets a temporary local ID and a `_pending: true` marker until the
-      // real insert confirms. See the pending-guards on edit/duplicate/
-      // delete/complete elsewhere in the app, which check this flag.
-      const _tempId = () => 'temp_' + ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2)));
-      const tempIds = eventsToSave.map(_tempId);
-      const optimisticEvents = eventsToSave.map((ev, i) => ({ ...ev, id: tempIds[i], _pending: true }));
-      A.events.push(...optimisticEvents);
-      toast(`Entry added!${eventsToSave.length>1?' ('+eventsToSave.length+' occurrences created)':''}`);
-      renderCal();
-      renderHome();
-
-      (async () => {
-        try {
-          const res = await sbWrite(() => sb.from('events').insert(cleanedRecurrences).select());
-          if (res.error || !res.data || res.data.length === 0) {
-            console.error('Insert error', res.error);
-            const tempIdSet = new Set(tempIds);
-            A.events = A.events.filter(e => !tempIdSet.has(e.id));
-            renderCal(); renderHome();
-            toast("Your new entry couldn't be saved — please try again.", true);
-            return;
-          }
-          // Match each returned real row back to its temporary placeholder
-          // by array order, since generateRecurrences() builds them in a
-          // fixed sequence — then swap the temp ID/_pending flag out for the
-          // real server record. This is what makes future edits/deletes/
-          // completions work correctly against the real ID.
-          const byTempId = {};
-          res.data.forEach((real, i) => { byTempId[tempIds[i]] = real; });
-          A.events = A.events.map(e => byTempId[e.id] ? byTempId[e.id] : e);
-          _syncFamilyTags();
-          if (!data.is_private) {
-            const _notifTitle = data.title || ET[type]?.label || '';
-            writeNotif('event', 'created', `${getActorName()} added a new event`, _notifTitle);
-          }
-          renderCal();
-          renderHome();
-        } catch (bgErr) {
-          console.error('saveEv background insert error', bgErr);
-          const tempIdSet = new Set(tempIds);
-          A.events = A.events.filter(e => !tempIdSet.has(e.id));
-          renderCal(); renderHome();
-          toast("Your new entry couldn't be saved — please try again.", true);
-        }
-      })();
+      const res = await sbWrite(() => sb.from('events').insert(cleanedRecurrences).select());
+      if (res.error) {
+        console.error('Insert error', res.error);
+        toast('Error: ' + (res.error.message||'unknown error'), true);
+        return;
+      }
+      if (!res.data || res.data.length === 0) {
+        console.error('Insert blocked silently — RLS or missing columns. Payload:', cleanedRecurrences[0]);
+        toast('Save failed — please check you are signed in and try again.', true);
+        return;
+      }
+      A.events.push(...res.data); savedFirst = res.data[0];
     }
+
+    // Sync any new tags to family.tags so they appear in Settings
+    if (data.tags?.length && A.family) {
+      const existingTags = A.family.tags || [];
+      const newTags = data.tags.filter(t => !existingTags.includes(t));
+      if (newTags.length) {
+        const merged = [...new Set([...existingTags, ...newTags])];
+        sb.from('families').update({tags:merged}).eq('id',A.family.id).select().single()
+          .then(({data:fd})=>{ if(fd) A.family=fd; });
+      }
+    }
+    _saveOk = true;
+    clearEvDraft(); // v13: event saved successfully — discard the localStorage draft
+    _closeModalDOM();
+    // v8: write activity notification so other family members are informed.
+    // v14: private events must never generate a visible notification to other
+    // family members — the notification trigger previously ignored is_private
+    // entirely, even though Home/Calendar already hid private events from
+    // everyone but the creator. The creator's own toast confirmation below is
+    // unaffected either way — this only gates the cross-family notification.
+    if (!data.is_private) {
+      const _notifTitle = data.title || ET[type]?.label || '';
+      writeNotif('event', evId ? 'updated' : 'created',
+        evId ? `${getActorName()} updated an event` : `${getActorName()} added a new event`,
+        _notifTitle
+      );
+    }
+    const _seriesMsg = A._seriesUpdateMsg; delete A._seriesUpdateMsg;
+    toast(_seriesMsg || (evId ? 'Entry updated! ✅' : `Entry added!${eventsToSave.length>1?' ('+eventsToSave.length+' occurrences created)':''}`));
+    renderCal();
+    renderHome();
   } catch(e) {
     console.error('saveEv error', e);
     toast('Something went wrong — please try again.', true);
   } finally {
+    hideSavingToast();
     if (!_saveOk && _saveBtn) {
       _saveBtn.disabled = false;
       _saveBtn.textContent = _saveBtn.dataset.origText || (evId ? 'Save Changes' : 'Add Entry');
@@ -3306,10 +3417,6 @@ window.restoreEvDraft=restoreEvDraft;
 function duplicateEv(id) {
   const ev = A.events.find(e=>e.id===id);
   if (!ev) return;
-  // v18 Pass E: an event still saving in the background (optimistic UI —
-  // see saveEv()) doesn't have a confirmed real ID yet. Acting on it now
-  // could act on an ID that's about to change or might not exist.
-  if (ev._pending) { toast('Still saving — one moment…'); return; }
   closeModal();
   openEvForm(ev.type, null, null, id);
 }
@@ -3464,10 +3571,16 @@ function viewEv(id) {
 
   if (ev.description) body += `<div style="background:${T.parchment};border-radius:9px;padding:9px 11px;font-size:13px;line-height:1.5;margin-bottom:10px">${ev.description}</div>`;
   if (ev.tags?.length) body += `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">${ev.tags.map(t=>`<span class="chip" style="background:${T.parchment};color:${T.muted}">${t}</span>`).join('')}</div>`;
-  if (ev.attachment_urls?.length) {
+  // v18 fix: this was reading from `ev.attachment_urls`, a field nothing in
+  // the app has ever written to — saveEv() has always saved attachment data
+  // to `ev.links` (as {label, url} objects via getLinks()). This means
+  // attachments have likely never displayed here, for any event type, even
+  // before this sprint — the data was always saved correctly, it just never
+  // rendered. Pre-existing bug, unrelated to anything built this sprint.
+  if (ev.links?.length) {
     body += `<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:${T.muted};margin-bottom:5px">ATTACHMENTS</div>`;
-    ev.attachment_urls.forEach(url => {
-      body += `<a href="${url}" target="_blank" style="display:flex;align-items:center;gap:7px;font-size:13px;color:${T.sky};margin-bottom:4px;text-decoration:none">📎 ${url.split('/').pop()}</a>`;
+    ev.links.forEach(link => {
+      body += `<a href="${link.url}" target="_blank" style="display:flex;align-items:center;gap:7px;font-size:13px;color:${T.sky};margin-bottom:4px;text-decoration:none">📎 ${link.label || link.url}</a>`;
     });
     body += '</div>';
   }
@@ -3506,9 +3619,6 @@ window.viewEv = viewEv;
 function delEv(id) {
   const ev = A.events.find(e=>e.id===id);
   if (!ev) return;
-  // v18 Pass E: don't let a still-saving (optimistic, not yet confirmed)
-  // event be deleted — its real ID might not exist yet or is about to change.
-  if (ev._pending) { toast('Still saving — one moment…'); return; }
   // If this event is part of a recurring series, offer options
   if(ev.series_id){
     const seriesCount=A.events.filter(e=>e.series_id===ev.series_id).length;
@@ -6873,9 +6983,6 @@ async function toggleEvAction(evId, actionIdx, done) {
   if (isSampleMode()) return;
   const ev = A.events.find(e => e.id === evId);
   if (!ev) return;
-  // v18 Pass E: don't act on an event that's still saving in the background
-  // (optimistic UI) — its real ID might not exist yet or is about to change.
-  if (ev._pending) { toast('Still saving — one moment…'); return; }
   const actions = (ev.actions || []).map((a, i) => i === actionIdx ? {...a, done} : a);
   const allDone = actions.length > 0 && actions.every(a => a.done);
   const completedAt = allDone ? new Date().toISOString() : null;
@@ -6911,8 +7018,6 @@ async function markEvComplete(evId) {
   if (isSampleMode()) return;
   const ev = A.events.find(e => e.id === evId);
   if (!ev) return;
-  // v18 Pass E: don't act on an event that's still saving in the background.
-  if (ev._pending) { toast('Still saving — one moment…'); return; }
   const completedAt = ev.completed_at ? null : new Date().toISOString();
   // v14: wrapped in sbWrite() — this was the only save-type function in the app
   // calling Supabase directly, which meant it had no timeout/retry safety net
