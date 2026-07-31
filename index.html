@@ -1,4 +1,4 @@
-<!-- Seamly v16.1 | PROD | 16 Jul 2026 -->
+<!-- Seamly v18 | PROD | 28 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -82,6 +82,15 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
 .tbl th{padding:8px 7px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;text-align:left;border-bottom:1px solid var(--border);background:var(--parchment);white-space:nowrap}
 .tbl td{padding:8px 7px;font-size:13px;color:var(--ink);border-bottom:1px solid var(--border);vertical-align:middle}
 .tbl tr:nth-child(even) td{background:#faf8f466}
+/* v17: sticky (frozen) table headers — applies to both the Meds table (two
+   stacked header rows: group labels + column labels) and the Meal Planner
+   table (single header row) since both share the .tbl class. The second
+   header row needs its own offset so it lands directly under the first
+   instead of overlapping it. Offset is an estimate based on current header
+   padding/font-size — verify visually on staging and adjust if header text
+   height ever changes (e.g. a future font-size tweak). */
+.tbl thead tr:first-child th{position:sticky;top:0;z-index:3}
+.tbl thead tr:nth-child(2) th{position:sticky;top:33px;z-index:2}
 .note-card{border-radius:13px;padding:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.05);transition:transform .15s;overflow:hidden;word-break:break-word}
 .note-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .note-card:active{transform:scale(.97)}
@@ -170,7 +179,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div class="auth-card">
     <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">Seamly</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v15 — Jul 2026</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v18.5 — 28 Jul 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -221,6 +230,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
+      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v18.5</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sample-btn" onclick="A.family?toggleSampleMode():goTo('settings')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:var(--honey-light);color:var(--honey);border:1px solid var(--honey)44;cursor:pointer;display:none">📋 Sample</button>
@@ -260,6 +270,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
+      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v18.5</span>
     </div>
     <button class="nav-btn" data-page="home" onclick="goTo('home')">
       <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0">
@@ -484,6 +495,33 @@ let A={
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 const fmt=d=>{if(!d)return'';const x=new Date(d);const _mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return`${String(x.getDate()).padStart(2,'0')}/${_mn[x.getMonth()]}/${x.getFullYear()}`;};
+
+// v18: shared "Last edited" formatter — used by Events (this pass), and future
+// Notes/Shopping Lists/Meal Planner passes (v19/v20), so the wording and date
+// math live in exactly one place.
+// - timestamp: ISO string or null. Returns '' if null (caller renders nothing).
+// - name: the editor's display name (may be null/blank — omitted if so).
+// - scope: 'occurrence' | 'series' | null/undefined (plain "Last edited...").
+function formatLastEdited(timestamp, name, scope){
+  if(!timestamp) return '';
+  const then=new Date(timestamp);
+  const diffMs=Date.now()-then.getTime();
+  const diffMin=Math.floor(diffMs/60000);
+  let whenStr;
+  if(diffMs<0||diffMin<1) whenStr='just now';
+  else if(diffMin<60) whenStr=`${diffMin} minute${diffMin!==1?'s':''} ago`;
+  else if(diffMin<24*60){
+    const h=Math.floor(diffMin/60);
+    whenStr=`${h} hour${h!==1?'s':''} ago`;
+  } else {
+    whenStr=fmt(timestamp);
+  }
+  const prefix=scope==='occurrence'?'This occurrence last edited'
+    :scope==='series'?'Full recurrence last edited'
+    :'Last edited';
+  return `${prefix} ${whenStr}${name?' by '+name:''}`;
+}
+window.formatLastEdited=formatLastEdited;
 const toISO=d=>d?new Date(d).toISOString().split('T')[0]:'';
 const todayD=()=>{const d=new Date();d.setHours(0,0,0,0);return d;};
 const addDays=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r;};
@@ -658,7 +696,7 @@ async function doSignOut(){
 
 // ── DATA LOADING ──────────────────────────────────────────────────────────────
 async function loadAll(){
-  const[fam,mems,evts,ngrps,nts,dm,ip,sl,mp]=await Promise.all([
+  const[fam,mems,evts,ngrps,nts,dm,ip,sl,mp,famSub,planLim]=await Promise.all([
     sb.from('families').select('*').maybeSingle(),
     sb.from('family_members').select('*').order('created_at'),
     sb.from('events').select('*').order('date'),
@@ -676,6 +714,13 @@ async function loadAll(){
     // was added via ALTER TABLE on 19 Jun 2026 as an immediate hotfix, but
     // updated_at is the semantically correct sort field here anyway.
     sb.from('meal_plans').select('*').order('updated_at', {ascending: false}).limit(1),
+    // v18 Pass D: subscription plan + global limits, needed for the event
+    // limit block-modal check in openEvForm(). Read-only per RLS — see
+    // seamly_schema_v18_28_07_PassA.sql. .maybeSingle() relies on RLS to
+    // scope family_subscription to just this user's own family row, same
+    // pattern as the 'families' fetch above.
+    sb.from('family_subscription').select('*').maybeSingle(),
+    sb.from('plan_limits').select('*'),
   ]);
   if(fam.data){A.family=fam.data;}
   A.members=mems.data||[];
@@ -687,6 +732,13 @@ async function loadAll(){
   A.shoppingLists=sl.data||[];
   // mp.data is now an array (from .limit(1)); take the first element or null.
   A.mealPlan=(mp.data&&mp.data.length>0)?mp.data[0]:null;
+  // v18 Pass D: null-safe — if either fetch fails (network hiccup, RLS not
+  // yet migrated on an older environment, etc.), fall through to "don't
+  // block" rather than accidentally locking a family out of creating
+  // events. See _isAtEventLimit().
+  A.subscription = famSub.data || null;
+  A.planLimits = {};
+  (planLim.data||[]).forEach(p => { A.planLimits[p.plan_name] = p; });
 }
 
 
@@ -737,7 +789,24 @@ async function cleanupOldMealsGroups(){
 async function initApp(user){
   A.user=user;
   document.getElementById('loading-screen').style.display='none';
-  try{await loadAll();}catch(e){console.error('Load error',e);}
+  // v18 fix: only fully refetch all app data on the TRUE first load of this
+  // session. initApp() can silently re-run in the background whenever
+  // Supabase's client recovers from a flaky connection (a "SIGNED_IN" event
+  // quietly re-fires — see the A._draftChecksDone note further down, which
+  // already worked around a related symptom of this same re-fire). If
+  // loadAll() ran again at that point, its fetch could resolve AFTER a local
+  // change (a save, an edit, a delete) had already correctly updated the
+  // screen — and blindly overwrite it with a stale snapshot taken before
+  // that change existed. This was the root cause of events appearing to
+  // "vanish" after a slow save/delete and then reappearing on their own.
+  // Every create/edit/delete in the app already keeps A.events (and
+  // everything else) in sync locally as it happens, so there's no need to
+  // re-fetch everything from scratch on these silent reconnects — only on
+  // the genuine first load. A._appInitialized is the same flag already used
+  // just below for this exact distinction.
+  if (!A._appInitialized) {
+    try{await loadAll();}catch(e){console.error('Load error',e);}
+  }
 
   // Seed Medical group if family exists and group doesn't yet
   if(A.family && !A.noteGroups.find(g=>g.name==='🏥 Medical Reference')){
@@ -835,10 +904,20 @@ async function initApp(user){
   if(A.showOB)renderOB();
   // v13: check for an unfinished event form draft saved before a page reload
   // Delay 1.5s so the home page renders first before showing the banner
-  setTimeout(checkAndOfferEvDraft,1500);
   // v14: same check for Notebook and Meal Planner drafts
-  setTimeout(checkAndOfferNoteDraft,1500);
-  setTimeout(checkAndOfferMealDraft,1500);
+  // v17 fix: only run these checks once per actual app session, not on every
+  // re-run of initApp() — the Supabase auth listener can silently re-fire a
+  // SIGNED_IN event in the background (e.g. connection retry after the phone
+  // locks/unlocks), which was re-triggering these same three checks over and
+  // over and re-showing banners that were already dismissed. Reuses the same
+  // guard pattern as A._appInitialized just above. Also run sequentially
+  // (see _runDraftChecksSequentially below) so at most one restore banner is
+  // ever visible on screen at once, instead of multiple overlapping banners
+  // rendering on top of each other.
+  if(!A._draftChecksDone){
+    A._draftChecksDone=true;
+    setTimeout(()=>_runDraftChecksSequentially([checkAndOfferEvDraft,checkAndOfferNoteDraft,checkAndOfferMealDraft]),1500);
+  }
 }
 
 // v14: global background-flush safety net for in-progress Notebook and Meal
@@ -892,8 +971,38 @@ function showModal(title,body){
 }
 // DOM-only close — safe to call before running another function
 function _closeModalDOM(){
+  // v18 Pass D fix: if a "cancel" handler was registered for the currently
+  // open modal (e.g. the Event Type Switcher's confirmation dialog), run
+  // that instead of just blank-closing. Without this, closing a
+  // confirmation modal via the ✕ button, tap-outside, or the back button
+  // would silently discard whatever it was confirming/cancelling on top of
+  // — for the type switcher specifically, that meant the entire event form
+  // disappeared with no way back, since the confirmation modal had already
+  // replaced it. Registered per-use (see confirmTypeSwitch()) and always
+  // cleared as soon as it's consumed, so it never lingers onto an unrelated
+  // later modal.
+  if (A._modalCancelHandler) {
+    const handler = A._modalCancelHandler;
+    A._modalCancelHandler = null;
+    handler();
+    return;
+  }
   // v13: cancel any pending auto-save timers so they don't fire into a closed modal
-  if(A._evDraftInterval){clearInterval(A._evDraftInterval);A._evDraftInterval=null;}
+  // v17 fix: a deliberate close (✕, tap-outside, back button) previously only
+  // stopped these timers — it never cleared the localStorage draft itself, so
+  // the draft sat there and got offered again on the next restore check even
+  // though the user had clearly chosen not to keep it. This only affects
+  // deliberate closes; it has no effect on the crash/reload/backgrounding
+  // scenario the draft system exists to protect, since that scenario never
+  // calls this function at all.
+  if(A._evDraftInterval){
+    clearInterval(A._evDraftInterval);
+    A._evDraftInterval=null;
+    clearEvDraft();
+  }
+  if(document.getElementById('ne-editor')){
+    clearNoteDraftLS();
+  }
   clearTimeout(A._noteAutoSaveTimer);
   A._noteAutoSaveTimer=null;
   document.getElementById('modal-root').innerHTML='';
@@ -1573,13 +1682,58 @@ function getLastWellness(memberId) {
   return logs[0] || null;
 }
 
+// ── SUBSCRIPTION FOUNDATION (v18 Pass D) ───────────────────────────────────────
+// Counts one recurring series (however many occurrence rows it generated) as a
+// single event, per the confirmed usage-counting rule.
+function _familyEventCount(){
+  const seen = new Set();
+  A.events.forEach(e => seen.add(e.series_id || e.id));
+  return seen.size;
+}
+// true only for a 'free'-plan family already at (or over) its event limit.
+// early_adopter/premium always return false (unlimited). Defensive: if the
+// subscription/limits data never loaded, this returns false rather than
+// ever locking someone out of creating events by accident.
+function _isAtEventLimit(){
+  const planName = A.subscription?.plan_name || 'free';
+  if (planName !== 'free') return false;
+  const max = A.planLimits?.free?.max_events;
+  if (max == null) return false;
+  return _familyEventCount() >= max;
+}
+
 // ── OPEN EVENT FORM ───────────────────────────────────────────────────────────
 function openEvForm(type, evId, dateTs, duplicateId) {
+  // v18 Pass D: Subscription block-modal check. Only gates a genuinely NEW
+  // event action (creating fresh, or duplicating an existing one — both
+  // grow the count) — never an edit of an existing event, and never an
+  // internal re-render mid-edit (type switch, health sub-type switch, or a
+  // draft restore), since those aren't creating anything new.
+  const _isInternalReload = !!(A._pendingTypeSwitchSource || A._healthOverride || A._evDraftRestore);
+  if (!evId && !_isInternalReload && _isAtEventLimit()) {
+    showModal('Event limit reached', `
+      <div style="text-align:center;padding:6px 0 4px">
+        <div style="font-size:13px;color:${T.ink};line-height:1.5">
+          You've reached your Events limit on the Free plan. Delete an existing event to add a new one, or upgrade for unlimited events.
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button class="btn btn-secondary btn-full" onclick="_closeModalDOM()">Manage existing</button>
+          <button class="btn btn-full" disabled style="background:#e5e0d5;color:#a89f8f;cursor:not-allowed;opacity:0.7">Upgrade — Coming soon</button>
+        </div>
+      </div>`);
+    return;
+  }
   const ev = evId ? A.events.find(e=>e.id===evId) : null;
   const dupEv = duplicateId ? A.events.find(e=>e.id===duplicateId) : null;
   // If health override set (from type switcher), use it
   const healthOverride = (type === 'health' && A._healthOverride) ? A._healthOverride : null;
-  const source = healthOverride || dupEv || ev; // source for pre-filling fields
+  // v18 (Event Type Switcher): if a cross-type switch was just confirmed,
+  // this holds the converted common-field values (title, date, participants,
+  // tags, description, actions, links, etc.) built from whatever was on
+  // screen before the switch — takes priority over the DB row or duplicate
+  // source, since it reflects the user's just-confirmed, possibly-unsaved edits.
+  const typeSwitchSource = A._pendingTypeSwitchSource || null;
+  const source = typeSwitchSource || healthOverride || dupEv || ev; // source for pre-filling fields
   const cfg = ET[type];
 
   // DATE/TIME DEFAULTS
@@ -1744,7 +1898,7 @@ function openEvForm(type, evId, dateTs, duplicateId) {
     if (hType === 'Appointment') {
       fields = `
         <div class="form-row"><label class="lbl">Health Event Type</label>
-          <select class="sel" id="ef-apt" onchange="reloadHealthForm(this.value,'${evId||''}',${dateTs||'null'})">
+          <select class="sel" id="ef-apt" onchange="confirmHealthSubTypeSwitch(this.value,'${hType}','${evId||''}',${dateTs||'null'})">
             ${['Appointment','Treatment','Illness'].map(t=>`<option${hType===t?' selected':''}>${t}</option>`).join('')}
           </select></div>
         <div class="form-row"><label class="lbl">Participants</label>${partButtons()}</div>
@@ -1778,7 +1932,7 @@ function openEvForm(type, evId, dateTs, duplicateId) {
     } else if (hType === 'Treatment') {
       fields = `
         <div class="form-row"><label class="lbl">Health Event Type</label>
-          <select class="sel" id="ef-apt" onchange="reloadHealthForm(this.value,'${evId||''}',${dateTs||'null'})">
+          <select class="sel" id="ef-apt" onchange="confirmHealthSubTypeSwitch(this.value,'${hType}','${evId||''}',${dateTs||'null'})">
             ${['Appointment','Treatment','Illness'].map(t=>`<option${hType===t?' selected':''}>${t}</option>`).join('')}
           </select></div>
         <div class="form-row"><label class="lbl">Participants</label>${partButtons()}</div>
@@ -1801,7 +1955,7 @@ function openEvForm(type, evId, dateTs, duplicateId) {
     } else { // Illness
       fields = `
         <div class="form-row"><label class="lbl">Health Event Type</label>
-          <select class="sel" id="ef-apt" onchange="reloadHealthForm(this.value,'${evId||''}',${dateTs||'null'})">
+          <select class="sel" id="ef-apt" onchange="confirmHealthSubTypeSwitch(this.value,'${hType}','${evId||''}',${dateTs||'null'})">
             ${['Appointment','Treatment','Illness'].map(t=>`<option${hType===t?' selected':''}>${t}</option>`).join('')}
           </select></div>
         <div class="form-row"><label class="lbl">Participants</label>${partButtons()}</div>
@@ -1824,6 +1978,8 @@ function openEvForm(type, evId, dateTs, duplicateId) {
         <select class="sel" id="ef-mem"><option value="">Anyone</option>${A.members.map(m=>`<option value="${m.id}"${source?.member_id===m.id?' selected':''}>${m.name}</option>`).join('')}</select></div>
       <div class="form-row"><label class="lbl">Title</label>
         <div style="position:relative"><input class="inp" id="ef-title" value="${source?.title||''}" placeholder="Add a title…"></div></div>
+      <div class="form-row"><label class="lbl">Location</label>
+        <div style="position:relative"><input class="inp" id="ef-loc" value="${source?.location||''}" placeholder="Where?"></div></div>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:10px;cursor:pointer">
         <input type="checkbox" id="ef-allday" ${isAllDay?'checked':''} onchange="toggleAllDay(this.checked)"> All day (no specific time)
       </label>
@@ -1839,7 +1995,24 @@ function openEvForm(type, evId, dateTs, duplicateId) {
         <button type="button" onclick="addChecklistRow('ef-actions')" style="font-size:12px;color:${T.sage};background:none;border:1px dashed ${T.sageMid};border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:600;margin-top:4px">+ Add item</button>
       </div>
       <div class="form-row"><label class="lbl">Tags</label>${tagButtons()}</div>
-      <div class="form-row"><label class="lbl">Description</label><textarea class="inp" id="ef-desc" rows="2" placeholder="Any notes…" style="resize:none">${source?.description||''}</textarea></div>`;
+      <div class="form-row"><label class="lbl">Description</label><textarea class="inp" id="ef-desc" rows="2" placeholder="Any notes…" style="resize:none">${source?.description||''}</textarea></div>
+      ${attachmentField()}`;
+  }
+
+  // v18 (Event Type Switcher): a dropdown to switch this event between
+  // Task / Social Event / Health Event, available both for brand-new
+  // (unsaved) events and existing (saved) ones being edited. Wellness is
+  // deliberately excluded — it's a per-day per-member log, not a general
+  // switchable event type. Placed at the very top of the form.
+  if (type === 'task' || type === 'social' || type === 'health') {
+    const typeSwitcherHtml = `
+      <div class="form-row"><label class="lbl">Event Type</label>
+        <select class="sel" id="ef-type-switch" onchange="confirmTypeSwitch(this.value,'${type}','${evId||''}',${dateTs||'null'})">
+          <option value="task"${type==='task'?' selected':''}>Task</option>
+          <option value="social"${type==='social'?' selected':''}>Social Event</option>
+          <option value="health"${type==='health'?' selected':''}>Health Event</option>
+        </select></div>`;
+    fields = typeSwitcherHtml + fields;
   }
 
   const isDup = !!duplicateId;
@@ -1864,11 +2037,19 @@ function openEvForm(type, evId, dateTs, duplicateId) {
 
   // Clear any pending health reload data
   delete A._pendingHealthData;
+  // v18: clear the pending type-switch source now that it's been consumed
+  delete A._pendingTypeSwitchSource;
 
   // Post-render setup
   setTimeout(() => {
     // v13: track event type and start periodic draft saving every 5 seconds
     A._evDraftType = type;
+    // v18 (Draft Safety Fix C1): also track which existing event (if any) is
+    // being edited, so a draft saved from this form knows to restore back
+    // into THIS event rather than always opening a blank new-event form.
+    // null for a genuinely new event or a duplicate (both correctly treated
+    // as "new" on restore).
+    A._evDraftEditingId = evId || null;
     clearInterval(A._evDraftInterval);
     A._evDraftInterval = setInterval(saveEvDraft, 5000);
     // v13: if a draft was queued by restoreEvDraft(), populate the form fields now.
@@ -1914,7 +2095,12 @@ function openEvForm(type, evId, dateTs, duplicateId) {
         if(rEl){rEl.value=_dr.fields['ef-recend-type'];updateRecurrenceEndType(rEl.value);}
       }
       if(_dr.fields?.['ef-rec']&&_dr.fields['ef-rec']!=='None') updateRecurrenceEnd(_dr.fields['ef-rec']);
-      toast('Draft restored ✓');
+      // v18: type-switch Cancel reuses this exact restore mechanism to put
+      // the original form back exactly as it was — but that's not really a
+      // "draft restored" event from the user's point of view, so it sets
+      // this flag to suppress the toast just for that one case.
+      if (A._suppressDraftRestoreToast) { delete A._suppressDraftRestoreToast; }
+      else { toast('Draft restored ✓'); }
     }
     // Autocomplete
     if (document.getElementById('ef-title')) buildAutocomplete('ef-title', type, 'title');
@@ -1965,8 +2151,25 @@ function reloadHealthForm(newType, evId, dateTs) {
   const title = document.getElementById('ef-title')?.value || '';
   const loc = document.getElementById('ef-loc')?.value || '';
   const desc = document.getElementById('ef-desc')?.value || '';
+  // v18 fix: Participants, Tags, Actions, and Attachments are common to
+  // every Health sub-type (Appointment/Treatment/Illness all render them) —
+  // but were never captured here, only title/location/description/dates.
+  // That meant switching sub-type silently lost them, since the fallback
+  // (the underlying `ev`, if any) doesn't reflect a not-yet-saved switch.
+  const partBtns = Array.from(document.querySelectorAll('#ef-parts button[data-sel="true"]'));
+  const participants_all_family = partBtns.some(b=>b.dataset.mid==='__family__');
+  const participants = partBtns.filter(b=>b.dataset.mid!=='__family__').map(b=>b.dataset.mid).filter(Boolean);
+  const tags = Array.from(document.querySelectorAll('#ef-tags button[data-sel="true"]')).map(b=>b.dataset.tag).filter(Boolean);
   A._pendingHealthData = { title, location: loc, description: desc,
+    participants, participants_all_family, tags,
     _curDate: curDate, _curEndDate: curEndDate, _curSTime: curSTime, _curETime: curETime };
+  // Only include actions/links if the CURRENT sub-type actually renders them
+  // (only Appointment does) — omitting the key entirely when it doesn't,
+  // rather than setting it to undefined, so the merge in openEvFormHealth()
+  // falls through to the underlying event's real saved value instead of
+  // clobbering it with undefined.
+  if (document.getElementById('ef-actions')) A._pendingHealthData.actions = getChecklist('ef-actions');
+  if (document.getElementById('ef-links')) A._pendingHealthData.links = getLinks();
   openEvFormHealth(newType, evId, dateTs);
 }
 window.reloadHealthForm = reloadHealthForm;
@@ -1983,10 +2186,403 @@ function openEvFormHealth(apptType, evId, dateTs) {
 }
 window.openEvFormHealth = openEvFormHealth;
 
+// ── HEALTH SUB-TYPE SWITCH CONFIRMATION (v18 fix) ─────────────────────────────
+// Appointment / Treatment / Illness have genuinely different fields (Doctor/
+// Specialty/Cost only on Appointment; Administration/Recommended By/
+// Considerations only on Treatment; Symptoms/Cure only on Illness) — so
+// switching between them can silently clear real data, the same problem the
+// top-level Task/Social/Health switcher already solves. This mirrors that
+// same pattern one level down. (Social's own sub-type — event category —
+// doesn't need this: every Social sub-type renders identical fields, so
+// nothing is ever lost switching between them.)
+function confirmHealthSubTypeSwitch(newSubType, oldSubType, evId, dateTs){
+  if(!newSubType || newSubType===oldSubType) return;
+  // Capture the full form NOW, before the confirmation modal (if shown)
+  // replaces this form's DOM — same reasoning as the top-level switcher's
+  // v18.2 fix. Both Cancel and the actual switch read from this snapshot.
+  const snapshot = _captureEvFormFields();
+  A._healthSubTypeSwitchSnapshot = snapshot;
+
+  // Skip the confirmation entirely for a genuinely blank, brand-new event —
+  // nothing to lose, so just switch. Same reasoning as the top-level switcher.
+  if (!evId) {
+    const f = snapshot.fields || {};
+    const textFieldsBlank = ['ef-title','ef-loc','ef-desc',
+      'ef-doctor','ef-specialty','ef-cost','ef-symptoms','ef-cure',
+      'ef-recby','ef-considerations'].every(id => !(f[id]??'').toString().trim());
+    const isFormBlank = textFieldsBlank
+      && !(snapshot.participants||[]).length
+      && !(snapshot.tags||[]).length
+      && !(snapshot.actions||[]).length
+      && !(snapshot.links||[]).length;
+    if (isFormBlank) { _confirmedHealthSubTypeSwitch(newSubType, evId, dateTs); return; }
+  }
+
+  // Only mention fields actually filled in that are exclusive to the
+  // sub-type being switched away from — same short, specific wording style
+  // as the top-level switcher.
+  const f = snapshot.fields || {};
+  const filledLabels = [];
+  if (oldSubType === 'Appointment') {
+    if ((f['ef-doctor']??'').toString().trim()) filledLabels.push('Doctor');
+    if ((f['ef-specialty']??'').toString().trim()) filledLabels.push('Specialty');
+    if ((f['ef-cost']??'').toString().trim()) filledLabels.push('Cost');
+  } else if (oldSubType === 'Treatment') {
+    if ((f['ef-recby']??'').toString().trim()) filledLabels.push('Recommended By');
+    if ((f['ef-considerations']??'').toString().trim()) filledLabels.push('Considerations');
+    // Administration rows are a dynamic row-list (like Actions/Attachments),
+    // not a simple field in the snapshot — check the live DOM directly,
+    // right now, before it's replaced.
+    if (document.getElementById('ef-admin') && getAdminRows('ef-admin').length) {
+      filledLabels.push('Administration/Dosage');
+    }
+  } else if (oldSubType === 'Illness') {
+    if ((f['ef-symptoms']??'').toString().trim()) filledLabels.push('Symptoms');
+    if ((f['ef-cure']??'').toString().trim()) filledLabels.push('Cure/Treatment');
+  }
+
+  const bodyText = filledLabels.length
+    ? `Switch to <b>${newSubType}</b>? This will clear: <b>${filledLabels.join(', ')}</b>.`
+    : `Switch this event to <b>${newSubType}</b>? Your entered details will carry over.`;
+
+  // Register a cancel handler so closing this modal ANY way (✕, tap-outside,
+  // back button) returns to the form instead of losing it — same fix as the
+  // top-level switcher.
+  A._modalCancelHandler = () => cancelHealthSubTypeSwitch(oldSubType, evId, dateTs);
+
+  showModal('Change Health Sub-Type', `
+    <div style="text-align:center;padding:6px 0 4px">
+      <div style="font-size:13px;color:${T.ink};line-height:1.5">${bodyText}</div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn btn-secondary btn-full" onclick="cancelHealthSubTypeSwitch('${oldSubType}','${evId||''}',${dateTs||'null'})">Cancel</button>
+        <button class="btn btn-primary btn-full" onclick="_confirmedHealthSubTypeSwitch('${newSubType}','${evId||''}',${dateTs||'null'})">Change Type</button>
+      </div>
+    </div>`);
+}
+window.confirmHealthSubTypeSwitch = confirmHealthSubTypeSwitch;
+
+// Cancel: reopen the SAME sub-type, restoring the exact snapshot captured
+// above via the existing draft-restore field-application mechanism.
+function cancelHealthSubTypeSwitch(oldSubType, evId, dateTs){
+  A._modalCancelHandler = null;
+  const snap = A._healthSubTypeSwitchSnapshot;
+  delete A._healthSubTypeSwitchSnapshot;
+  _closeModalDOM();
+  A._evDraftType = 'health';
+  if (snap) {
+    A._evDraftRestore = snap;
+    A._suppressDraftRestoreToast = true;
+  }
+  openEvFormHealth(oldSubType, evId||null, dateTs);
+}
+window.cancelHealthSubTypeSwitch = cancelHealthSubTypeSwitch;
+
+// Confirm: build the pending-override object from the ALREADY-captured
+// snapshot (not live DOM — by the time this runs, the confirmation modal
+// has already replaced the form, same lesson as the top-level switcher).
+function _confirmedHealthSubTypeSwitch(newSubType, evId, dateTs){
+  A._modalCancelHandler = null;
+  const snap = A._healthSubTypeSwitchSnapshot || { fields:{}, participants:[], tags:[], actions:[], links:[] };
+  delete A._healthSubTypeSwitchSnapshot;
+  const f = snap.fields || {};
+  const isFamily = (snap.participants||[]).includes('__family__');
+  const memberIds = (snap.participants||[]).filter(p=>p!=='__family__');
+  A._pendingHealthData = {
+    title: f['ef-title'] || '',
+    location: f['ef-loc'] || '',
+    description: f['ef-desc'] || '',
+    participants: memberIds,
+    participants_all_family: isFamily,
+    tags: snap.tags || [],
+    _curDate: f['ef-date'] || '',
+    _curEndDate: f['ef-enddate'] || '',
+    _curSTime: f['ef-stime'] || '',
+    _curETime: f['ef-etime'] || '',
+  };
+  // Only include actions/links if something was actually captured — omit
+  // the key entirely otherwise (rather than an empty array) so a later
+  // merge against a real saved event's data doesn't clobber it. See the
+  // matching note in reloadHealthForm().
+  if (snap.actions && snap.actions.length) A._pendingHealthData.actions = snap.actions;
+  if (snap.links && snap.links.length) A._pendingHealthData.links = snap.links;
+  _closeModalDOM();
+  openEvFormHealth(newSubType, evId||null, dateTs);
+}
+window._confirmedHealthSubTypeSwitch = _confirmedHealthSubTypeSwitch;
+
 function openEvFormWithType(type, evId, dateTs, forceApptType) {
   openEvFormHealth(forceApptType, evId, dateTs);
 }
 window.openEvFormWithType = openEvFormWithType;
+
+// ── EVENT TYPE SWITCHER (v18) ─────────────────────────────────────────────────
+// Lets a user change an event's type (Task / Social / Health) directly from
+// the create/edit popup, instead of discarding it and starting over. Same
+// database row/id is kept — this is an UPDATE, not delete+recreate.
+
+// Captures every currently-rendered form field, in the same shape as the
+// localStorage draft system ({fields, participants, tags}). Used so that
+// cancelling a type switch can restore the exact in-progress form the user
+// had, untouched, with the dropdown reverted to the original type. Kept as
+// its own small function (rather than reusing saveEvDraft()'s internals) to
+// keep this feature self-contained and avoid touching that function again
+// this sprint.
+function _captureEvFormFields(){
+  const fieldIds=[
+    'ef-title','ef-date','ef-enddate','ef-allday',
+    'ef-loc','ef-social-type','ef-desc','ef-mem','ef-rec',
+    'ef-recend-type','ef-recend-n','ef-recend-d',
+    'ef-wt','ef-ht','ef-hyd','ef-ex','ef-act','ef-actm','ef-mood','ef-en','ef-sl','ef-wcomment',
+    'ef-apt','ef-doctor','ef-specialty','ef-cost','ef-cost-cur',
+    'ef-symptoms','ef-cure','ef-recby','ef-considerations','ef-private'
+  ];
+  const fields={};
+  fieldIds.forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    fields[id]=el.type==='checkbox'?el.checked:el.value;
+  });
+  const stimeVal=getTimeVal('ef-stime');
+  if(stimeVal) fields['ef-stime']=stimeVal;
+  const etimeVal=getTimeVal('ef-etime');
+  if(etimeVal) fields['ef-etime']=etimeVal;
+  const participants=Array.from(document.querySelectorAll('#ef-parts button[data-sel="true"]')).map(b=>b.dataset.mid).filter(Boolean);
+  const tags=Array.from(document.querySelectorAll('#ef-tags button[data-sel="true"]')).map(b=>b.dataset.tag).filter(Boolean);
+  // v18.2 fix: also capture Actions/checklist and Attachments live, right
+  // now, while the form's DOM still exists. This matters because the Type
+  // Switcher's confirmation modal replaces this form's entire DOM before
+  // either Cancel or Confirm is clicked — anything not captured here is
+  // gone by the time those handlers run.
+  const actions = document.getElementById('ef-actions') ? getChecklist('ef-actions') : [];
+  const links = document.getElementById('ef-links') ? getLinks() : [];
+  return { fields, participants, tags, actions, links };
+}
+
+// Fired by the "Event Type" dropdown's onchange. Shows the confirmation
+// modal before anything actually changes.
+function confirmTypeSwitch(newType, oldType, evId, dateTs){
+  if(!newType || newType===oldType) return;
+  // v18.2 fix: capture the FULL current form state — once, right now,
+  // before showModal() below replaces this form's DOM. Both Cancel and
+  // Confirm read from this same snapshot afterward; neither can safely read
+  // live DOM anymore once the confirmation modal is showing. (This was the
+  // root cause of the "fields get cleared" bug reported after Pass C —
+  // switchEventType() was reading document.getElementById(...) for fields
+  // that had already been removed from the page by the time it ran.)
+  A._typeSwitchSnapshot = _captureEvFormFields();
+
+  // v18 fix: if this is a brand-new (never-saved) event and truly nothing
+  // has been entered anywhere in the form yet, there's no "migration"
+  // happening at all — the user is just picking a different starting point
+  // before they've begun. Skip the confirmation entirely and switch right
+  // away. (Only applies to unsaved events — evId existing means a title was
+  // already required to save it originally, and there's real saved state
+  // like recurrence/series membership worth still confirming about.)
+  if (!evId) {
+    const f = A._typeSwitchSnapshot.fields || {};
+    const snap = A._typeSwitchSnapshot;
+    const textFieldsBlank = ['ef-title','ef-loc','ef-desc','ef-social-type',
+      'ef-doctor','ef-specialty','ef-cost','ef-symptoms','ef-cure',
+      'ef-recby','ef-considerations'].every(id => !(f[id]??'').toString().trim());
+    const isFormBlank = textFieldsBlank
+      && !(snap.participants||[]).length
+      && !(snap.tags||[]).length
+      && !(snap.actions||[]).length
+      && !(snap.links||[]).length;
+    if (isFormBlank) {
+      switchEventType(newType, oldType, evId, dateTs);
+      return;
+    }
+  }
+
+  const existingEv = evId ? A.events.find(e=>e.id===evId) : null;
+  const isFullSeriesEdit = !!A._editSeriesMode;
+  const isSingleOccurrenceOfSeries = !!(existingEv && existingEv.series_id && !isFullSeriesEdit);
+
+  const oldLabel = ET[oldType]?.label || oldType;
+  const newLabel = ET[newType]?.label || newType;
+  let extraLine = '';
+  if (isFullSeriesEdit) {
+    extraLine = `<div style="font-size:12px;color:${T.muted};margin-top:8px">This will change the entire recurring series.</div>`;
+  } else if (isSingleOccurrenceOfSeries) {
+    extraLine = `<div style="font-size:12px;color:${T.muted};margin-top:8px">This occurrence will be detached from its series.</div>`;
+  }
+
+  // Pass D fix: v18.2's wording was still too long, and always listed every
+  // "kept" field even when nothing was ever going to be lost. Now: check
+  // which fields exclusive to the OLD type actually have something entered
+  // in them (per the captured snapshot), and only mention THOSE, by name.
+  // If nothing filled-in would actually be lost — which includes every
+  // switch away from Task, since Task has no type-exclusive fields at all —
+  // skip the warning entirely and just confirm the switch.
+  const EXCLUSIVE_FIELD_LABELS = {
+    social: { 'ef-social-type': 'Event Category' },
+    health: {
+      'ef-doctor':'Doctor','ef-specialty':'Specialty','ef-cost':'Cost',
+      'ef-symptoms':'Symptoms','ef-cure':'Cure/Treatment',
+      'ef-recby':'Recommended By','ef-considerations':'Considerations'
+    },
+  };
+  const fieldMap = EXCLUSIVE_FIELD_LABELS[oldType] || {};
+  const snapFields = A._typeSwitchSnapshot.fields || {};
+  const filledLabels = Object.keys(fieldMap)
+    .filter(id => (snapFields[id] ?? '').toString().trim())
+    .map(id => fieldMap[id]);
+
+  const bodyText = filledLabels.length
+    ? `Switch to <b>${newLabel}</b>? This will clear: <b>${filledLabels.join(', ')}</b>.`
+    : `Switch this event to <b>${newLabel}</b>? Your entered details will carry over.`;
+
+  // Pass D fix: register a cancel handler so closing this modal ANY way
+  // (✕, tap-outside, back button) — not just the explicit Cancel button —
+  // returns to the original form instead of losing the event entirely.
+  // See _closeModalDOM() for the dispatch logic.
+  A._modalCancelHandler = () => cancelTypeSwitch(oldType, evId, dateTs);
+
+  showModal('Change Event Type', `
+    <div style="text-align:center;padding:6px 0 4px">
+      <div style="font-size:13px;color:${T.ink};line-height:1.5">
+        ${bodyText}
+      </div>
+      ${extraLine}
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn btn-secondary btn-full" onclick="cancelTypeSwitch('${oldType}','${evId||''}',${dateTs||'null'})">Cancel</button>
+        <button class="btn btn-primary btn-full" onclick="switchEventType('${newType}','${oldType}','${evId||''}',${dateTs||'null'})">Change Type</button>
+      </div>
+    </div>`);
+}
+window.confirmTypeSwitch = confirmTypeSwitch;
+
+// Cancel: reopen the same type, restoring the exact snapshot captured above
+// (reusing the existing draft-restore field-application mechanism inside
+// openEvForm(), with its toast suppressed for this case).
+function cancelTypeSwitch(oldType, evId, dateTs){
+  // Pass D fix: clear the cancel handler FIRST, unconditionally — this
+  // function can now be reached two ways (the explicit Cancel button, or
+  // _closeModalDOM()'s dispatch on ✕/tap-outside/back), and either way the
+  // handler must not linger and fire again on some later, unrelated modal.
+  A._modalCancelHandler = null;
+  const snap = A._typeSwitchSnapshot;
+  delete A._typeSwitchSnapshot;
+  _closeModalDOM();
+  A._evDraftType = oldType;
+  if (snap) {
+    A._evDraftRestore = snap;
+    A._suppressDraftRestoreToast = true;
+  }
+  openEvForm(oldType, evId||null, dateTs);
+}
+window.cancelTypeSwitch = cancelTypeSwitch;
+
+// Confirm: build a converted "pseudo-source" object holding the common
+// fields (per spec §3.1–§3.4), mapped from the snapshot captured in
+// confirmTypeSwitch() (NOT live DOM — see the fix note there), then reload
+// the form as the new type using that as its prefill source.
+function switchEventType(newType, oldType, evId, dateTs){
+  // Pass D fix: clear the cancel handler — Confirm is closing this modal
+  // for real, not cancelling, so nothing should fire on the next
+  // unrelated modal's close.
+  A._modalCancelHandler = null;
+  if(!newType || newType===oldType){ _closeModalDOM(); return; }
+  const existingEv = evId ? A.events.find(e=>e.id===evId) : null;
+  const isFullSeriesEdit = !!A._editSeriesMode;
+  const isSingleOccurrenceOfSeries = !!(existingEv && existingEv.series_id && !isFullSeriesEdit);
+
+  const snap = A._typeSwitchSnapshot || { fields:{}, participants:[], tags:[], actions:[], links:[] };
+  const f = snap.fields || {};
+
+  const src = {};
+
+  // Title (§3.1 — always mapped)
+  src.title = f['ef-title'] || '';
+
+  // Date / time / all-day (§3.3)
+  // Health Treatment/Illness render no ef-allday checkbox at all — those
+  // sub-types are always date-only/all-day, so absence of the checkbox
+  // means "was all-day" for mapping purposes.
+  src.all_day = ('ef-allday' in f) ? !!f['ef-allday'] : true;
+  const dateV = f['ef-date'] || '';
+  const stimeV = f['ef-stime'] || '12:00';
+  src.date = dateV ? localDT(dateV, src.all_day ? '12:00' : stimeV) : new Date().toISOString();
+
+  // End date (§3.3) — only meaningful if the TARGET type uses one (Social /
+  // Health-Appointment). Dropped entirely for Task, which has none.
+  if (newType === 'task') {
+    src.end_date = null;
+  } else {
+    const endDateV = f['ef-enddate'] || dateV;
+    if (src.all_day) {
+      src.end_date = endDateV ? localDT(endDateV, '12:00') : null;
+    } else {
+      let endTimeV = f['ef-etime'] || '';
+      if (!endTimeV) {
+        // Source had no end time of its own (e.g. Task -> Social) — default
+        // to start time + 1 hour, per spec.
+        const [h,m] = stimeV.split(':').map(Number);
+        endTimeV = `${String(Math.min(h+1,23)).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+      }
+      src.end_date = endDateV ? localDT(endDateV, endTimeV) : null;
+    }
+  }
+
+  // Location, Description, Tags, Actions, Attachments (§3.1 — always mapped)
+  src.location = f['ef-loc'] || null;
+  src.description = f['ef-desc'] || null;
+  src.tags = snap.tags || [];
+  src.actions = snap.actions || [];
+  src.links = snap.links || [];
+
+  // Assignee conversion (§3.2)
+  if (newType === 'task') {
+    if (oldType === 'task') {
+      src.member_id = f['ef-mem'] || null;
+    } else {
+      const parts = snap.participants || [];
+      const isFamily = parts.includes('__family__');
+      const memberIds = parts.filter(p=>p!=='__family__');
+      // Exactly one participant (and not "entire family") carries over;
+      // multiple participants or "entire family" -> Task left unassigned
+      // ("Anyone"), per confirmed interim behavior.
+      src.member_id = (!isFamily && memberIds.length===1) ? memberIds[0] : null;
+    }
+    src.participants = [];
+    src.participants_all_family = false;
+  } else {
+    if (oldType === 'task') {
+      const mid = f['ef-mem'] || '';
+      src.participants = mid ? [mid] : [];
+      src.participants_all_family = false;
+    } else {
+      const parts = snap.participants || [];
+      src.participants_all_family = parts.includes('__family__');
+      src.participants = parts.filter(p=>p!=='__family__');
+    }
+    src.member_id = null;
+  }
+
+  // Recurrence (§3.5) — only carried over when editing the FULL series.
+  // A single-occurrence type switch on a recurring event detaches that
+  // occurrence entirely (handled at save time via A._detachSeriesOnSave,
+  // matching the app's existing single-occurrence-edit behavior).
+  if (isFullSeriesEdit) {
+    src.recurrence = f['ef-rec'] || 'None';
+    src.recurrence_end_type = f['ef-recend-type'] || 'count';
+    src.recurrence_end_count = parseInt(f['ef-recend-n']) || null;
+    src.recurrence_end_date = f['ef-recend-d'] || null;
+  } else {
+    src.recurrence = 'None';
+    src.recurrence_end_type = null;
+    src.recurrence_end_count = null;
+    src.recurrence_end_date = null;
+  }
+  A._detachSeriesOnSave = isSingleOccurrenceOfSeries;
+
+  A._pendingTypeSwitchSource = src;
+  delete A._typeSwitchSnapshot;
+  _closeModalDOM();
+  openEvForm(newType, evId||null, dateTs);
+}
+window.switchEventType = switchEventType;
 
 function toggleAllDay(checked) {
   const rows = ['ef-stime-row','ef-etime-row'];
@@ -2155,6 +2751,12 @@ window.addTag = addTag;
 // Wraps any Supabase operation with timeout + one automatic retry
 // Fixes silent failures caused by stale HTTP/2 connections
 async function sbWrite(operation) {
+  // v18 revert: back to 7000ms, per Roxana's testing feedback — the 25s
+  // change (from the now-reverted Pass E) meant waiting a long time on every
+  // slow save before even getting a retry, which felt worse in practice than
+  // the faster-to-retry original. Worth investigating separately why saves
+  // were slow enough to hit this at all — that's a more useful fix than the
+  // timeout number itself.
   const TIMEOUT_MS = 7000;
   const withTimeout = (fn) => Promise.race([
     fn(),
@@ -2214,7 +2816,6 @@ async function saveEv(type, evId, dateTs) {
   // For series editing (Change IV):
   const editSeriesId = A._editSeriesMode || null;
   delete A._editSeriesMode;
-  let seriesUpdateMsg = null;
   let data = { family_id: A.family.id, type };
   // v14: capture the edited occurrence's ORIGINAL date/time before any of the
   // user's edits are applied. Needed to compute the date-delta for "edit full
@@ -2261,6 +2862,10 @@ async function saveEv(type, evId, dateTs) {
       }
       data.end_date = null;
       data.member_id = document.getElementById('ef-mem')?.value || null;
+      // v18 (Event Type Switcher §3.4): Task gains Location + Attachments,
+      // so these aren't lost when converting Social/Health -> Task.
+      data.location = document.getElementById('ef-loc')?.value || null;
+      data.links = getLinks();
       data.actions = getChecklist('ef-actions');
       data.tags = Array.from(document.querySelectorAll('#ef-tags button[data-sel="true"]')).map(b=>b.dataset.tag).filter(Boolean);
       data.description = document.getElementById('ef-desc')?.value || null;
@@ -2390,6 +2995,63 @@ async function saveEv(type, evId, dateTs) {
       }
     }
 
+    // v18: stamp "last edited" metadata on every create AND edit.
+    data.updated_at = new Date().toISOString();
+    data.updated_by_name = getActorName();
+    // updated_scope only means anything for recurring events being edited:
+    // - editing the full series (editSeriesId set)     -> 'series'
+    // - editing a single occurrence of an existing series -> 'occurrence'
+    // - a brand-new event/series, or a plain non-recurring edit -> null
+    //   (no scope to show until the first real edit decision is made)
+    if (evId) {
+      const _existEvForScope = A.events.find(e => e.id === evId);
+      if (editSeriesId) data.updated_scope = 'series';
+      else if (_existEvForScope?.series_id) data.updated_scope = 'occurrence';
+      else data.updated_scope = null;
+    } else {
+      data.updated_scope = null;
+    }
+
+    // v18 (Event Type Switcher §3.6): when an edit changes an event's type,
+    // explicitly clear every field exclusive to the OLD type. This is
+    // necessary because cleanData() further down only ever writes keys that
+    // are actually present on `data` — and each type-branch above only ever
+    // sets ITS OWN fields — so without this, something like `doctor` or
+    // `cost` left over from a Health event would silently survive in the
+    // database after switching to Task/Social (cleanData() would simply
+    // omit it from the UPDATE payload rather than clearing it).
+    if (evId) {
+      const _origType = A.events.find(e => e.id === evId)?.type;
+      if (_origType && _origType !== type) {
+        const TYPE_EXCLUSIVE_NULL_FIELDS = [
+          'social_type','doctor','specialty','cost','cost_currency',
+          'administration','recommended_by','considerations','symptoms','cure',
+          'appt_type','weight','height','hydration','exercised','activity',
+          'activity_mins','mood','energy','sleep','member_id'
+        ];
+        TYPE_EXCLUSIVE_NULL_FIELDS.forEach(f => { if (data[f] === undefined) data[f] = null; });
+        // Array/boolean columns need their proper "empty" value, not null
+        if (data.participants === undefined) data.participants = [];
+        if (data.participants_all_family === undefined) data.participants_all_family = false;
+      }
+    }
+
+    // v18 (Event Type Switcher §3.5): a single-occurrence type switch on a
+    // recurring event detaches that occurrence from its series entirely —
+    // same as the app's existing single-occurrence-edit behavior for any
+    // other field change. (Full-series type switches carry the recurrence
+    // pattern to the new type instead — no special handling needed here,
+    // since that path already flows through the normal editSeriesId logic
+    // below, siblings' `type` column included.)
+    if (A._detachSeriesOnSave) {
+      data.series_id = null;
+      data.recurrence = 'None';
+      data.recurrence_end_type = null;
+      data.recurrence_end_count = null;
+      data.recurrence_end_date = null;
+    }
+    delete A._detachSeriesOnSave;
+
     // v14: generateRecurrences() must ONLY ever run when creating a brand-new
     // event. Previously it ran unconditionally on every save — including
     // edits — which always stamped a fresh series_id onto the edited row
@@ -2408,7 +3070,8 @@ async function saveEv(type, evId, dateTs) {
         'weight','height','hydration','exercised','activity','activity_mins','mood','energy','sleep',
         'social_type','actions','doctor','specialty','cost','cost_currency',
         'symptoms','cure','recommended_by','administration','considerations','links','series_id',
-        'is_private','created_by_user_id']; // v8: privacy fields
+        'is_private','created_by_user_id', // v8: privacy fields
+        'updated_at','updated_by_name','updated_scope']; // v18: last-edited timestamps
       const clean = {};
       allowed.forEach(k => { if (obj[k] !== undefined) clean[k] = obj[k]; });
       return clean;
@@ -2487,7 +3150,7 @@ async function saveEv(type, evId, dateTs) {
             const byId = {};
             succeeded.forEach(r => { byId[r.data.id] = r.data; });
             A.events = A.events.map(e => byId[e.id] ? byId[e.id] : e);
-            seriesUpdateMsg = `Series updated! ✅ (${succeeded.length + 1} occurrence${succeeded.length+1!==1?'s':''})`;
+            A._seriesUpdateMsg = `Series updated! ✅ (${succeeded.length + 1} occurrence${succeeded.length+1!==1?'s':''})`;
           }
         }
       }
@@ -2532,7 +3195,8 @@ async function saveEv(type, evId, dateTs) {
         _notifTitle
       );
     }
-    toast(seriesUpdateMsg || (evId ? 'Entry updated! ✅' : `Entry added!${eventsToSave.length>1?' ('+eventsToSave.length+' occurrences created)':''}`));
+    const _seriesMsg = A._seriesUpdateMsg; delete A._seriesUpdateMsg;
+    toast(_seriesMsg || (evId ? 'Entry updated! ✅' : `Entry added!${eventsToSave.length>1?' ('+eventsToSave.length+' occurrences created)':''}`));
     renderCal();
     renderHome();
   } catch(e) {
@@ -2601,6 +3265,26 @@ function generateRecurrences(data) {
   return events;
 }
 
+// ── DRAFT-CHECK SEQUENCING (v17) ────────────────────────────────────────────
+// Runs the event/note/meal draft-restore checks one at a time instead of all
+// at once, so at most one restore banner is ever visible on screen. Each
+// checkAndOffer*Draft() function returns the DOM id of the banner it just
+// displayed (or nothing, if there was no draft worth offering). We poll for
+// that banner's removal — Discard/Restore tap, or its own 15s auto-dismiss —
+// before moving on to the next check in the queue.
+function _runDraftChecksSequentially(queue){
+  if(!queue.length) return;
+  const [check,...rest]=queue;
+  const bannerId=check();
+  if(!bannerId){ _runDraftChecksSequentially(rest); return; }
+  const poll=setInterval(()=>{
+    if(!document.getElementById(bannerId)){
+      clearInterval(poll);
+      _runDraftChecksSequentially(rest);
+    }
+  },300);
+}
+
 // ── EVENT FORM DRAFT (v13) ────────────────────────────────────────────────────
 // Protects against iOS Safari silently reloading tabs and destroying unsaved event
 // form data. A draft is written to localStorage every 5 seconds while any event
@@ -2612,6 +3296,11 @@ const _evDraftMaxAge=2*60*60*1000; // discard drafts older than 2 hours
 
 function saveEvDraft(){
   if(!A.user||!A.family) return;
+  // v17 fix: don't bother saving a draft that's essentially blank — no title
+  // means there's nothing meaningful worth protecting, so nothing gets
+  // written, and therefore nothing will ever get offered for restore later.
+  const _titleEl=document.getElementById('ef-title');
+  if(!_titleEl||!_titleEl.value||!_titleEl.value.trim()) return;
   // Collect all possible form field values that exist in the DOM right now.
   // ef-stime/ef-etime are excluded here — v13's custom time picker made them
   // hour/minute select pairs rather than single inputs, so they're captured
@@ -2641,6 +3330,9 @@ function saveEvDraft(){
     type:A._evDraftType||'social',
     apptType:document.getElementById('ef-apt')?.value||null,
     timestamp:Date.now(),
+    // v18 (Draft Safety Fix C1): which real event this draft belongs to, if
+    // any. null means it's a brand-new (unsaved) event.
+    editingEventId:A._evDraftEditingId||null,
     fields,participants,tags,
   };
   try{localStorage.setItem(_evDraftKey(),JSON.stringify(draft));}catch(_){}
@@ -2665,6 +3357,12 @@ function checkAndOfferEvDraft(){
   if(!draft||!draft.timestamp||Date.now()-draft.timestamp>_evDraftMaxAge){
     clearEvDraft();return;
   }
+  // v17 defensive backstop: silently discard a near-blank draft instead of
+  // offering it — covers any old blank draft already sitting in localStorage
+  // from before saveEvDraft()'s title check above existed.
+  if(!draft.fields?.['ef-title']||!draft.fields['ef-title'].trim()){
+    clearEvDraft();return;
+  }
   // Show a non-intrusive restoration banner at the bottom of the screen
   const existing=document.getElementById('ev-draft-banner');
   if(existing) existing.remove();
@@ -2686,6 +3384,7 @@ function checkAndOfferEvDraft(){
     </div>`;
   document.body.appendChild(banner);
   setTimeout(()=>document.getElementById('ev-draft-banner')?.remove(),15000); // auto-dismiss
+  return 'ev-draft-banner'; // v17: tells the sequencing orchestrator a banner is now showing
 }
 window.checkAndOfferEvDraft=checkAndOfferEvDraft;
 
@@ -2697,10 +3396,20 @@ function restoreEvDraft(){
     draft=JSON.parse(raw);
   }catch(_){return;}
   if(!draft) return;
-  // Queue the draft data, then open a fresh form — restoration happens inside openEvForm's setTimeout
+  // v18 (Draft Safety Fix C1): reopen the SAME existing event this draft was
+  // edited from, instead of always opening a blank new-event form (which
+  // previously caused Save to create a duplicate rather than update the
+  // original). Defensive fallback: if the event no longer exists (e.g. it
+  // was deleted by another family member while this draft sat unsaved),
+  // fall back to treating it as a new entry rather than trying to update a
+  // row that isn't there.
+  const targetEvId = (draft.editingEventId && A.events.some(e=>e.id===draft.editingEventId))
+    ? draft.editingEventId
+    : null;
+  // Queue the draft data, then open the form — restoration happens inside openEvForm's setTimeout
   A._evDraftType=draft.type;
   A._evDraftRestore=draft;
-  openEvForm(draft.type,null,null);
+  openEvForm(draft.type,targetEvId,null);
 }
 window.restoreEvDraft=restoreEvDraft;
 
@@ -2805,6 +3514,12 @@ function viewEv(id) {
   body += `<div id="ev-completion-banner">${ev.completed_at
     ? `<div style="display:inline-flex;align-items:center;gap:6px;background:${T.sageLight};color:${T.sage};border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;margin-bottom:10px">✅ Completed ${fmt(ev.completed_at)} at ${evFmtTime(ev.completed_at)}</div>`
     : ''}</div>`;
+  // v18: "Last edited" line — renders nothing for events with no edit history yet
+  // (updated_at is NULL until the record's next post-v18 save), per spec.
+  const _lastEditedStr = formatLastEdited(ev.updated_at, ev.updated_by_name, ev.updated_scope);
+  if (_lastEditedStr) {
+    body += `<div style="font-size:11px;color:${T.muted};margin-bottom:10px">${_lastEditedStr}</div>`;
+  }
 
   if (ev.type === 'wellness') {
     body += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px">
@@ -2856,10 +3571,16 @@ function viewEv(id) {
 
   if (ev.description) body += `<div style="background:${T.parchment};border-radius:9px;padding:9px 11px;font-size:13px;line-height:1.5;margin-bottom:10px">${ev.description}</div>`;
   if (ev.tags?.length) body += `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">${ev.tags.map(t=>`<span class="chip" style="background:${T.parchment};color:${T.muted}">${t}</span>`).join('')}</div>`;
-  if (ev.attachment_urls?.length) {
+  // v18 fix: this was reading from `ev.attachment_urls`, a field nothing in
+  // the app has ever written to — saveEv() has always saved attachment data
+  // to `ev.links` (as {label, url} objects via getLinks()). This means
+  // attachments have likely never displayed here, for any event type, even
+  // before this sprint — the data was always saved correctly, it just never
+  // rendered. Pre-existing bug, unrelated to anything built this sprint.
+  if (ev.links?.length) {
     body += `<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:${T.muted};margin-bottom:5px">ATTACHMENTS</div>`;
-    ev.attachment_urls.forEach(url => {
-      body += `<a href="${url}" target="_blank" style="display:flex;align-items:center;gap:7px;font-size:13px;color:${T.sky};margin-bottom:4px;text-decoration:none">📎 ${url.split('/').pop()}</a>`;
+    ev.links.forEach(link => {
+      body += `<a href="${link.url}" target="_blank" style="display:flex;align-items:center;gap:7px;font-size:13px;color:${T.sky};margin-bottom:4px;text-decoration:none">📎 ${link.label || link.url}</a>`;
     });
     body += '</div>';
   }
@@ -3065,9 +3786,14 @@ function renderNB(){
     </div>
     <!-- Search bar — full width above the split layout -->
     <div style="padding:8px 16px 6px">
-      <input class="inp" id="nb-search-inp" placeholder="🔍  Search notes…" value="${A.noteSearch}"
-        oninput="A.noteSearch=this.value;clearTimeout(A._nT);A._nT=setTimeout(()=>renderNB(),350)"
-        onkeydown="if(event.key==='Enter'){clearTimeout(A._nT);renderNB();}">
+      <div style="position:relative">
+        <input class="inp" id="nb-search-inp" placeholder="🔍  Search notes…" value="${A.noteSearch}"
+          style="padding-right:${A.noteSearch?'36px':'12px'}"
+          oninput="A.noteSearch=this.value;clearTimeout(A._nT);A._nT=setTimeout(()=>{renderNB();const si=document.getElementById('nb-search-inp');if(si){si.focus();si.setSelectionRange(si.value.length,si.value.length);}},350);document.getElementById('nb-search-x').style.display=this.value?'flex':'none'"
+          onkeydown="if(event.key==='Enter'){clearTimeout(A._nT);renderNB();this.blur();}">
+        <button id="nb-search-x" onclick="A.noteSearch='';document.getElementById('nb-search-inp').value='';renderNB();this.style.display='none'"
+          style="display:${A.noteSearch?'flex':'none'};position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:${T.muted};font-size:16px;cursor:pointer;width:24px;height:24px;align-items:center;justify-content:center;border-radius:50%">×</button>
+      </div>
     </div>
     <!-- Body: ribbon (left) + notes grid (right) -->
     <div style="display:flex;align-items:flex-start">
@@ -3462,6 +4188,16 @@ async function saveNote(noteId){
   showSavingToast();
   let _saveOk=false;
   try{
+    // v17 fix (Notebook note duplication bug): resolve the ACTUAL current note
+    // id, falling back to whatever id the background 4-second auto-save has
+    // already created for this note (A._noteEditingId). Without this, a new
+    // note's Save button — rendered once at modal-open time with an empty
+    // noteId baked into its onclick — would always take the insert branch
+    // below, creating a duplicate row even after auto-save had already
+    // inserted the "real" one. Every use of noteId below this line now uses
+    // effectiveId instead, so a manual Save always lands on whatever row
+    // auto-save already created.
+    const effectiveId = noteId || A._noteEditingId || '';
     const checklist=[];
     document.querySelectorAll('#ne-cl > div').forEach((row,i)=>{
       const cb=row.querySelector('input[type="checkbox"]');
@@ -3476,7 +4212,7 @@ async function saveNote(noteId){
     // If the toggle is not shown (non-creator editing a shared note), preserve
     // the existing is_private value so it is never accidentally cleared.
     const _notePrivToggle = document.getElementById('ne-private');
-    const _existNote = noteId ? A.notes.find(n => n.id === noteId) : null;
+    const _existNote = effectiveId ? A.notes.find(n => n.id === effectiveId) : null;
     const data={
       family_id:A.family.id,
       title:document.getElementById('ne-t')?.value||'',
@@ -3489,24 +4225,24 @@ async function saveNote(noteId){
       is_private: _notePrivToggle ? _notePrivToggle.checked : (_existNote?.is_private || false),
     };
     // Set created_by_user_id only when creating a new note — never overwrite on edits.
-    if (!noteId) data.created_by_user_id = A.user?.id || null;
+    if (!effectiveId) data.created_by_user_id = A.user?.id || null;
     // v7: sbWrite() for idle-safety
     let res;
-    if(noteId)res=await sbWrite(()=>sb.from('notes').update(data).eq('id',noteId).select().single());
+    if(effectiveId)res=await sbWrite(()=>sb.from('notes').update(data).eq('id',effectiveId).select().single());
     else res=await sbWrite(()=>sb.from('notes').insert(data).select().single());
     if(res.error){toast('Error saving note: '+(res.error.message||'please try again.'),true);console.error(res.error);return;}
     const savedNote = res.data;
-    if(noteId)A.notes=A.notes.map(n=>n.id===noteId?savedNote:n);
+    if(effectiveId)A.notes=A.notes.map(n=>n.id===effectiveId?savedNote:n);
     else A.notes.push(savedNote);
     _saveOk=true;
     A._noteDirty=false; // v13: mark note as clean after explicit manual save
     clearNoteDraftLS(); // v14: saved successfully — discard the localStorage draft
     // v8: notify other family members
-    writeNotif('note', noteId ? 'updated' : 'created',
-      noteId ? `${getActorName()} updated a note` : `${getActorName()} added a new note`,
+    writeNotif('note', effectiveId ? 'updated' : 'created',
+      effectiveId ? `${getActorName()} updated a note` : `${getActorName()} added a new note`,
       data.title || 'Untitled'
     );
-    closeModal();toast(noteId?'Note updated!':'Note saved!');renderNB();
+    closeModal();toast(effectiveId?'Note updated!':'Note saved!');renderNB();
   }catch(e){
     console.error('saveNote error', e);
     toast('Something went wrong — please try again.', true);
@@ -3651,6 +4387,13 @@ function saveNoteDraftLS(){
   if(!A.user||!A.family) return;
   const editorEl=document.getElementById('ne-editor');
   if(!editorEl) return; // note editor isn't open right now — nothing to draft
+  // v17 fix: skip saving a draft that's essentially blank — both title and
+  // body content must be empty for this to be considered "nothing worth
+  // protecting" (checking content with its HTML tags stripped out, so an
+  // empty formatted paragraph like "<p></p>" doesn't count as content).
+  const _titleVal=document.getElementById('ne-t')?.value||'';
+  const _contentVal=(editorEl.innerHTML||'').replace(/<[^>]*>/g,'').trim();
+  if(!_titleVal.trim()&&!_contentVal) return;
   const checklist=[];
   document.querySelectorAll('#ne-cl > div').forEach((row,i)=>{
     const cb=row.querySelector('input[type="checkbox"]');
@@ -3694,6 +4437,14 @@ function checkAndOfferNoteDraft(){
   if(!draft||!draft.timestamp||Date.now()-draft.timestamp>_noteDraftMaxAge){
     clearNoteDraftLS();return;
   }
+  // v17 defensive backstop: silently discard a near-blank draft instead of
+  // offering it — covers any old blank draft already sitting in localStorage
+  // from before saveNoteDraftLS()'s blank-content check above existed.
+  const _draftTitle=(draft.fields?.title||'').trim();
+  const _draftContent=(draft.fields?.content||'').replace(/<[^>]*>/g,'').trim();
+  if(!_draftTitle&&!_draftContent){
+    clearNoteDraftLS();return;
+  }
   const existing=document.getElementById('note-draft-banner');
   if(existing) existing.remove();
   const banner=document.createElement('div');
@@ -3713,6 +4464,7 @@ function checkAndOfferNoteDraft(){
     </div>`;
   document.body.appendChild(banner);
   setTimeout(()=>document.getElementById('note-draft-banner')?.remove(),15000); // auto-dismiss
+  return 'note-draft-banner'; // v17: tells the sequencing orchestrator a banner is now showing
 }
 window.checkAndOfferNoteDraft=checkAndOfferNoteDraft;
 
@@ -3732,6 +4484,35 @@ function restoreNoteDraftLS(){
 window.restoreNoteDraftLS=restoreNoteDraftLS;
 
 // ── MEDS ──────────────────────────────────────────────────────────────────────
+
+// v17 fix (Meds alert clarity + stock sync): single source of truth for how
+// many days of supply a medication has left "as of right now" — used by BOTH
+// the Meds table's warning badge/coloring (renderMeds()) and the low-stock
+// notification alert (computeAlerts()), so they can never disagree with each
+// other again. Uses updated_stock (the real current stock once at least one
+// order has been confirmed) instead of the frozen stock_today whenever it's
+// available, falling back to stock_today only when no order has ever been
+// confirmed yet. Depletes that base stock forward by the days elapsed since
+// stock_date, same anchor already used elsewhere in this module.
+function effMedDaysLeft(med){
+  const dailyDose=(med.member_ids||[]).length*(med.dose_per_day||1);
+  if(!dailyDose) return null;
+  const hasUpd = med.updated_stock!==null && med.updated_stock!==undefined;
+  const baseStock = hasUpd ? med.updated_stock : (med.stock_today||0);
+  const stockBase = med.stock_date ? new Date(med.stock_date+'T00:00:00') : todayD();
+  const daysPassed = Math.max(0, Math.round((todayD() - stockBase) / 86400000));
+  const currentStock = Math.max(0, baseStock - daysPassed*dailyDose);
+  return Math.floor(currentStock/dailyDose);
+}
+// Status buckets unchanged from before this fix: critical (≤7 days), low (≤14 days), ok.
+function effMedStatus(med){
+  const d=effMedDaysLeft(med);
+  if(d===null) return 'ok';
+  if(d<=7) return 'critical';
+  if(d<=14) return 'low';
+  return 'ok';
+}
+
 function exportMedsXLSX() {
   // Export as HTML that Excel can open natively - no library needed
   const dm = getFilteredMeds(), s = symC();
@@ -4068,19 +4849,23 @@ function renderMeds(targetId){
           </thead>
           <tbody>
             ${dm.map((med,idx)=>{
-              const dl=daysLeft(med);
-              const st=dl===null?'ok':dl<=7?'critical':dl<=14?'low':'ok';
+              // v17 fix: badge/coloring now driven by the shared effective-status
+              // helper (updated_stock-aware) instead of the old stock_today-only
+              // "dl" calc — this is what makes the badge agree with the low-stock
+              // notification alert. "Stock lasts until" / "Updated stock lasts
+              // until" display columns below keep their own separate, unchanged
+              // display logic — only the warning trigger is consolidated.
+              const st=effMedStatus(med);
+              const medHasUpdated=hasUpdated(med);
               const rowMems=getMembers().filter(m=>(med.member_ids||[]).includes(m.id));
               // One entry per medCols column, in the exact same order, so
               // collapseRowCells() can merge any collapsed group correctly.
               const cellsArr=[
-                `<td><div style="font-weight:700">${med.name}</div>${med.shared?`<span class="chip" style="background:${T.skyLight};color:${T.sky};font-size:10px">Shared</span>`:''}<div style="font-size:11px;color:${T.muted}">${med.note||''}</div></td>`,
+                `<td><div style="display:flex;align-items:center;gap:5px"><span style="font-weight:700">${med.name}</span>${st==='critical'?`<span title="Low stock" style="font-size:12px;color:${T.rose}">⚠️</span>`:st==='low'?`<span title="Stock running low" style="font-size:12px;color:${T.honey}">⚠️</span>`:''}</div>${med.shared?`<span class="chip" style="background:${T.skyLight};color:${T.sky};font-size:10px">Shared</span>`:''}<div style="font-size:11px;color:${T.muted}">${med.note||''}</div></td>`,
                 `<td><div style="display:flex;gap:3px">${rowMems.map(m=>av(m,20)).join('')}</div></td>`,
                 `<td>${med.dose_per_day}</td>`,
-                `<td style="font-weight:700;color:${st==='critical'?T.rose:st==='low'?T.honey:T.sage}">
+                `<td style="font-weight:700;color:${medHasUpdated?T.muted:(st==='critical'?T.rose:st==='low'?T.honey:T.sage)}">
                   ${med.stock_today}
-                  ${st==='critical'?`<div style="font-size:10px;color:${T.rose}">⚠️ Low!</div>`:''}
-                  ${st==='low'?`<div style="font-size:10px;color:${T.honey}">Soon</div>`:''}
                 </td>`,
                 `<td style="font-size:11px;color:${T.muted}">${med.stock_date?fmt(med.stock_date+'T00:00:00'):'—'}</td>`,
                 `<td style="color:${st==='critical'?T.rose:st==='low'?T.honey:T.muted}">${lastsUntil(med)}</td>`,
@@ -4089,8 +4874,8 @@ function renderMeds(targetId){
                 `<td><input type="number" min="0" value="${med.new_order_pkgs||''}" placeholder="0" onfocus="if(this.value==='0')this.value=''" onchange="updateMedOrder('${med.id}',this.value)" style="width:55px;padding:4px 6px;border-radius:7px;border:1px solid ${T.border};font-size:13px;text-align:center"></td>`,
                 `<td style="font-weight:600;color:${T.sage}">${med.new_order_pkgs&&med.new_order_pkgs!=='0'?`${s}${orderPrice(med)}`:'—'}</td>`,
                 `<td style="font-weight:600;color:${T.sky};font-size:12px">${simUntil(med)}</td>`,
-                `<td style="font-weight:600;color:${T.sage}">${hasUpdated(med)?med.updated_stock:'—'}</td>`,
-                `<td style="font-weight:600;color:${T.sage};font-size:12px">${hasUpdated(med)?updLastsUntil(med):'—'}</td>`,
+                `<td style="font-weight:600;color:${medHasUpdated?(st==='critical'?T.rose:st==='low'?T.honey:T.sage):T.muted}">${medHasUpdated?med.updated_stock:'—'}</td>`,
+                `<td style="font-weight:600;color:${T.sage};font-size:12px">${medHasUpdated?updLastsUntil(med):'—'}</td>`,
                 `<td style="font-size:11px;color:${T.muted}">${med.last_ordered?fmt(med.last_ordered):'—'}</td>`,
                 `<td>
                   ${med.new_order_pkgs&&med.new_order_pkgs!=='0'?`<button onclick="confirmOrder('${med.id}')" style="background:${T.sageLight};border:1px solid ${T.sageMid};border-radius:7px;padding:3px 8px;font-size:11px;font-weight:700;color:${T.sage};cursor:pointer;white-space:nowrap">✓ Got it</button>`:''}
@@ -4862,7 +5647,8 @@ function renderShoppingTab(){
       <div style="position:relative;flex:1;min-width:0">
         <input class="inp" id="shop-search-all-inp" placeholder="🔍  Search all lists…" value="${A.shopSearchAll||''}"
           style="padding-right:${A.shopSearchAll?'36px':'12px'}"
-          oninput="A.shopSearchAll=this.value;clearTimeout(A._ssT);A._ssT=setTimeout(renderMeals,300);document.getElementById('shop-search-all-x').style.display=this.value?'flex':'none'">
+          oninput="A.shopSearchAll=this.value;clearTimeout(A._ssT);A._ssT=setTimeout(()=>{renderMeals();const si=document.getElementById('shop-search-all-inp');if(si){si.focus();si.setSelectionRange(si.value.length,si.value.length);}},300);document.getElementById('shop-search-all-x').style.display=this.value?'flex':'none'"
+          onkeydown="if(event.key==='Enter'){clearTimeout(A._ssT);renderMeals();this.blur();}">
         <button id="shop-search-all-x" onclick="A.shopSearchAll='';document.getElementById('shop-search-all-inp').value='';renderMeals();this.style.display='none'"
           style="display:${A.shopSearchAll?'flex':'none'};position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:${T.muted};font-size:16px;cursor:pointer;width:24px;height:24px;align-items:center;justify-content:center;border-radius:50%">×</button>
       </div>
@@ -5102,7 +5888,8 @@ function renderShoppingModal(id){
     <div style="position:relative;margin-bottom:10px">
       <input class="inp" id="shop-search-list-inp" placeholder="🔍  Search this list…" value="${A._shopSearchQ||''}"
         style="padding-right:${A._shopSearchQ?'36px':'12px'}"
-        oninput="A._shopSearchQ=this.value;clearTimeout(A._slT);A._slT=setTimeout(()=>renderShoppingModal('${id}'),250)">
+        oninput="A._shopSearchQ=this.value;clearTimeout(A._slT);A._slT=setTimeout(()=>{renderShoppingModal('${id}');const si=document.getElementById('shop-search-list-inp');if(si){si.focus();si.setSelectionRange(si.value.length,si.value.length);}},250)"
+        onkeydown="if(event.key==='Enter'){clearTimeout(A._slT);renderShoppingModal('${id}');this.blur();}">
       <button id="shop-search-list-x" onclick="A._shopSearchQ='';renderShoppingModal('${id}')"
         style="display:${A._shopSearchQ?'flex':'none'};position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:${T.muted};font-size:16px;cursor:pointer;width:24px;height:24px;align-items:center;justify-content:center;border-radius:50%">×</button>
     </div>`:''}
@@ -5559,6 +6346,7 @@ function checkAndOfferMealDraft(){
     </div>`;
   document.body.appendChild(banner);
   setTimeout(()=>document.getElementById('meal-draft-banner')?.remove(),15000); // auto-dismiss
+  return 'meal-draft-banner'; // v17: tells the sequencing orchestrator a banner is now showing
 }
 window.checkAndOfferMealDraft=checkAndOfferMealDraft;
 
@@ -5934,6 +6722,12 @@ async function saveFamName(){
     const sBtn=document.getElementById('sample-btn');
     if(sBtn) sBtn.style.display='none';
     if(isSampleMode()) toggleSampleMode();
+    // v18: create the default 'free' subscription row for this new family.
+    // Fire-and-forget — the enforcement logic that reads this table lands in
+    // a later pass, but the row needs to exist from day one so no family is
+    // ever missing one. A failure here doesn't block family creation.
+    sb.from('family_subscription').insert({family_id:data.id,plan_name:'free'})
+      .then(({error})=>{ if(error) console.error('family_subscription row creation failed', error); });
     toast('Family created! ✅');
     renderSettings();
     return;
@@ -6393,14 +7187,16 @@ function computeAlerts() {
   const now = new Date();
 
   // Low stock medications (≤ 7 days of supply remaining)
+  // v17 fix: now reads via the shared effMedDaysLeft() helper (also used by
+  // the Meds table badge in renderMeds()) which is updated_stock-aware —
+  // falls back to stock_today only when no order has ever been confirmed.
+  // Previously this block only ever read stock_today, which never changes
+  // after an order is confirmed (see confirmOrder()), so the alert kept
+  // firing forever after ordering even once updated_stock was healthy.
   if (prefs.alert_low_stock !== false) {
     getDM().forEach(med => {
-      const dailyDose = (med.member_ids || []).length * (med.dose_per_day || 1);
-      if (!dailyDose) return;
-      const stockBase = med.stock_date ? new Date(med.stock_date + 'T00:00:00') : today;
-      const daysPassed = Math.max(0, Math.round((today - stockBase) / 86400000));
-      const currentStock = Math.max(0, (med.stock_today || 0) - daysPassed * dailyDose);
-      const daysLeft = Math.floor(currentStock / dailyDose);
+      const daysLeft = effMedDaysLeft(med);
+      if (daysLeft === null) return;
       if (daysLeft <= 7) {
         const memberNames = A.members
           .filter(m => (med.member_ids || []).includes(m.id))
