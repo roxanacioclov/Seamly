@@ -1,4 +1,4 @@
-<!-- Seamly v18 | PROD | 28 Jul 2026 -->
+<!-- Seamly v19 | PROD | 31 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1700,6 +1700,24 @@ function _isAtEventLimit(){
   const max = A.planLimits?.free?.max_events;
   if (max == null) return false;
   return _familyEventCount() >= max;
+}
+
+// v19: Notes count + limit check — same pattern as events above, applied to
+// the Notebook. Notes have no series concept, so this is a plain count of
+// every row in A.notes (already scoped to the family via RLS).
+function _familyNoteCount(){
+  return A.notes.length;
+}
+// true only for a 'free'-plan family already at (or over) its note limit.
+// early_adopter/premium always return false (unlimited). Defensive: if the
+// subscription/limits data never loaded, this returns false rather than
+// ever locking someone out of creating notes by accident.
+function _isAtNoteLimit(){
+  const planName = A.subscription?.plan_name || 'free';
+  if (planName !== 'free') return false;
+  const max = A.planLimits?.free?.max_notes;
+  if (max == null) return false;
+  return _familyNoteCount() >= max;
 }
 
 // ── OPEN EVENT FORM ───────────────────────────────────────────────────────────
@@ -3728,6 +3746,10 @@ function renderNB(){
         ${grp?`<span style="font-size:10px;font-weight:700;background:rgba(255,255,255,.55);border-radius:99px;padding:2px 6px;color:${T.ink}">${grp.name}</span>`:''}
         ${mem?av(mem,16):''}
       </div>
+      ${(()=>{ // v19: small muted "Last edited" footer — renders nothing for notes with no edit history yet
+        const _le=formatLastEdited(n.updated_at,n.updated_by_name);
+        return _le?`<div style="font-size:10px;color:${T.muted};margin-top:5px;opacity:0.85">${_le}</div>`:'';
+      })()}
     </div>`;
   };
 
@@ -3948,6 +3970,27 @@ window.confirmDeleteGroup=confirmDeleteGroup;
 
 function openNote(noteId){
   if(isSampleMode()){toast('Switch to My Family to edit notes.',true);return;}
+  // v19: Subscription block-modal check. Only gates a genuinely NEW note
+  // (noteId falsy) — never editing an existing one. Also skipped when this
+  // call is an internal reload restoring an in-progress draft (queued by
+  // restoreNoteDraftLS() into A._noteDraftRestore just before calling
+  // openNote()) — that draft was started before any limit was hit, and
+  // blocking it here would silently strand the user's unsaved work with no
+  // way to save it. Mirrors the same pattern used in openEvForm().
+  const _isInternalReload = !!A._noteDraftRestore;
+  if(!noteId && !_isInternalReload && _isAtNoteLimit()){
+    showModal('Note limit reached', `
+      <div style="text-align:center;padding:6px 0 4px">
+        <div style="font-size:13px;color:${T.ink};line-height:1.5">
+          You've reached your Notes limit on the Free plan. Delete an existing note to add a new one, or upgrade for unlimited notes.
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button class="btn btn-secondary btn-full" onclick="closeModal()">Manage existing</button>
+          <button class="btn btn-full" disabled style="background:#e5e0d5;color:#a89f8f;cursor:not-allowed;opacity:0.7">Upgrade — Coming soon</button>
+        </div>
+      </div>`);
+    return;
+  }
   const note=noteId?A.notes.find(n=>n.id===noteId):null;
   const groups=A.noteGroups;
   const cl=note?.checklist||[];
@@ -4014,6 +4057,10 @@ function openNote(noteId){
     <div style="min-height:18px;margin-bottom:6px">
       <span id="note-autosave-status" style="font-size:11px;font-weight:600"></span>
     </div>
+    <!-- v19: "Last edited" line — empty for notes with no edit history yet
+         (updated_at is NULL until the record's next post-v19 save). Kept in
+         sync live as auto-save fires, by _doNoteAutoSave(). -->
+    <div id="note-last-edited" style="font-size:11px;color:${T.muted};margin-bottom:10px">${formatLastEdited(note?.updated_at, note?.updated_by_name)}</div>
     <div style="display:flex;gap:10px">
       <button class="btn btn-primary" style="flex:1" onclick="saveNote('${noteId||''}')">Save</button>
       ${noteId?`<button class="btn btn-danger" onclick="delNote('${noteId}')">🗑</button>`:''}
@@ -4226,6 +4273,9 @@ async function saveNote(noteId){
     };
     // Set created_by_user_id only when creating a new note — never overwrite on edits.
     if (!effectiveId) data.created_by_user_id = A.user?.id || null;
+    // v19: stamp "last edited" metadata on every manual save (create AND edit).
+    data.updated_at = new Date().toISOString();
+    data.updated_by_name = getActorName();
     // v7: sbWrite() for idle-safety
     let res;
     if(effectiveId)res=await sbWrite(()=>sb.from('notes').update(data).eq('id',effectiveId).select().single());
@@ -4346,6 +4396,11 @@ async function _doNoteAutoSave(){
     is_private:_notePrivToggle?_notePrivToggle.checked:(_existNote?.is_private||false),
   };
   if(!A._noteEditingId) data.created_by_user_id=A.user?.id||null;
+  // v19: DB autosave is a genuine save (per spec), not a draft — stamp it too,
+  // so the "Last edited" line updates live as autosave fires, matching
+  // Google-Docs-style "all changes saved" behavior.
+  data.updated_at=new Date().toISOString();
+  data.updated_by_name=getActorName();
   // Use update if we already have an ID, insert if this is the first auto-save of a new note
   const res=A._noteEditingId
     ?await sbWrite(()=>sb.from('notes').update(data).eq('id',A._noteEditingId).select().single())
@@ -4368,6 +4423,9 @@ async function _doNoteAutoSave(){
   const now=new Date();
   const t=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
   if(status){status.textContent=`✓ Auto-saved at ${t}`;status.style.color='#5e8b62';}
+  // v19: keep the "Last edited" line in sync live as autosave fires
+  const lastEditedEl=document.getElementById('note-last-edited');
+  if(lastEditedEl) lastEditedEl.textContent=formatLastEdited(res.data.updated_at,res.data.updated_by_name);
 }
 
 // ── NOTEBOOK DRAFT SAFETY (v14) ──────────────────────────────────────────────
