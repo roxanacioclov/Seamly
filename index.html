@@ -1,4 +1,4 @@
-<!-- Seamly v19 | STAGING | 31 Jul 2026 -->
+<!-- Seamly v20 | STAGING | 01 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -742,30 +742,71 @@ async function loadAll(){
 }
 
 
-async function seedMedicalGroup(){
-  if(!A.family)return;
-  // v10 (UX hardening): sbWrite() for idle-safety. This runs silently during
-  // first-time setup with no button/UI to give feedback on — if it failed
-  // on a flaky connection, the user just quietly never got their starter
-  // content with no way to know why. No user-facing error needed since
-  // there's nothing actionable for them to do; just make it more reliable.
-  const{data:grp}=await sbWrite(()=>sb.from('note_groups').insert({
-    family_id:A.family.id, name:'🏥 Medical Reference'
+// v20: Curated Content Library — a single catalog of opt-in reference
+// content. Adding a future topic (Relaxing Activities, Meal Ideas, etc.)
+// means adding one entry here — no other code changes required. Each
+// topic's `notes` array is inserted as-is (plus family_id/group_id/
+// is_curated, added by seedCuratedGroup() below) the first time a family
+// toggles that topic on in Settings.
+const CURATED_CONTENT_LIBRARY = [
+  {
+    key: 'medical_reference',
+    groupName: '🏥 Medical Reference',
+    settingsLabel: 'Medical Reference notes',
+    description: 'Natural-remedy reference cards for common ailments (flu, ear pain, cough, stomach bugs, headaches, fever) — supplements, herbal teas, and essential oils, with guidance on when to see a doctor. Read-only; you can still pin the ones you use most.',
+    notes: [
+      {title:'🤧 Flu & Cold',content:'**Natural relief for flu & cold**\n\n💊 Supplements: Vitamin C (1000mg/day), Zinc (15-20mg), Elderberry syrup\n\n🌿 Plants: Echinacea tea, Ginger & honey tea, Thyme infusion for cough\n\n🛢 DoTerra oils: OnGuard on feet & chest, Breathe for congestion (diffuse), Frankincense on spine\n\n🌡 Rest, fluids & warm broth. Fever >39°C or >3 days → see doctor.',color:"#f2ddd4",pinned:false},
+      {title:'👂 Ear Pain',content:'**Natural relief for ear pain**\n\n💊 Supplements: Vitamin D3 (immune support), Garlic oil drops (warm, 2-3 drops)\n\n🌿 Plants: Warm chamomile compress on ear, Mullein-garlic ear oil\n\n🛢 DoTerra oils: Basil & Melaleuca (behind ear only, never inside), Lavender for pain relief\n\n⚠️ If fever, discharge or pain >48h → see doctor immediately.',color:"#f2ddd4",pinned:false},
+      {title:'😤 Cough',content:'**Natural relief for cough**\n\n💊 Supplements: Vitamin C, Propolis drops, Honey (1 tsp, children >1yr)\n\n🌿 Plants: Thyme syrup, Marshmallow root tea (soothes throat), Licorice root tea\n\n🛢 DoTerra oils: Breathe blend on chest & diffused, Eucalyptus (adults only), OnGuard\n\n🍵 Steam inhalation with peppermint oil. Stay hydrated.',color:"#f2ddd4",pinned:false},
+      {title:'🤢 Stomach Bug',content:'**Natural relief for stomach issues**\n\n💊 Supplements: Probiotics, Activated charcoal (food poisoning), Electrolytes\n\n🌿 Plants: Ginger tea (nausea), Peppermint tea (cramps), Chamomile (calming)\n\n🛢 DoTerra oils: DigestZen on abdomen, Peppermint for nausea (inhale)\n\n💧 Hydration is key. BRAT diet: Banana, Rice, Applesauce, Toast.',color:"#f2ddd4",pinned:false},
+      {title:'🤕 Headache',content:'**Natural relief for headaches**\n\n💊 Supplements: Magnesium (400mg), Riboflavin/B2, CoQ10\n\n🌿 Plants: Feverfew (migraine prevention), Peppermint tea, Willow bark tea\n\n🛢 DoTerra oils: Peppermint on temples & neck, PastTense blend, Lavender (tension)\n\n💤 Rest in dark room, hydrate, cold/warm compress on neck.',color:"#f2ddd4",pinned:false},
+      {title:'🌡 Fever Management',content:'**Managing fever naturally**\n\n💊 Supplements: Vitamin C, Elderberry, plenty of fluids\n\n🌿 Plants: Elder flower tea (promotes sweating), Linden blossom tea, Echinacea\n\n🛢 DoTerra oils: Peppermint diluted on forehead & feet (cooling), Frankincense\n\n⚠️ <38°C: let it fight. 38-39°C: monitor, comfort. >39°C children / >40°C adults → paracetamol & doctor.',color:"#f2ddd4",pinned:false}
+    ]
+  }
+  // Future topics go here, e.g.:
+  // { key: 'relaxing_activities', groupName: '🧘 Relaxing Activities', settingsLabel: '...', description: '...', notes: [...] },
+];
+window.CURATED_CONTENT_LIBRARY = CURATED_CONTENT_LIBRARY;
+
+// v20: Generic curated-group seeder, driven by the catalog above. Replaces
+// the old always-on seedMedicalGroup() — only ever runs the first time a
+// family toggles a given topic ON (called from toggleCuratedContent()), not
+// automatically on every login. Inserts the group + all its notes, both
+// flagged is_curated:true so they're read-only and excluded from the note
+// count. Returns the inserted group row, or null on failure.
+async function seedCuratedGroup(key){
+  if(!A.family)return null;
+  const topic=CURATED_CONTENT_LIBRARY.find(t=>t.key===key);
+  if(!topic)return null;
+  // v10 (UX hardening): sbWrite() for idle-safety.
+  const{data:grp,error:grpErr}=await sbWrite(()=>sb.from('note_groups').insert({
+    family_id:A.family.id, name:topic.groupName, is_curated:true, curated_key:key
   }).select().single());
-  if(!grp)return;
+  if(grpErr||!grp){toast('Error adding curated content.',true);console.error(grpErr);return null;}
   A.noteGroups.push(grp);
-  const notes=[
-    {title:'🤧 Flu & Cold',content:'**Natural relief for flu & cold**\n\n💊 Supplements: Vitamin C (1000mg/day), Zinc (15-20mg), Elderberry syrup\n\n🌿 Plants: Echinacea tea, Ginger & honey tea, Thyme infusion for cough\n\n🛢 DoTerra oils: OnGuard on feet & chest, Breathe for congestion (diffuse), Frankincense on spine\n\n🌡 Rest, fluids & warm broth. Fever >39°C or >3 days → see doctor.',color:"#f2ddd4",pinned:false},
-    {title:'👂 Ear Pain',content:'**Natural relief for ear pain**\n\n💊 Supplements: Vitamin D3 (immune support), Garlic oil drops (warm, 2-3 drops)\n\n🌿 Plants: Warm chamomile compress on ear, Mullein-garlic ear oil\n\n🛢 DoTerra oils: Basil & Melaleuca (behind ear only, never inside), Lavender for pain relief\n\n⚠️ If fever, discharge or pain >48h → see doctor immediately.',color:"#f2ddd4",pinned:false},
-    {title:'😤 Cough',content:'**Natural relief for cough**\n\n💊 Supplements: Vitamin C, Propolis drops, Honey (1 tsp, children >1yr)\n\n🌿 Plants: Thyme syrup, Marshmallow root tea (soothes throat), Licorice root tea\n\n🛢 DoTerra oils: Breathe blend on chest & diffused, Eucalyptus (adults only), OnGuard\n\n🍵 Steam inhalation with peppermint oil. Stay hydrated.',color:"#f2ddd4",pinned:false},
-    {title:'🤢 Stomach Bug',content:'**Natural relief for stomach issues**\n\n💊 Supplements: Probiotics, Activated charcoal (food poisoning), Electrolytes\n\n🌿 Plants: Ginger tea (nausea), Peppermint tea (cramps), Chamomile (calming)\n\n🛢 DoTerra oils: DigestZen on abdomen, Peppermint for nausea (inhale)\n\n💧 Hydration is key. BRAT diet: Banana, Rice, Applesauce, Toast.',color:"#f2ddd4",pinned:false},
-    {title:'🤕 Headache',content:'**Natural relief for headaches**\n\n💊 Supplements: Magnesium (400mg), Riboflavin/B2, CoQ10\n\n🌿 Plants: Feverfew (migraine prevention), Peppermint tea, Willow bark tea\n\n🛢 DoTerra oils: Peppermint on temples & neck, PastTense blend, Lavender (tension)\n\n💤 Rest in dark room, hydrate, cold/warm compress on neck.',color:"#f2ddd4",pinned:false},
-    {title:'🌡 Fever Management',content:'**Managing fever naturally**\n\n💊 Supplements: Vitamin C, Elderberry, plenty of fluids\n\n🌿 Plants: Elder flower tea (promotes sweating), Linden blossom tea, Echinacea\n\n🛢 DoTerra oils: Peppermint diluted on forehead & feet (cooling), Frankincense\n\n⚠️ <38°C: let it fight. 38-39°C: monitor, comfort. >39°C children / >40°C adults → paracetamol & doctor.',color:"#f2ddd4",pinned:false}
-  ];
-  const toInsert=notes.map(n=>({...n,family_id:A.family.id,group_id:grp.id}));
-  const{data:newNotes}=await sbWrite(()=>sb.from('notes').insert(toInsert).select());
+  const toInsert=topic.notes.map(n=>({...n,family_id:A.family.id,group_id:grp.id,is_curated:true}));
+  const{data:newNotes,error:noteErr}=await sbWrite(()=>sb.from('notes').insert(toInsert).select());
+  if(noteErr){toast('Error adding curated content.',true);console.error(noteErr);return grp;}
   if(newNotes)A.notes.push(...newNotes);
+  return grp;
 }
+window.seedCuratedGroup=seedCuratedGroup;
+
+// v20: Hides any curated group/notes the family hasn't opted into (Settings
+// toggle). Runs once right after loadAll() so nothing hidden ever reaches
+// rendering, the group ribbon, or Pinned. Toggling in Settings updates
+// A.notes/A.noteGroups directly (see toggleCuratedContent()) rather than
+// re-running this — this only governs what loadAll() just fetched.
+function _applyCuratedContentVisibility(){
+  const prefs=A.family?.curated_content_prefs||{};
+  const hiddenGroupIds=new Set(
+    A.noteGroups.filter(g=>g.is_curated && !prefs[g.curated_key]).map(g=>g.id)
+  );
+  if(hiddenGroupIds.size===0)return;
+  A.noteGroups=A.noteGroups.filter(g=>!hiddenGroupIds.has(g.id));
+  A.notes=A.notes.filter(n=>!(n.is_curated && hiddenGroupIds.has(n.group_id)));
+}
+window._applyCuratedContentVisibility=_applyCuratedContentVisibility;
 
 // ── ONE-TIME CLEANUP: remove old Meals-generated Notebook groups (v6) ─────────
 // Pre-v6, the Meals page auto-created Notebook groups/notes for shopping lists
@@ -808,9 +849,14 @@ async function initApp(user){
     try{await loadAll();}catch(e){console.error('Load error',e);}
   }
 
-  // Seed Medical group if family exists and group doesn't yet
-  if(A.family && !A.noteGroups.find(g=>g.name==='🏥 Medical Reference')){
-    try { await seedMedicalGroup(); } catch(e){ console.warn('Medical group seed error',e); }
+  // v20: Curated Content Library — hide any curated group/notes the family
+  // hasn't opted into (Settings toggle). Replaces the old always-on
+  // seedMedicalGroup() auto-seed from earlier versions — nothing curated
+  // appears in a fresh Notebook until the user chooses it. Only needs to
+  // run right after a genuine loadAll() (guarded above), not on every
+  // silent reconnect re-fire.
+  if (!A._appInitialized) {
+    _applyCuratedContentVisibility();
   }
 
   // One-time cleanup: remove old Meals-generated Notebook groups (v6)
@@ -1706,7 +1752,9 @@ function _isAtEventLimit(){
 // the Notebook. Notes have no series concept, so this is a plain count of
 // every row in A.notes (already scoped to the family via RLS).
 function _familyNoteCount(){
-  return A.notes.length;
+  // v20: curated notes never count toward the Free-plan limit — they're
+  // system-provided reference content, not something the user created.
+  return A.notes.filter(n=>!n.is_curated).length;
 }
 // true only for a 'free'-plan family already at (or over) its note limit.
 // early_adopter/premium always return false (unlimited). Defensive: if the
@@ -1718,6 +1766,38 @@ function _isAtNoteLimit(){
   const max = A.planLimits?.free?.max_notes;
   if (max == null) return false;
   return _familyNoteCount() >= max;
+}
+
+// v20: Shopping list count + limit check — same pattern as events/notes above.
+function _familyShoppingListCount(){
+  return A.shoppingLists.length;
+}
+// true only for a 'free'-plan family already at (or over) its shopping list
+// limit. early_adopter/premium always return false (unlimited). Defensive:
+// if the subscription/limits data never loaded, this returns false rather
+// than ever locking someone out of creating a list by accident.
+function _isAtShoppingListLimit(){
+  const planName = A.subscription?.plan_name || 'free';
+  if (planName !== 'free') return false;
+  const max = A.planLimits?.free?.max_shopping_lists;
+  if (max == null) return false;
+  return _familyShoppingListCount() >= max;
+}
+
+// v20: Family member count + limit check — same pattern as events/notes above.
+function _familyMemberCount(){
+  return A.members.length;
+}
+// true only for a 'free'-plan family already at (or over) its member limit.
+// early_adopter/premium always return false (unlimited). Defensive: if the
+// subscription/limits data never loaded, this returns false rather than
+// ever locking someone out of adding a member by accident.
+function _isAtMemberLimit(){
+  const planName = A.subscription?.plan_name || 'free';
+  if (planName !== 'free') return false;
+  const max = A.planLimits?.free?.max_members;
+  if (max == null) return false;
+  return _familyMemberCount() >= max;
 }
 
 // ── OPEN EVENT FORM ───────────────────────────────────────────────────────────
@@ -3785,7 +3865,7 @@ function renderNB(){
   };
 
   // Section order: user groups first, then a divider, then All Notes + Uncategorized at bottom
-  const userGroupSections=groups.map(g=>rSection(g.id,g.name,g.color||T.sage,true)).join('');
+  const userGroupSections=groups.map(g=>rSection(g.id,g.name,g.color||T.sage,!g.is_curated)).join('');
   // Divider only rendered when user has at least one group (separates user groups from defaults)
   const dividerEl=groups.length>0
     ? `<div style="height:1px;background:${T.border};margin:${ribbonOpen?'3px 8px 3px 12px':'3px 0'};opacity:.5"></div>`
@@ -3801,10 +3881,15 @@ function renderNB(){
       </button>`
     : '';
 
+  // v20: Curated Content Library — hide "+ Note" while viewing a curated
+  // group, since notes can't be added into a read-only group.
+  const _selectedGroupCurated = A.noteFGroup && A.noteFGroup!=='all' && A.noteFGroup!=='none'
+    && !!A.noteGroups.find(g=>g.id===A.noteFGroup)?.is_curated;
+
   // ── PAGE RENDER ──────────────────────────────────────────────────────────
   document.getElementById('page-notebook').innerHTML=`
     <div class="page-header">
-      <div class="page-title">Notebook <button class="btn btn-primary btn-sm" onclick="openNote(null)">+ Note</button></div>
+      <div class="page-title">Notebook ${_selectedGroupCurated?'':'<button class="btn btn-primary btn-sm" onclick="openNote(null)">+ Note</button>'}</div>
     </div>
     <!-- Search bar — full width above the split layout -->
     <div style="padding:8px 16px 6px">
@@ -3992,6 +4077,15 @@ function openNote(noteId){
     return;
   }
   const note=noteId?A.notes.find(n=>n.id===noteId):null;
+
+  // v20: Curated Content Library — curated notes are read-only. Show a
+  // view-only modal instead of the editable form: no Save/Delete, just the
+  // content and a Close button. Pin/unpin stays available separately since
+  // it's a personal action, not a content edit.
+  if(note?.is_curated){
+    _renderCuratedNoteView(note);
+    return;
+  }
   const groups=A.noteGroups;
   const cl=note?.checklist||[];
   // v8: show privacy toggle for new notes or notes the current user created.
@@ -4036,7 +4130,7 @@ function openNote(noteId){
         <select class="sel" id="ne-grp">
           <option value="">No group</option>
           <option value="__new__">+ New Group…</option>
-          ${groups.map(g=>{
+          ${groups.filter(g=>!g.is_curated).map(g=>{
             // v15: for a brand-new note (noteId is null), pre-select whichever
             // group the user was currently viewing in Notebook when they hit
             // "+ Note" (A.noteFGroup) — 'all'/'none' don't count as a real
@@ -4136,6 +4230,33 @@ function openNote(noteId){
 }
 window.openNote=openNote;
 
+// v20: View-only modal for a curated note — no title/content editing, no
+// Group/Member fields, no Save or Delete. Pin/unpin is the one interactive
+// control, since pinning is a personal action rather than a content edit.
+function _renderCuratedNoteView(note){
+  const safeContent=note.content?note.content.replace(/`/g,'&#96;'):'';
+  showModal(note.title||'Untitled',`
+    <div style="font-size:11px;color:${T.muted};margin-bottom:10px">📖 Curated reference content — read-only</div>
+    <div class="note-editor" style="margin-bottom:14px">${safeContent}</div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:16px;cursor:pointer">
+      <input type="checkbox" ${note.pinned?'checked':''} onchange="toggleCuratedNotePin('${note.id}',this.checked)"> 📌 Pin this note
+    </label>
+    <button class="btn btn-secondary btn-full" onclick="closeModal()">Close</button>`);
+}
+window._renderCuratedNoteView=_renderCuratedNoteView;
+
+// v20: Pin/unpin for curated notes — the one edit curated notes still allow.
+// Same optimistic-update + revert-on-failure shape as other quick toggles.
+async function toggleCuratedNotePin(noteId,checked){
+  const note=A.notes.find(n=>n.id===noteId);
+  if(!note)return;
+  const{error}=await sbWrite(()=>sb.from('notes').update({pinned:checked}).eq('id',noteId));
+  if(error){toast('Error saving — please try again.',true);console.error(error);return;}
+  note.pinned=checked;
+  renderNB();
+}
+window.toggleCuratedNotePin=toggleCuratedNotePin;
+
 // v14: opens the "New Group" mini-modal. Takes the target <select>'s id so
 // the Create button (below) can look it up via document.getElementById()
 // at click time -- safe from an inline onclick attribute, unlike a closure
@@ -4220,6 +4341,11 @@ window.addCLItem=addCLItem;
 
 async function saveNote(noteId){
   if(!A.family){toast('Set up your family first.',true);return;}
+  // v20: defensive guard — the Save button is never rendered for curated
+  // notes (see _renderCuratedNoteView()), but this stops any other path
+  // from editing one.
+  const _existingNote=noteId?A.notes.find(n=>n.id===noteId):null;
+  if(_existingNote?.is_curated){toast("Curated notes can't be edited — turn the topic off in Settings instead.",true);return;}
   // v13: cancel any pending auto-save — we're saving manually right now
   clearTimeout(A._noteAutoSaveTimer);
   A._noteAutoSaveTimer=null;
@@ -4308,6 +4434,11 @@ window.saveNote=saveNote;
 function delNote(id){
   const note=A.notes.find(n=>n.id===id);
   if(!note)return;
+  // v20: defensive guard — the Delete button is never rendered for curated
+  // notes (see _renderCuratedNoteView()), but this stops any other path
+  // from deleting one. Turning the topic off in Settings is the only way
+  // to hide curated content.
+  if(note.is_curated){toast("Curated notes can't be deleted — turn the topic off in Settings instead.",true);return;}
   showModal('Delete Note', `
     <div style="text-align:center;padding:10px 0">
       <div style="font-size:40px;margin-bottom:12px">🗑</div>
@@ -5764,9 +5895,44 @@ function renderShoppingTab(){
 }
 window.renderShoppingTab=renderShoppingTab;
 
+// v20: Shared write helper for Shopping Lists — every write to the
+// shopping_lists table routes through here so updated_at/updated_by_name
+// (Timestamps) can never be missed by a future write path. Callers pass
+// whatever fields they were already writing (e.g. {items} or {name}); this
+// merges in the timestamp fields automatically. Pass {select:true} as a
+// third argument for the one call site (saveShoppingListName) that needs
+// the updated row back.
+async function touchList(listId, extraFields, opts={}){
+  const payload={
+    ...extraFields,
+    updated_at:new Date().toISOString(),
+    updated_by_name:getActorName()
+  };
+  let q=sb.from('shopping_lists').update(payload).eq('id',listId);
+  if(opts.select) q=q.select().single();
+  return await sbWrite(()=>q);
+}
+window.touchList=touchList;
+
 function createShoppingList(){
   if(isSampleMode()){toast('Switch to My Family to create lists.',true);return;}
   if(!A.family){toast('Set up your family first.',true);return;}
+  // v20: Subscription block-modal check. Mirrors the same pattern used in
+  // openEvForm()/openNote() — only gates creating a brand-new list, never
+  // renaming or editing an existing one.
+  if(_isAtShoppingListLimit()){
+    showModal('Shopping list limit reached', `
+      <div style="text-align:center;padding:6px 0 4px">
+        <div style="font-size:13px;color:${T.ink};line-height:1.5">
+          You've reached your Shopping Lists limit on the Free plan. Delete an existing list to add a new one, or upgrade for unlimited lists.
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button class="btn btn-secondary btn-full" onclick="closeModal()">Manage existing</button>
+          <button class="btn btn-full" disabled style="background:#e5e0d5;color:#a89f8f;cursor:not-allowed;opacity:0.7">Upgrade — Coming soon</button>
+        </div>
+      </div>`);
+    return;
+  }
   // v9: show a naming modal instead of creating the list immediately with an
   // auto-generated name. The suggested name is pre-filled and auto-selected
   // so the user can just start typing to override it.
@@ -5877,7 +6043,7 @@ async function saveShoppingListName(id){
   showSavingToast();
   let _saveOk=false;
   try{
-    const{data,error}=await sbWrite(()=>sb.from('shopping_lists').update({name}).eq('id',id).select().single());
+    const{data,error}=await touchList(id,{name},{select:true});
     if(error){toast('Error renaming: '+(error.message||'please try again.'),true);console.error(error);return;}
     if(data){
       A.shoppingLists=A.shoppingLists.map(l=>l.id===id?data:l);
@@ -5938,6 +6104,10 @@ function renderShoppingModal(id){
     ? 'No items yet — add your first item below'
     : (searchQ ? `No items match "${A._shopSearchQ}"` : 'All items completed — toggle above to view');
   showModal(`🛒 ${list.name}`,`
+    ${(()=>{ // v20: small muted "Last edited" line — renders nothing for lists with no edit history yet
+      const _le=formatLastEdited(list.updated_at,list.updated_by_name);
+      return _le?`<div style="font-size:11px;color:${T.muted};margin-bottom:8px;opacity:0.85">${_le}</div>`:'';
+    })()}
     <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:${T.muted};margin-bottom:10px;cursor:pointer">
       <input type="checkbox" ${hideDone?'checked':''} onchange="A._shopHideDone=this.checked;renderShoppingModal('${id}')">
       👁 Hide completed (${doneCount})
@@ -5989,7 +6159,7 @@ async function updateShoppingItemText(listId,idx,newText){
   if(trimmed===item.text)return; // unchanged — nothing to save
   const newItems=items.map((it,i)=>i===idx?{...it,text:trimmed}:it);
   list.items=newItems;
-  const{error}=await sbWrite(()=>sb.from('shopping_lists').update({items:newItems}).eq('id',listId));
+  const{error}=await touchList(listId,{items:newItems});
   if(error){toast('Error saving item.',true);console.error(error);}
 }
 window.updateShoppingItemText=updateShoppingItemText;
@@ -6042,7 +6212,7 @@ async function reorderShoppingItems(listId,cont){
   list.items=newItems;
   // v10 (UX hardening): sbWrite() + error toast. No loading state — drag-to-
   // reorder should feel instant. Always re-render regardless of outcome.
-  const{error}=await sbWrite(()=>sb.from('shopping_lists').update({items:newItems}).eq('id',listId));
+  const{error}=await touchList(listId,{items:newItems});
   if(error){toast('Error saving new order.',true);console.error(error);}
   // v14: keep the Shopping tab page behind this modal in sync too — it was
   // previously only refreshed by leaving and returning to the Meals tab.
@@ -6065,7 +6235,7 @@ async function addShoppingItem(listId){
   const _addBtn=inp?.nextElementSibling;
   if(_addBtn){_addBtn.disabled=true;_addBtn.style.opacity='0.7';}
   try{
-    const{error}=await sbWrite(()=>sb.from('shopping_lists').update({items}).eq('id',listId));
+    const{error}=await touchList(listId,{items});
     if(error){toast('Error adding item.',true);console.error(error);return;}
     list.items=items;
     // v8: notify other family members
@@ -6087,7 +6257,7 @@ async function removeShoppingItem(listId,idx){
   const items=(list.items||[]).filter((_,i)=>i!==idx);
   list.items=items;
   // v10 (UX hardening): sbWrite() + error toast on failure.
-  const{error}=await sbWrite(()=>sb.from('shopping_lists').update({items}).eq('id',listId));
+  const{error}=await touchList(listId,{items});
   if(error){toast('Error removing item.',true);console.error(error);}
   // v14: keep the Shopping tab page behind this modal in sync too.
   renderMeals();
@@ -6104,7 +6274,7 @@ async function resetShoppingList(listId){
   const _resetBtn=document.querySelector('.modal-body .btn-secondary.btn-full');
   if(_resetBtn){_resetBtn.disabled=true;_resetBtn.style.opacity='0.7';}
   try{
-    const{error}=await sbWrite(()=>sb.from('shopping_lists').update({items}).eq('id',listId));
+    const{error}=await touchList(listId,{items});
     if(error){toast('Error resetting list.',true);console.error(error);return;}
     list.items=items;
     toast('All items unchecked! ✅');
@@ -6130,7 +6300,7 @@ async function toggleShoppingItem(listId,idx,checked){
   // confirmed DB write. On failure, re-render from the unchanged saved state
   // so the checkbox visually reverts instead of showing a state that was
   // never actually saved.
-  const{error}=await sbWrite(()=>sb.from('shopping_lists').update({items}).eq('id',listId));
+  const{error}=await touchList(listId,{items});
   if(error){
     toast('Error saving — please try again.',true);console.error(error);
     renderShoppingModal(listId);
@@ -6163,7 +6333,7 @@ async function toggleItemUrgent(listId,idx){
   if(!items[idx])return;
   const newUrgent=!items[idx].urgent;
   items[idx]={...items[idx],urgent:newUrgent};
-  const{error}=await sbWrite(()=>sb.from('shopping_lists').update({items}).eq('id',listId));
+  const{error}=await touchList(listId,{items});
   if(error){toast('Error saving — please try again.',true);console.error(error);return;}
   list.items=items;
   if(newUrgent){
@@ -6205,7 +6375,7 @@ async function undoShopCheck(listId,idx){
   // local state only updates after a confirmed DB write. On failure, re-render
   // from the unchanged saved state so the checkbox visually reverts instead of
   // showing an undo that was never actually saved.
-  const{error}=await sbWrite(()=>sb.from('shopping_lists').update({items}).eq('id',listId));
+  const{error}=await touchList(listId,{items});
   if(error){
     toast('Error saving — please try again.',true);console.error(error);
     renderShoppingModal(listId);
@@ -6655,7 +6825,7 @@ window.saveEditProduct=saveEditProduct;
 // ── SETTINGS ──────────────────────────────────────────────────────────────────
 function renderSettings(){
   const fam=getFamily(),members=getMembers();
-  const TABS=[{id:'family',label:'👨‍👩‍👧‍👦 Family'},{id:'calendar',label:'🗓 Calendar'},{id:'notifs',label:'🔔 Notifications'}];
+  const TABS=[{id:'family',label:'👨‍👩‍👧‍👦 Family'},{id:'calendar',label:'🗓 Calendar'},{id:'content',label:'📖 Curated Content'},{id:'notifs',label:'🔔 Notifications'}];
   let tc='';
 
   if(A.settingsTab==='family'){
@@ -6700,6 +6870,22 @@ function renderSettings(){
         <input class="inp" id="s-tag" placeholder="Add new tag…" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addFamTag();}">
         <button class="btn btn-primary btn-sm" onclick="addFamTag()">Add</button>
       </div>
+    </div>`;
+  } else if(A.settingsTab==='content'){
+    // v20: Curated Content Library toggles — driven entirely by the
+    // CURATED_CONTENT_LIBRARY catalog, so a future topic needs no new UI code.
+    const curatedPrefs=A.family?.curated_content_prefs||{};
+    tc=`<div class="card" style="padding:14px">
+      <div class="lbl" style="margin-bottom:10px">Curated Content Library</div>
+      <p style="font-size:12px;color:${T.muted};margin-bottom:14px">Optional reference content you can add to your Notebook. Read-only — you can still pin the notes you use most. Turning a topic off doesn't delete anything; it just hides it, and you can turn it back on any time.</p>
+      ${CURATED_CONTENT_LIBRARY.map(topic=>`
+        <label style="display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid ${T.border};cursor:pointer">
+          <input type="checkbox" style="margin-top:2px" ${curatedPrefs[topic.key]?'checked':''} onchange="toggleCuratedContent('${topic.key}',this.checked)">
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:700;margin-bottom:3px">${topic.settingsLabel}</div>
+            <div style="font-size:12px;color:${T.muted};line-height:1.5">${topic.description}</div>
+          </div>
+        </label>`).join('')}
     </div>`;
   } else {
     const prefs = getNotifPrefs();
@@ -6928,6 +7114,24 @@ async function confirmDelMem(id){
 window.confirmDelMem=confirmDelMem;
 
 function openAddMem(){
+  // v20: Subscription block-modal check. Mirrors the same pattern used in
+  // openEvForm()/openNote()/createShoppingList() — gates opening the "add
+  // member" form itself (there's no separate "new vs edit" entry point for
+  // members the way events/notes have, so this is the right gate, same as
+  // saveMem() is the equivalent of saveEv()/saveNote()).
+  if(_isAtMemberLimit()){
+    showModal('Family member limit reached', `
+      <div style="text-align:center;padding:6px 0 4px">
+        <div style="font-size:13px;color:${T.ink};line-height:1.5">
+          You've reached your Family Members limit on the Free plan. Remove an existing member to add a new one, or upgrade for unlimited members.
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button class="btn btn-secondary btn-full" onclick="closeModal()">Manage existing</button>
+          <button class="btn btn-full" disabled style="background:#e5e0d5;color:#a89f8f;cursor:not-allowed;opacity:0.7">Upgrade — Coming soon</button>
+        </div>
+      </div>`);
+    return;
+  }
   showModal('Add Family Member',`
     <div class="grid2">
       <div class="form-row" style="margin:0"><label class="lbl">Name *</label><input class="inp" id="nm-n" placeholder="Name" autofocus></div>
@@ -7506,6 +7710,59 @@ async function updateNotifPref(key, val) {
   A.family = data;
 }
 window.updateNotifPref = updateNotifPref;
+
+// v20: Curated Content Library — Settings toggle. Mirrors updateNotifPref()'s
+// structure (optimistic-feeling update, sbWrite(), revert + toast on failure).
+async function toggleCuratedContent(key, val){
+  if(!A.family)return;
+  const topic=CURATED_CONTENT_LIBRARY.find(t=>t.key===key);
+  if(!topic)return;
+  const prefs={...(A.family.curated_content_prefs||{}), [key]:val};
+  const{data,error}=await sbWrite(()=>sb.from('families')
+    .update({curated_content_prefs:prefs})
+    .eq('id',A.family.id)
+    .select().single());
+  if(error){toast('Error saving preference.',true);console.error(error);renderSettings();return;}
+  A.family=data;
+
+  if(val){
+    // Turning ON. If the group already exists locally, nothing else to do —
+    // it was never actually removed from the DB by a toggle-off.
+    let grp=A.noteGroups.find(g=>g.curated_key===key);
+    if(!grp){
+      // Not in local state — either this is genuinely the first time ever
+      // (no row in the DB yet), or it exists in the DB but was filtered out
+      // of local state while hidden (a previous toggle-off, earlier this
+      // session or a previous session). Check the DB before seeding fresh,
+      // so re-enabling never creates a duplicate group+notes.
+      const{data:existingGrp}=await sb.from('note_groups').select('*').eq('curated_key',key).maybeSingle();
+      if(existingGrp){
+        grp=existingGrp;
+        A.noteGroups.push(grp);
+        const{data:existingNotes}=await sb.from('notes').select('*').eq('group_id',grp.id);
+        (existingNotes||[]).forEach(n=>{ if(!A.notes.some(x=>x.id===n.id)) A.notes.push(n); });
+      } else {
+        grp=await seedCuratedGroup(key); // genuinely first time — insert group+notes
+        if(!grp){renderSettings();return;} // seeding failed — toast already shown
+      }
+    }
+  } else {
+    // Turning OFF: drop the group+notes from local state only — nothing is
+    // deleted in the database, so toggling back on later is instant.
+    const grp=A.noteGroups.find(g=>g.curated_key===key);
+    if(grp){
+      A.notes=A.notes.filter(n=>n.group_id!==grp.id);
+      A.noteGroups=A.noteGroups.filter(g=>g.id!==grp.id);
+      // If the hidden group was the one currently selected in the Notebook
+      // ribbon, fall back to "All Notes" so the view doesn't point at a
+      // group that no longer exists in local state.
+      if(A.noteFGroup===grp.id) A.noteFGroup='all';
+    }
+  }
+  renderNB();
+  renderSettings();
+}
+window.toggleCuratedContent=toggleCuratedContent;
 
 // ── FEEDBACK ──────────────────────────────────────────────────────────────────
 // Floating 💬 button → modal form → saves to `feedback` table in Supabase.
