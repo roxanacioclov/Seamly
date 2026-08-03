@@ -1,4 +1,4 @@
-<!-- Seamly v20 | STAGING | 01 Aug 2026 -->
+<!-- Seamly v20.2 | STAGING | 03 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -774,14 +774,25 @@ window.CURATED_CONTENT_LIBRARY = CURATED_CONTENT_LIBRARY;
 // automatically on every login. Inserts the group + all its notes, both
 // flagged is_curated:true so they're read-only and excluded from the note
 // count. Returns the inserted group row, or null on failure.
+//
+// v20.2 fix: seedMedicalGroup() (the old V19 function this replaced) had a
+// duplicate-seeding bug — its only protection was a client-side check of
+// A.noteGroups, which two near-simultaneous loads (two tabs/devices) could
+// both pass before either insert resolved, producing two identical groups.
+// The new curated system had the same latent risk here. Fixed at the
+// database level instead of relying on JS timing: uses .upsert() against
+// the new UNIQUE(family_id, curated_key) partial index (see
+// seamly_schema_v20_2_03_08.sql), so a racing second seed attempt is now a
+// harmless no-op enforced by Postgres itself — same pattern already used
+// for meal_plans since v7.
 async function seedCuratedGroup(key){
   if(!A.family)return null;
   const topic=CURATED_CONTENT_LIBRARY.find(t=>t.key===key);
   if(!topic)return null;
   // v10 (UX hardening): sbWrite() for idle-safety.
-  const{data:grp,error:grpErr}=await sbWrite(()=>sb.from('note_groups').insert({
+  const{data:grp,error:grpErr}=await sbWrite(()=>sb.from('note_groups').upsert({
     family_id:A.family.id, name:topic.groupName, is_curated:true, curated_key:key
-  }).select().single());
+  },{onConflict:'family_id,curated_key'}).select().single());
   if(grpErr||!grp){toast('Error adding curated content.',true);console.error(grpErr);return null;}
   A.noteGroups.push(grp);
   const toInsert=topic.notes.map(n=>({...n,family_id:A.family.id,group_id:grp.id,is_curated:true}));
@@ -5902,6 +5913,18 @@ window.renderShoppingTab=renderShoppingTab;
 // merges in the timestamp fields automatically. Pass {select:true} as a
 // third argument for the one call site (saveShoppingListName) that needs
 // the updated row back.
+//
+// v20 fix (staging feedback): two issues found in testing —
+// 1) The "Last edited" line only updated after a full page refresh, because
+//    the DB write succeeded but the in-memory `list` object was never
+//    updated to match — fixed by syncing local state here, in the one
+//    shared place, right after a successful write.
+// 2) Loading feedback was inconsistent across the 9 call sites (only
+//    saveShoppingListName showed the standard "Saving…" spinner toast used
+//    elsewhere in the app). Now consistent everywhere by default. Pass
+//    {silent:true} to skip it for actions that should feel instant — used
+//    by reorderShoppingItems(), matching its existing "should feel instant"
+//    design intent.
 async function touchList(listId, extraFields, opts={}){
   const payload={
     ...extraFields,
@@ -5910,7 +5933,14 @@ async function touchList(listId, extraFields, opts={}){
   };
   let q=sb.from('shopping_lists').update(payload).eq('id',listId);
   if(opts.select) q=q.select().single();
-  return await sbWrite(()=>q);
+  if(!opts.silent) showSavingToast();
+  const result=await sbWrite(()=>q);
+  if(!opts.silent) hideSavingToast();
+  if(!result.error){
+    const list=A.shoppingLists.find(l=>l.id===listId);
+    if(list){ list.updated_at=payload.updated_at; list.updated_by_name=payload.updated_by_name; }
+  }
+  return result;
 }
 window.touchList=touchList;
 
@@ -6212,7 +6242,7 @@ async function reorderShoppingItems(listId,cont){
   list.items=newItems;
   // v10 (UX hardening): sbWrite() + error toast. No loading state — drag-to-
   // reorder should feel instant. Always re-render regardless of outcome.
-  const{error}=await touchList(listId,{items:newItems});
+  const{error}=await touchList(listId,{items:newItems},{silent:true});
   if(error){toast('Error saving new order.',true);console.error(error);}
   // v14: keep the Shopping tab page behind this modal in sync too — it was
   // previously only refreshed by leaving and returning to the Meals tab.
