@@ -1988,10 +1988,25 @@ function openEvForm(type, evId, dateTs, duplicateId) {
   // DATE/TIME DEFAULTS
   // Fix date offset: use local ISO, not UTC-shifted
   const nowD = new Date();
-  const iDate = dateTs ? toISOLocal(new Date(dateTs)) : toISOLocal(nowD);
-  const nowH = nowD.getHours();
-  const defST = String(nowH).padStart(2,'0') + ':00';
-  const defET = String(Math.min(nowH+1,23)).padStart(2,'0') + ':00';
+  // v21 fix (found in staging testing of Quick Add, then confirmed as a
+  // wider issue): this previously truncated to the current hour, so a
+  // brand-new timed event always defaulted to a start time already in the
+  // past (e.g. opened at 21:25 -> defaulted to 21:00). Nobody plans an
+  // event that already started — this now rounds UP to the next full hour
+  // instead. Day rollover past 23:00 (e.g. 23:40 -> tomorrow 00:00) only
+  // applies when no specific date was already chosen (dateTs null, e.g.
+  // the general "+ Add" entry point) — tapping a specific day on the
+  // Calendar always keeps that exact day, regardless of the current time;
+  // in that case the hour is simply capped at 23:00 instead of wrapping.
+  let defHour = nowD.getHours() + 1;
+  let defDateD = nowD;
+  if (defHour >= 24) {
+    if (dateTs) { defHour = 23; }
+    else { defHour = 0; defDateD = addDays(nowD, 1); }
+  }
+  const iDate = dateTs ? toISOLocal(new Date(dateTs)) : toISOLocal(defDateD);
+  const defST = String(defHour).padStart(2,'0') + ':00';
+  const defET = String(Math.min(defHour+1,23)).padStart(2,'0') + ':00';
 
   const evDate = source ? toISOLocal(new Date(source.date)) : '';
   const evTime = source ? new Date(source.date).toTimeString().slice(0,5) : '';
@@ -8012,9 +8027,20 @@ function openQuickTask(){
   // limit rather than becoming an accidental way around it.
   if(_isAtEventLimit()){ _quickLimitModal('Events'); return; }
   const nowD=new Date();
-  const iDate=toISOLocal(nowD);
-  // Same "current hour, on the hour" default openEvForm() already uses.
-  const defTime=String(nowD.getHours()).padStart(2,'0')+':00';
+  // v21 fix (found in staging testing): unlike the full Calendar form —
+  // where truncating to the current hour is fine, since the person is
+  // already looking at the form and can adjust it — Quick Add's whole
+  // point is that people save the suggested defaults without checking
+  // them. Truncating meant a task saved at 21:25 defaulted to 21:00,
+  // already in the past, so it never showed in Home's Today section. This
+  // genuinely rounds UP to the next full hour instead, rolling over to
+  // tomorrow if it's currently past 23:00. Deliberately NOT applied to
+  // openEvForm() itself — that's separate, established behavior elsewhere.
+  let defHour=nowD.getHours()+1;
+  let defDateD=nowD;
+  if(defHour>=24){ defHour=0; defDateD=addDays(nowD,1); }
+  const iDate=toISOLocal(defDateD);
+  const defTime=String(defHour).padStart(2,'0')+':00';
   showModal('Quick Task', `
     <div class="form-row"><label class="lbl">Title *</label><input class="inp" id="qt-title" placeholder="Task title" autofocus></div>
     <div class="grid2">
