@@ -1,4 +1,4 @@
-<!-- Seamly v20.2 | PROD | 03 Aug 2026 -->
+<!-- Seamly v21 | PROD | 04 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -125,9 +125,11 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
    button now opens the consolidated My Profile menu, not just Notifications. */
 #profile-btn{position:relative;background:none;border:none;font-size:20px;cursor:pointer;padding:2px 6px;color:var(--muted);-webkit-tap-highlight-color:transparent}
 #profile-dot{position:absolute;top:1px;right:3px;background:var(--rose);border-radius:99px;width:9px;height:9px;display:none;box-sizing:border-box}
-/* ── Feedback floating action button (V8) ───────────────────────── */
-.feedback-fab{position:fixed;bottom:80px;right:16px;z-index:100;width:44px;height:44px;border-radius:50%;background:var(--sage);color:#fff;border:none;font-size:18px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;transition:transform .2s,box-shadow .2s;-webkit-tap-highlight-color:transparent}
-.feedback-fab:active{transform:scale(.93);box-shadow:0 2px 8px rgba(0,0,0,.15)}
+/* ── Quick Add floating action button (v21) ─────────────────────── */
+/* Replaces the old .feedback-fab in this same bottom-right spot — Send
+   Feedback moved into the Profile Menu instead (see openProfileMenu()). */
+.quick-add-fab{position:fixed;bottom:80px;right:16px;z-index:100;width:48px;height:48px;border-radius:50%;background:var(--sage);color:#fff;border:none;font-size:24px;font-weight:400;line-height:1;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;transition:transform .2s,box-shadow .2s;-webkit-tap-highlight-color:transparent}
+.quick-add-fab:active{transform:scale(.93);box-shadow:0 2px 8px rgba(0,0,0,.15)}
 @media (min-width:768px){
   #root{max-width:none;margin:0}
   .bottom-nav{position:fixed;top:0;left:0;bottom:0;width:220px;flex-direction:column;justify-content:flex-start;align-items:stretch;border-top:none;border-right:1px solid var(--border);box-shadow:none;padding:16px 0;z-index:60;overflow-y:auto}
@@ -179,7 +181,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div class="auth-card">
     <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">Seamly</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v18.5 — 28 Jul 2026</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v21 — 04 Aug 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -230,7 +232,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v18.5</span>
+      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v21</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sample-btn" onclick="A.family?toggleSampleMode():goTo('settings')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:var(--honey-light);color:var(--honey);border:1px solid var(--honey)44;cursor:pointer;display:none">📋 Sample</button>
@@ -270,7 +272,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v18.5</span>
+      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v21</span>
     </div>
     <button class="nav-btn" data-page="home" onclick="goTo('home')">
       <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0">
@@ -323,8 +325,8 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div id="modal-root"></div>
   <div id="ob-root"></div>
   <div id="notif-root"></div>
-  <!-- ── Feedback floating action button (V8) ─────────────────── -->
-  <button class="feedback-fab" id="feedback-fab-btn" onclick="openFeedback()" title="Send feedback" aria-label="Send feedback">💬</button>
+  <!-- ── Quick Add floating action button (v21) ────────────────── -->
+  <button class="quick-add-fab" id="quick-add-fab-btn" onclick="openQuickAddMenu()" title="Quick add" aria-label="Quick add">+</button>
 </div>
 
 <script>
@@ -597,6 +599,12 @@ function switchAuth(m){
   document.getElementById('s-msg').textContent='';
 }
 
+// v21: no invite-token changes needed here — signInWithPassword() doesn't
+// redirect anywhere, it just triggers Supabase's SIGNED_IN event in place,
+// which boot() already routes to handleSession() -> initApp(). initApp()'s
+// new invite-acceptance step (see below) runs for every session, login
+// included, so an existing user who clicked an invite link is covered
+// automatically with no extra code needed here.
 async function doLogin(){
   const email=document.getElementById('a-email').value.trim();
   const pass=document.getElementById('a-pass').value;
@@ -615,7 +623,14 @@ async function doSignup(){
   if(!name||!email||!pass){msg.textContent='Please fill in all fields.';return;}
   if(pass.length<6){msg.textContent='Password must be at least 6 characters.';return;}
   msg.textContent='Creating account…';
-  const{error}=await sb.auth.signUp({email,password:pass,options:{data:{name}}});
+  // v21: if the user arrived via an invite link, carry the token through
+  // Supabase's confirmation-email redirect so it's still in the URL when
+  // they click through and land back here — boot() re-captures it and
+  // initApp() runs accept_family_invite() once they're signed in.
+  const _pendingInvite = localStorage.getItem('ks_pending_invite');
+  const _redirectBase = window.location.origin + window.location.pathname;
+  const emailRedirectTo = _pendingInvite ? `${_redirectBase}?invite=${_pendingInvite}` : _redirectBase;
+  const{error}=await sb.auth.signUp({email,password:pass,options:{data:{name},emailRedirectTo}});
   if(error){msg.textContent=error.message;return;}
   msg.style.color=T.sage;
   msg.textContent='Account created! Signing you in…';
@@ -635,9 +650,14 @@ async function doForgot(){
 window.doForgot=doForgot;
 
 async function doGoogleAuth(){
+  // v21: same invite-token carry-through as doSignup(), for the OAuth
+  // redirect — Google sends the user back to this exact URL after auth.
+  const _pendingInvite = localStorage.getItem('ks_pending_invite');
+  const _redirectBase = window.location.origin + window.location.pathname;
+  const redirectTo = _pendingInvite ? `${_redirectBase}?invite=${_pendingInvite}` : _redirectBase;
   const{error}=await sb.auth.signInWithOAuth({
     provider:'google',
-    options:{ redirectTo: window.location.origin + window.location.pathname }
+    options:{ redirectTo }
   });
   if(error) toast(error.message, true);
 }
@@ -876,6 +896,34 @@ async function initApp(user){
     try { localStorage.setItem('ks_meals_cleanup_v6_'+A.family.id,'1'); } catch(_) {}
   }
 
+  // v21: token-based invite acceptance — runs BEFORE the unlinked-member
+  // email fallback below, since the token (not the invited email) is now
+  // the primary source of truth for linking an invited user to a family.
+  // The email-match fallback further down stays exactly as-is, for members
+  // added without ever generating an invite link.
+  const _pendingInvite = localStorage.getItem('ks_pending_invite');
+  if (_pendingInvite) {
+    try {
+      const { data: acceptResult, error: acceptErr } = await sb.rpc('accept_family_invite', { invite_token: _pendingInvite });
+      localStorage.removeItem('ks_pending_invite');
+      if (acceptErr) {
+        console.error('Invite acceptance error', acceptErr);
+        toast('There was a problem with that invite link — please try again or ask the family owner for a new one.', true);
+      } else if (acceptResult?.success) {
+        try { await loadAll(); } catch(e) { console.error('Reload after invite accept error', e); }
+        toast(`Welcome to ${acceptResult.family_name || 'the family'}! 🎉`);
+      } else if (acceptResult && !acceptResult.success) {
+        // invalid_or_used or member_missing — accept_family_invite() already
+        // wrote a clear, user-facing message for either case.
+        toast(acceptResult.message || "That invite link isn't valid — please ask the family owner for a new one.", true);
+      }
+    } catch (e) {
+      console.error('Invite acceptance error', e);
+      localStorage.removeItem('ks_pending_invite');
+      toast('There was a problem with that invite link — please try again.', true);
+    }
+  }
+
   // ALWAYS check for unlinked family_members rows matching this user's email
   // This covers: invited users who already had an account, users added after signup
   try {
@@ -1080,30 +1128,49 @@ window.addEventListener('popstate', () => {
 
 // ── ONBOARDING ────────────────────────────────────────────────────────────────
 // Single unified onboarding flow — all new users start from Settings
-const OB=[
-  {icon:'👋',title:'Welcome to Seamly',body:"Your family's all-in-one hub — calendar, notes, meds tracking, and wellness insights. Let's take a quick tour!"},
-  {icon:'⚙️',title:'Settings',body:'Start here — create your family or explore the one you were invited to, add or review family members, and set your preferences.'},
-  {icon:'🗓',title:'Calendar',body:'Add social events, health appointments, wellness logs, and tasks. Filter by type or member. Everything shared in one view.'},
-  {icon:'📓',title:'Notebook',body:'Digital notes organised into groups. School schedules, health notes, shopping lists, travel plans — shared with your family.'},
-  {icon:'💊',title:'Meds & Supplies',body:'Track daily and occasional medications. The app calculates run-out dates and helps you coordinate your next order.'},
-  {icon:'📊',title:'Insights',body:"Wellness trends for your family — sleep, hydration, energy, weight — plus a personalised weekly challenge."},
-  {icon:'🚀',title:"You're all set!",body:'Head to Settings first to set up your family or meet the one you joined. Everything you add is shared in real time.',final:true},
-];
+// v21: content split by obFlow (finally reading the flag initApp() already
+// set but nothing consumed before) + a Shopping Lists slide that was
+// missing from the tour entirely. Only the Settings and final slides
+// differ between the two flows; everything else is identical either way.
+// Each slide's accentColor matches the color already used for that feature
+// elsewhere in the app (existing palette — Calendar:sky, Notebook:plum,
+// Shopping:sage, Meds:rose, Insights:honey, Welcome/Settings/final:sage),
+// used for both the icon badge's tint background and this slide's dot.
+function getOB(){
+  const isNew = A.obFlow === 'new';
+  return [
+    {icon:'👋',title:'Welcome to Seamly',body:"Your family's all-in-one hub — calendar, notes, meds tracking, shopping lists, and insights. Let's take a quick tour!",accent:T.sage},
+    isNew
+      ? {icon:'⚙️',title:'Settings',body:'Start here to create your family — add members, set your preferences, and get everyone set up.',accent:T.sage}
+      : {icon:'⚙️',title:'Settings',body:'Review your family and the members already in it, and make it your own.',accent:T.sage},
+    {icon:'🗓',title:'Calendar',body:'Add social events, health appointments, wellness logs, and tasks. Filter by type or member. Everything shared in one view.',accent:T.sky},
+    {icon:'📓',title:'Notebook',body:'Digital notes organised into groups. School schedules, health notes, travel plans — shared with your family.',accent:T.plum},
+    {icon:'🛒',title:'Shopping Lists',body:'Keep a running list for every store or occasion. Check items off together, from anywhere, in real time.',accent:T.sage},
+    {icon:'💊',title:'Meds & Supplies',body:'Track daily and occasional medications. The app calculates run-out dates and helps you coordinate your next order.',accent:T.rose},
+    {icon:'📊',title:'Insights',body:"A simple weekly digest across your calendar, notes, meds, shopping, and meals — plus a personalised family challenge.",accent:T.honey},
+    isNew
+      ? {icon:'🚀',title:"You're all set!",body:'Head to Settings to create your family and add your first members.',accent:T.sage,final:true,cta:'settings'}
+      : {icon:'🚀',title:"You're all set!",body:"You're ready to go — head to Home to see what's happening.",accent:T.sage,final:true,cta:'home'},
+  ];
+}
 
 function renderOB(){
+  const OB=getOB();
   const s=A.obStep, cur=OB[s];
   const card = document.getElementById('ob-root');
   card.innerHTML=`
     <div class="ob-bg">
       <div class="ob-card" id="ob-card-inner">
-        <div class="ob-dots">${OB.map((_,i)=>`<div class="ob-dot ${i===s?'active':''}"></div>`).join('')}</div>
-        <div style="font-size:52px;text-align:center;margin-bottom:14px">${cur.icon}</div>
+        <div class="ob-dots">${OB.map((step,i)=>`<div class="ob-dot ${i===s?'active':''}" style="${i===s?`background:${step.accent||T.sage}`:''}"></div>`).join('')}</div>
+        <div style="width:64px;height:64px;border-radius:50%;background:${(cur.accent||T.sage)}22;display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+          <span style="font-size:30px">${cur.icon}</span>
+        </div>
         <div style="font-family:'Playfair Display',serif;font-size:21px;color:${T.ink};text-align:center;margin-bottom:10px;font-weight:600">${cur.title}</div>
         <div style="font-size:13px;color:${T.muted};text-align:center;line-height:1.7;margin-bottom:20px">${cur.body}</div>
         <div style="display:flex;gap:10px">
           ${s>0?`<button class="btn btn-secondary" style="flex:1" onclick="A.obStep--;renderOB()">← Back</button>`:''}
           ${cur.final
-            ?`<button class="btn btn-primary" style="flex:1" onclick="document.getElementById('ob-root').innerHTML='';goTo('settings')">Go to Settings 🚀</button>`
+            ?`<button class="btn btn-primary" style="flex:1" onclick="document.getElementById('ob-root').innerHTML='';goTo('${cur.cta||'settings'}')">${cur.cta==='home'?'Go to Home 🚀':'Go to Settings 🚀'}</button>`
             :`<button class="btn btn-primary" style="flex:1" onclick="A.obStep++;renderOB()">${s===0?"Let's go →":"Next →"}</button>`
           }
         </div>
@@ -1288,6 +1355,7 @@ function renderCal(){
     <div class="page-header">
       <div class="page-title">Calendar <button class="btn btn-primary btn-sm" onclick="showPicker(null)">+ Add</button></div>
     </div>
+    ${_usageBanner('events','Events')}
     <div style="padding:8px 16px 0;display:flex;gap:5px;flex-wrap:wrap;align-items:center">
       <select class="sel" style="width:auto;font-size:12px;padding:4px 10px;border-radius:20px;flex-shrink:0;font-weight:700;color:${T.sage};border:1.5px solid ${T.sage};background:#fff" onchange="A.calView=this.value;renderCal()">
         ${['month','week','year'].map(v=>`<option value="${v}"${A.calView===v?' selected':''}>${v.charAt(0).toUpperCase()+v.slice(1)} view</option>`).join('')}
@@ -1811,6 +1879,78 @@ function _isAtMemberLimit(){
   return _familyMemberCount() >= max;
 }
 
+// ── SUBSCRIPTION — USAGE DISPLAY (v21 Pass B) ────────────────────────────────
+// The counting logic and 100%-block modals above already existed; this adds
+// the two pieces the Subscription spec still needed: an 80% warning banner,
+// and the Settings "Plan & Usage" card.
+
+// Returns {count, max, pct} for a free-plan family, or null if the family
+// isn't on the free plan (early_adopter/premium: nothing to show) or the
+// limit isn't configured. Reuses the exact same _family*Count() helpers the
+// 100%-block modals already rely on, so this can never disagree with them.
+function _usageInfo(kind){
+  const planName = A.subscription?.plan_name || 'free';
+  if (planName !== 'free') return null;
+  const map = {
+    events:   { count: _familyEventCount(),        max: A.planLimits?.free?.max_events },
+    notes:    { count: _familyNoteCount(),          max: A.planLimits?.free?.max_notes },
+    shopping: { count: _familyShoppingListCount(),  max: A.planLimits?.free?.max_shopping_lists },
+    members:  { count: _familyMemberCount(),        max: A.planLimits?.free?.max_members },
+  };
+  const info = map[kind];
+  if (!info || info.max == null) return null;
+  const pct = info.max > 0 ? Math.min(100, Math.round((info.count / info.max) * 100)) : 0;
+  return { count: info.count, max: info.max, pct };
+}
+
+// Small dismissible banner shown once a free-plan family reaches 80% of a
+// limit. Dismiss is per-SESSION only (A._dismissedUsageBanners is a plain
+// in-memory object, never persisted) — it reappears next visit if still at
+// or above 80%, per spec §5.
+function _usageBanner(kind, label){
+  if (A._dismissedUsageBanners?.[kind]) return '';
+  const info = _usageInfo(kind);
+  if (!info || info.pct < 80) return '';
+  return `<div style="margin:8px 16px 0;background:${T.honeyLight};border:1px solid ${T.honey}55;border-radius:11px;padding:10px 12px;display:flex;align-items:center;gap:10px">
+    <span style="flex:1;font-size:12px;font-weight:600;color:${T.honey}">You're at ${info.count}/${info.max} ${label} on the Free plan.</span>
+    <button onclick="A._dismissedUsageBanners=A._dismissedUsageBanners||{};A._dismissedUsageBanners['${kind}']=true;renderPage()" style="background:none;border:none;color:${T.honey};font-size:16px;cursor:pointer;line-height:1;padding:0 2px;flex-shrink:0" aria-label="Dismiss">×</button>
+  </div>`;
+}
+
+// Settings "Plan & Usage" card — plan name plainly stated, plus four
+// progress bars for free-plan families (amber at 80%+, red at 100%), or a
+// single "unlimited" line for early_adopter/premium. Per spec §6.
+function _renderPlanUsageCard(){
+  const planName = A.subscription?.plan_name || 'free';
+  if (planName !== 'free') {
+    const label = planName === 'early_adopter' ? 'Early Adopter 🌟' : 'Premium';
+    return `<div class="card" style="padding:14px;margin-bottom:12px">
+      <div class="lbl" style="margin-bottom:8px">Plan &amp; Usage</div>
+      <div style="font-weight:700;font-size:14px;color:${T.ink};margin-bottom:4px">${label}</div>
+      <div style="font-size:12px;color:${T.muted}">Unlimited usage — thank you for being an early supporter!</div>
+    </div>`;
+  }
+  const rows = [['events','Events'], ['notes','Notes'], ['shopping','Shopping Lists'], ['members','Family Members']];
+  const bar = (kind, label) => {
+    const info = _usageInfo(kind);
+    if (!info) return '';
+    const barColor = info.pct >= 100 ? T.rose : info.pct >= 80 ? T.honey : T.sage;
+    return `<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:${T.ink};margin-bottom:4px">
+        <span>${label}</span><span style="color:${T.muted}">${info.count}/${info.max}</span>
+      </div>
+      <div style="background:${T.parchment};border-radius:99px;height:6px;overflow:hidden">
+        <div style="height:100%;width:${info.pct}%;background:${barColor};border-radius:99px"></div>
+      </div>
+    </div>`;
+  };
+  return `<div class="card" style="padding:14px;margin-bottom:12px">
+    <div class="lbl" style="margin-bottom:10px">Plan &amp; Usage</div>
+    <div style="font-weight:700;font-size:14px;color:${T.ink};margin-bottom:12px">Free Plan</div>
+    ${rows.map(([k,l]) => bar(k,l)).join('')}
+  </div>`;
+}
+
 // ── OPEN EVENT FORM ───────────────────────────────────────────────────────────
 function openEvForm(type, evId, dateTs, duplicateId) {
   // v18 Pass D: Subscription block-modal check. Only gates a genuinely NEW
@@ -1848,10 +1988,25 @@ function openEvForm(type, evId, dateTs, duplicateId) {
   // DATE/TIME DEFAULTS
   // Fix date offset: use local ISO, not UTC-shifted
   const nowD = new Date();
-  const iDate = dateTs ? toISOLocal(new Date(dateTs)) : toISOLocal(nowD);
-  const nowH = nowD.getHours();
-  const defST = String(nowH).padStart(2,'0') + ':00';
-  const defET = String(Math.min(nowH+1,23)).padStart(2,'0') + ':00';
+  // v21 fix (found in staging testing of Quick Add, then confirmed as a
+  // wider issue): this previously truncated to the current hour, so a
+  // brand-new timed event always defaulted to a start time already in the
+  // past (e.g. opened at 21:25 -> defaulted to 21:00). Nobody plans an
+  // event that already started — this now rounds UP to the next full hour
+  // instead. Day rollover past 23:00 (e.g. 23:40 -> tomorrow 00:00) only
+  // applies when no specific date was already chosen (dateTs null, e.g.
+  // the general "+ Add" entry point) — tapping a specific day on the
+  // Calendar always keeps that exact day, regardless of the current time;
+  // in that case the hour is simply capped at 23:00 instead of wrapping.
+  let defHour = nowD.getHours() + 1;
+  let defDateD = nowD;
+  if (defHour >= 24) {
+    if (dateTs) { defHour = 23; }
+    else { defHour = 0; defDateD = addDays(nowD, 1); }
+  }
+  const iDate = dateTs ? toISOLocal(new Date(dateTs)) : toISOLocal(defDateD);
+  const defST = String(defHour).padStart(2,'0') + ':00';
+  const defET = String(Math.min(defHour+1,23)).padStart(2,'0') + ':00';
 
   const evDate = source ? toISOLocal(new Date(source.date)) : '';
   const evTime = source ? new Date(source.date).toTimeString().slice(0,5) : '';
@@ -3902,6 +4057,7 @@ function renderNB(){
     <div class="page-header">
       <div class="page-title">Notebook ${_selectedGroupCurated?'':'<button class="btn btn-primary btn-sm" onclick="openNote(null)">+ Note</button>'}</div>
     </div>
+    ${_usageBanner('notes','Notes')}
     <!-- Search bar — full width above the split layout -->
     <div style="padding:8px 16px 6px">
       <div style="position:relative">
@@ -5363,70 +5519,196 @@ async function saveEditDM(id){
 window.saveEditDM=saveEditDM;
 
 // ── INSIGHTS ──────────────────────────────────────────────────────────────────
-function renderInsights(){
-  const wLogs=getEvents().filter(e=>e.type==='wellness');
-  const hEvs=getEvents().filter(e=>e.type==='health');
-  const avg=(arr,k)=>{const v=arr.map(e=>parseFloat(e[k])).filter(v=>!isNaN(v)&&v>0);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;};
-  if(!A.insightsMember)A.insightsMember='all';
+// ── INSIGHTS PAGE ────────────────────────────────────────────────────────────
+// v21: full rework. Previously this page showed Wellness observations plus
+// trend charts (weight/sleep/energy/hydration); the Wellness section is now
+// dropped entirely and no charts appear anywhere on this page. Instead it
+// surfaces one simple line/list/number per item, pulled from the app's five
+// other modules — Calendar, Notebook, Inventory, Shopping, Meals. The
+// Weekly Family Challenge banner is unchanged, just moved to the top
+// instead of sitting above the old Wellness section.
+// See seamly_v17_insights_spec.md (content confirmed, assigned to V21) for
+// the full spec this implements.
 
-  // Pick challenge based on week number
+// Adjustable config for the Inventory > "Products expiring soon" section —
+// kept as a named constant instead of a hardcoded 30 inline, per spec §2.3.
+const INSIGHTS_EXPIRY_WINDOW_DAYS = 30;
+
+// ── Calendar helpers ─────────────────────────────────────────────────────────
+
+// Busiest day of the week, by AVERAGE event count per weekday, over the
+// last 30 days (today and the 29 days before it). A straight count would
+// be biased by the fact that a 30-day window doesn't contain the exact
+// same number of each weekday — dividing by how many times each weekday
+// actually occurred in the window corrects for that.
+// Wellness log entries (type:'wellness') are excluded, consistent with how
+// the rest of the app (e.g. Home's Today/Coming Up sections) already
+// treats them as daily logs rather than calendar events.
+function _insightsBusiestDay(){
+  const end=todayD(); end.setHours(23,59,59,999);
+  const start=addDays(todayD(),-29); start.setHours(0,0,0,0);
+  const counts=[0,0,0,0,0,0,0], occurrences=[0,0,0,0,0,0,0];
+  for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)) occurrences[d.getDay()]++;
+  getEvents().forEach(e=>{
+    if(e.type==='wellness') return;
+    const d=new Date(e.date);
+    if(d<start||d>end) return;
+    counts[d.getDay()]++;
+  });
+  let bestIdx=-1, bestAvg=0;
+  for(let i=0;i<7;i++){
+    if(!occurrences[i]) continue;
+    const avgV=counts[i]/occurrences[i];
+    if(avgV>bestAvg){bestAvg=avgV;bestIdx=i;}
+  }
+  if(bestIdx===-1) return null;
+  const names=['Sundays','Mondays','Tuesdays','Wednesdays','Thursdays','Fridays','Saturdays'];
+  return names[bestIdx];
+}
+
+// Busiest family member over the same 30-day window. Tasks are tallied by
+// member_id; Social/Health events are tallied by participants[]. Events
+// flagged participants_all_family:true are excluded from every member's
+// count entirely — confirmed rule from the spec.
+function _insightsBusiestMember(){
+  const end=todayD(); end.setHours(23,59,59,999);
+  const start=addDays(todayD(),-29); start.setHours(0,0,0,0);
+  const tally={};
+  getEvents().forEach(e=>{
+    if(e.type==='wellness') return;
+    if(e.participants_all_family) return;
+    const d=new Date(e.date);
+    if(d<start||d>end) return;
+    const ids = e.member_id ? [e.member_id] : (e.participants||[]);
+    ids.forEach(id=>{ tally[id]=(tally[id]||0)+1; });
+  });
+  let bestId=null, bestCt=0;
+  Object.entries(tally).forEach(([id,ct])=>{ if(ct>bestCt){bestCt=ct;bestId=id;} });
+  if(!bestId) return null;
+  const m=getMem(bestId);
+  return m ? {name:m.name, count:bestCt} : null;
+}
+
+// Most recent Health-type event per family member (no 30-day window — this
+// one looks back as far as needed). A whole-family Health event
+// (participants_all_family:true) counts as the "last health event" for
+// every member.
+function _insightsLastHealthPerMember(){
+  const hEvs=getEvents().filter(e=>e.type==='health').sort((a,b)=>new Date(b.date)-new Date(a.date));
+  return getMembers().map(m=>{
+    const ev=hEvs.find(e=>{
+      if(e.participants_all_family) return true;
+      const ids = e.member_id ? [e.member_id] : (e.participants||[]);
+      return ids.includes(m.id);
+    });
+    return {member:m, event:ev||null};
+  });
+}
+
+// Shared with Home's "Other Actions" section (renderHome()) — same
+// two-part definition (incomplete Tasks + non-Task events with an open
+// action item), same overdue/7-days-ahead window. Pulled out into one
+// function so the two can never quietly drift apart, per the spec's own
+// risk note. excludeIds lets Home hide items its own Today/Coming Up
+// sections already show above Other Actions; Insights has no such
+// sections, so it calls this with no exclusion at all.
+function _followUpCalendarItems(excludeIds){
+  const today=todayD();
+  const weekAhead=addDays(today,7); weekAhead.setHours(23,59,59,999);
+  const ex=excludeIds||new Set();
+  return [
+    ...getEvents().filter(e=>e.type==='task'&&!e.completed_at&&new Date(e.date)<=weekAhead&&!ex.has(e.id)),
+    ...getEvents().filter(e=>e.type!=='task'&&e.actions?.length>0&&e.actions.some(a=>!a.done)&&new Date(e.date)<=weekAhead&&!ex.has(e.id)),
+  ].sort((a,b)=>new Date(a.date)-new Date(b.date));
+}
+
+// ── Notebook helper ──────────────────────────────────────────────────────────
+function _insightsOpenChecklistNotes(){
+  return getNotes().filter(n=>n.checklist?.length>0&&n.checklist.some(c=>!c.done)).length;
+}
+
+// ── Inventory (Medications) helpers ──────────────────────────────────────────
+function _insightsMedsPerMember(){
+  return getMembers().map(m=>({
+    member:m,
+    count:getDM().filter(med=>(med.member_ids||[]).includes(m.id)).length
+  }));
+}
+// Reuses effMedDaysLeft() — the same formula already driving the Meds
+// table's stock badges and the low-stock notification alert — so this can
+// never disagree with what's shown elsewhere in Inventory.
+function _insightsMedRunsOutFirst(){
+  return getMembers().map(m=>{
+    const meds=getDM().filter(med=>(med.member_ids||[]).includes(m.id));
+    let worst=null, worstDays=Infinity;
+    meds.forEach(med=>{
+      const d=effMedDaysLeft(med);
+      if(d!==null && d<worstDays){worstDays=d;worst=med;}
+    });
+    return {member:m, med:worst, daysLeft:worst?worstDays:null};
+  });
+}
+function _insightsExpiringProducts(){
+  const now=new Date();
+  const cutoff=addDays(now, INSIGHTS_EXPIRY_WINDOW_DAYS); cutoff.setHours(23,59,59,999);
+  return (A.invProducts||[])
+    .filter(p=>p.expiry && new Date(p.expiry)>=now && new Date(p.expiry)<=cutoff)
+    .sort((a,b)=>new Date(a.expiry)-new Date(b.expiry));
+}
+
+// ── Shopping helper ──────────────────────────────────────────────────────────
+function _insightsUncheckedShoppingCount(){
+  let n=0;
+  (A.shoppingLists||[]).forEach(l=>(l.items||[]).forEach(item=>{ if(!item.done) n++; }));
+  return n;
+}
+
+// ── Meals helper ─────────────────────────────────────────────────────────────
+function _insightsMealPlanCompletion(){
+  const data=A.mealPlan?.plan_data||{};
+  let filled=0; const total=MEAL_PLAN_ROWS.length*MEAL_PLAN_DAYS.length;
+  MEAL_PLAN_ROWS.forEach(row=>MEAL_PLAN_DAYS.forEach(day=>{ if((data[row]?.[day]||'').trim()) filled++; }));
+  return total ? Math.round((filled/total)*100) : 0;
+}
+
+function renderInsights(){
+  // Weekly Family Challenge — unchanged selection logic, just repositioned
+  // above the module sections below instead of above the old Wellness
+  // section.
   const weekNum=Math.floor((new Date()-new Date(new Date().getFullYear(),0,1))/(7*24*60*60*1000));
   const challenge=CHALLENGES[weekNum%CHALLENGES.length];
-  const insights=genInsights(wLogs,hEvs);
 
-  // Filter logs by selected member
-  const filteredLogs = A.insightsMember==='all' ? wLogs : wLogs.filter(e=>e.member_id===A.insightsMember);
+  // Calendar
+  const busiestDay=_insightsBusiestDay();
+  const busiestMember=_insightsBusiestMember();
+  const lastHealthPerMember=_insightsLastHealthPerMember();
+  const followUpCount=_followUpCalendarItems().length;
 
-  const memberCards=getMembers()
-    .filter(m=>A.insightsMember==='all'||A.insightsMember===m.id)
-    .map(member=>{
-    const logs=filteredLogs.filter(e=>e.member_id===member.id);
-    if(!logs.length)return'';
-    const aSlp=avg(logs,'sleep'),aEn=avg(logs,'energy'),aHy=avg(logs,'hydration');
-    const exDays=logs.filter(l=>l.exercised).length;
-    const acts={};logs.filter(l=>l.exercised&&l.activity).forEach(l=>{acts[l.activity]=(acts[l.activity]||0)+1;});
-    const topAct=Object.entries(acts).sort((a,b)=>b[1]-a[1])[0]?.[0];
-    const ill=hEvs.filter(e=>(e.participants||[]).includes(member.id)&&e.appt_type==='Illness').length;
-    return`<div class="card" style="margin-bottom:12px;overflow:hidden">
-      <div style="padding:12px 14px;border-bottom:1px solid ${T.border};display:flex;align-items:center;gap:10px">
-        ${av(member,36)}<div><div style="font-weight:800;font-size:14px">${member.name}</div><div style="font-size:11px;color:${T.muted}">${logs.length} logs recorded</div></div>
-      </div>
-      <div style="padding:12px 14px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-        ${[['😴','Sleep',aSlp?`${aSlp.toFixed(1)}h`:'-',aSlp&&aSlp>=7,aSlp&&aSlp<6],
-           ['⚡','Energy',aEn?`${Math.round(aEn)}%`:'-',aEn&&aEn>=70,aEn&&aEn<50],
-           ['💧','H₂O',aHy?`${Math.round(aHy)}ml`:'-',aHy&&aHy>=1800,aHy&&aHy<1200],
-           ['🏃','Exercise',`${exDays}/${logs.length}`,exDays/Math.max(logs.length,1)>=0.5,false]
-        ].map(([ic,lb,val,good,warn])=>`
-          <div style="background:${good?T.sageLight:warn?T.roseLight:T.parchment};border-radius:9px;padding:7px 8px;text-align:center">
-            <div style="font-size:15px">${ic}</div>
-            <div style="font-size:12px;font-weight:800;color:${good?T.sage:warn?T.rose:T.ink}">${val}</div>
-            <div style="font-size:9px;color:${T.muted};font-weight:700;text-transform:uppercase">${lb}</div>
-          </div>`).join('')}
-        ${topAct?`<div style="background:${T.parchment};border-radius:9px;padding:7px 8px;text-align:center"><div style="font-size:15px">🏅</div><div style="font-size:12px;font-weight:800;color:${T.ink}">${topAct}</div><div style="font-size:9px;color:${T.muted};font-weight:700;text-transform:uppercase">Top Activity</div></div>`:''}
-        ${ill>0?`<div style="background:${T.roseLight};border-radius:9px;padding:7px 8px;text-align:center"><div style="font-size:15px">🤒</div><div style="font-size:12px;font-weight:800;color:${T.rose}">${ill}</div><div style="font-size:9px;color:${T.muted};font-weight:700;text-transform:uppercase">Illnesses</div></div>`:''}
-      </div>
-      ${aSlp?`<div style="padding:0 14px 12px">
-        <div style="font-size:10px;color:${T.muted};font-weight:700;margin-bottom:3px">Sleep vs 8h goal</div>
-        <div style="background:${T.parchment};border-radius:99px;height:6px;overflow:hidden">
-          <div style="height:100%;width:${Math.min(100,(aSlp/8)*100)}%;background:${aSlp>=7?T.sage:aSlp>=6?T.honey:T.rose};border-radius:99px"></div>
-        </div>
-      </div>`:''}
-      <div id="charts-${member.id}" style="padding:0 14px 14px"></div>
-    </div>`;
-  }).join('');
+  // Notebook
+  const openChecklistCount=_insightsOpenChecklistNotes();
 
-  const memberFilter=`<div style="padding:0 16px 8px;display:flex;gap:6px;overflow-x:auto">
-    <button onclick="A.insightsMember='all';renderInsights()" style="padding:4px 12px;border-radius:99px;border:1.5px solid ${A.insightsMember==='all'?T.sage:T.border};background:${A.insightsMember==='all'?T.sage:'#fff'};color:${A.insightsMember==='all'?'#fff':T.muted};font-weight:700;font-size:12px;cursor:pointer;flex-shrink:0">All</button>
-    ${getMembers().map(m=>`<button onclick="A.insightsMember='${m.id}';renderInsights()" style="padding:4px 12px;border-radius:99px;border:1.5px solid ${A.insightsMember===m.id?m.color:T.border};background:${A.insightsMember===m.id?m.color+'22':'#fff'};color:${A.insightsMember===m.id?m.color:T.muted};font-weight:700;font-size:12px;cursor:pointer;flex-shrink:0">${m.name}</button>`).join('')}
-  </div>`;
+  // Inventory
+  const medsPerMember=_insightsMedsPerMember();
+  const medRunsOutFirst=_insightsMedRunsOutFirst();
+  const expiringProducts=_insightsExpiringProducts();
+
+  // Shopping
+  const uncheckedShoppingCount=_insightsUncheckedShoppingCount();
+
+  // Meals
+  const mealCompletion=_insightsMealPlanCompletion();
+
+  const sectionTitle=(icon,label)=>`<div style="font-family:'Playfair Display',serif;font-size:16px;color:${T.ink};margin:18px 0 10px;display:flex;align-items:center;gap:7px">${icon} ${label}</div>`;
+  const lineCard=html=>`<div class="card" style="padding:12px 14px;margin-bottom:8px;font-size:13px;color:${T.ink};line-height:1.5">${html}</div>`;
+  const emptyLine=text=>`<div style="font-size:12px;color:${T.muted};padding:2px 0">${text}</div>`;
+  const memberRow=(name,valueHtml)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:3px 0"><span>${name}</span><span style="color:${T.muted};text-align:right">${valueHtml}</span></div>`;
 
   document.getElementById('page-insights').innerHTML=`
     <div class="page-header">
       <div class="page-title">Insights</div>
     </div>
-    ${memberFilter}
-    <div style="padding:4px 16px 0">
-      <div style="background:linear-gradient(135deg,${T.sage},${T.sageMid});border-radius:17px;padding:18px;margin-bottom:16px;color:#fff;position:relative;overflow:hidden">
+    <div style="padding:4px 16px 24px">
+      <div style="background:linear-gradient(135deg,${T.sage},${T.sageMid});border-radius:17px;padding:18px;margin-bottom:8px;color:#fff;position:relative;overflow:hidden">
         <div style="position:absolute;right:-10px;top:-10px;font-size:68px;opacity:.12">🌿</div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;opacity:.8;margin-bottom:5px">This Week's Family Challenge</div>
         <div style="font-family:'Playfair Display',serif;font-size:18px;margin-bottom:8px;line-height:1.3">${challenge.title}</div>
@@ -5434,166 +5716,28 @@ function renderInsights(){
         <div style="display:flex;gap:6px;flex-wrap:wrap">${challenge.tips.map(t=>`<span style="background:rgba(255,255,255,.2);border-radius:99px;padding:3px 10px;font-size:11px;font-weight:600">💡 ${t}</span>`).join('')}</div>
       </div>
 
-      <div style="font-family:'Playfair Display',serif;font-size:17px;color:${T.ink};margin-bottom:12px">Smart Observations</div>
-      ${insights.map(ins=>`<div class="card" style="padding:12px 14px;margin-bottom:10px;border-left:4px solid ${ins.color}">
-        <div style="font-size:16px;margin-bottom:3px">${ins.icon}</div>
-        <div style="font-weight:700;font-size:13px;margin-bottom:2px">${ins.title}</div>
-        <div style="font-size:12px;color:${T.muted};line-height:1.5">${ins.body}</div>
-      </div>`).join('')}
+      ${sectionTitle('📅','Calendar')}
+      ${lineCard(busiestDay?`<b>${busiestDay}</b> are usually your busiest day.`:emptyLine('Not enough events yet to spot a pattern.'))}
+      ${lineCard(busiestMember?`<b>${busiestMember.name}</b> has the most on their plate this month (${busiestMember.count} event${busiestMember.count===1?'':'s'}).`:emptyLine('No events assigned to a member in the last 30 days.'))}
+      ${lineCard(`<div style="font-weight:700;margin-bottom:6px">Last health event per member</div>${lastHealthPerMember.length?lastHealthPerMember.map(({member,event})=>memberRow(member.name, event?`${event.title||'Health event'}, ${fmt(event.date)}`:'No health events logged')).join(''):emptyLine('No family members yet.')}`)}
+      ${lineCard(`Events to follow up on: <b>${followUpCount}</b>`)}
 
-      ${filteredLogs.length===0?`<div class="card" style="padding:20px;text-align:center;color:${T.muted};margin-bottom:16px">
-        <div style="font-size:32px;margin-bottom:8px">🌿</div>
-        <div style="font-weight:700;margin-bottom:5px">No wellness data yet</div>
-        <div style="font-size:13px">Add Wellness Logs in the Calendar to see personalised insights here.</div>
-      </div>`:memberCards}
+      ${sectionTitle('📓','Notebook')}
+      ${lineCard(`Notes with open checklist items: <b>${openChecklistCount}</b>`)}
+
+      ${sectionTitle('💊','Inventory')}
+      ${lineCard(`<div style="font-weight:700;margin-bottom:6px">Meds assigned per member</div>${medsPerMember.length?medsPerMember.map(({member,count})=>memberRow(member.name, count)).join(''):emptyLine('No family members yet.')}`)}
+      ${lineCard(`<div style="font-weight:700;margin-bottom:6px">Runs out first, per member</div>${medRunsOutFirst.length?medRunsOutFirst.map(({member,med,daysLeft})=>memberRow(member.name, med?`<span style="color:${daysLeft!==null&&daysLeft<=7?T.rose:T.muted}">${med.name} — ${daysLeft}d left</span>`:'No meds assigned')).join(''):emptyLine('No family members yet.')}`)}
+      ${lineCard(expiringProducts.length?`<div style="font-weight:700;margin-bottom:6px">Products expiring within ${INSIGHTS_EXPIRY_WINDOW_DAYS} days</div>${expiringProducts.map(p=>memberRow(p.name, `<span style="color:${T.rose}">${fmt(p.expiry)}</span>`)).join('')}`:emptyLine('Nothing expiring in the next '+INSIGHTS_EXPIRY_WINDOW_DAYS+' days.'))}
+
+      ${sectionTitle('🛒','Shopping')}
+      ${lineCard(`Items still to be bought: <b>${uncheckedShoppingCount}</b>`)}
+
+      ${sectionTitle('🍽️','Meals')}
+      ${lineCard(`This week's meal plan is <b>${mealCompletion}%</b> filled in.`)}
     </div>`;
-
-  // Render per-member charts into each member card
-  setTimeout(()=>{
-    getMembers()
-      .filter(m=>A.insightsMember==='all'||A.insightsMember===m.id)
-      .forEach(m=>{
-        const mLogs = filteredLogs.filter(e=>e.member_id===m.id);
-        if(mLogs.length>=2) renderInsightCharts(mLogs, 'charts-'+m.id);
-      });
-  },50);
 }
 
-// ── INSIGHT CHARTS ────────────────────────────────────────────────────────────
-function renderInsightCharts(logs, containerId) {
-  const cont = document.getElementById(containerId || 'insights-charts');
-  if (!cont) return;
-
-  // Sort logs by date
-  const sorted = [...logs].sort((a,b)=>new Date(a.date)-new Date(b.date));
-
-  // Metrics to chart: [key, label, unit, colour, goal]
-  // Get selected member's data for reference values
-  const selMem = A.insightsMember!=='all' ? getMembers().find(m=>m.id===A.insightsMember) : null;
-  const memAge = selMem?.age || null;
-  const avgWeight = logs.filter(l=>l.member_id===selMem?.id&&l.weight).map(l=>l.weight);
-  const latestKg = avgWeight.length ? avgWeight[avgWeight.length-1] : null;
-  // Hydration reference: ~35ml per kg bodyweight, min 1.5L, max 3.5L
-  const hydRef = latestKg ? Math.min(3.5, Math.max(1.5, latestKg * 0.035)).toFixed(1) : 1.8;
-  const metrics = [
-    ['weight', 'Weight', 'kg', T.sage, null,
-      memAge ? (memAge<12?'Reference: healthy range varies by age & height':memAge<18?'Teens: BMI 18.5–24.9 range':'Adults: BMI 18.5–24.9 range') : null],
-    ['sleep',  'Sleep',  'h',  T.sky,  8,
-      memAge ? (memAge<6?'Ages 3–5: 10–13h recommended':memAge<12?'Ages 6–12: 9–12h recommended':memAge<18?'Teens: 8–10h recommended':'Adults: 7–9h recommended') : 'Recommended: 7–9h for adults'],
-    ['energy', 'Energy', '%',  T.honey, 70,
-      'Aim for 70%+ — low energy often links to sleep or hydration'],
-    ['hydration','Hydration','L', T.plum, parseFloat(hydRef),
-      latestKg ? `~${hydRef}L recommended for ${latestKg}kg (35ml/kg)` : 'Recommended: 1.8–2.5L per day'],
-  ];
-
-  const charts = metrics.map(([key, label, unit, colour, goal]) => {
-    const points = sorted
-      .map(e=>({d:new Date(e.date), v:parseFloat(e[key])}))
-      .filter(p=>!isNaN(p.v)&&p.v>0);
-    if (points.length < 2) return '';
-
-    const vals = points.map(p=>p.v);
-    const minV = Math.min(...vals);
-    const maxV = Math.max(...vals);
-    const range = maxV - minV || 1;
-    const padded_min = minV - range*0.15;
-    const padded_max = maxV + range*0.15;
-    const padded_range = padded_max - padded_min;
-
-    const W = 320, H = 100, PL = 36, PR = 12, PT = 10, PB = 24;
-    const cW = W - PL - PR, cH = H - PT - PB;
-    const xScale = i => PL + (i / (points.length-1)) * cW;
-    const yScale = v => PT + cH - ((v - padded_min) / padded_range) * cH;
-
-    // Line path
-    const pathD = points.map((p,i)=>`${i===0?'M':'L'}${xScale(i).toFixed(1)},${yScale(p.v).toFixed(1)}`).join(' ');
-    // Fill path
-    const fillD = pathD + ` L${xScale(points.length-1).toFixed(1)},${(PT+cH).toFixed(1)} L${PL},${(PT+cH).toFixed(1)} Z`;
-
-    // X-axis labels (max 5)
-    const step = Math.max(1, Math.floor(points.length/5));
-    const xLabels = points.filter((_,i)=>i%step===0||i===points.length-1).map((p,_,arr)=>{
-      const idx = points.indexOf(p);
-      const d = p.d;
-      const label = `${d.getDate()}/${d.getMonth()+1}`;
-      return `<text x="${xScale(idx)}" y="${H-6}" text-anchor="middle" font-size="9" fill="${T.muted}">${label}</text>`;
-    }).join('');
-
-    // Y-axis labels (min, max)
-    const yMin = `<text x="${PL-4}" y="${(PT+cH+4).toFixed(1)}" text-anchor="end" font-size="9" fill="${T.muted}">${minV.toFixed(1)}</text>`;
-    const yMax = `<text x="${PL-4}" y="${(PT+8).toFixed(1)}" text-anchor="end" font-size="9" fill="${T.muted}">${maxV.toFixed(1)}</text>`;
-
-    // Goal line
-    const goalLine = (goal && goal >= padded_min && goal <= padded_max)
-      ? `<line x1="${PL}" y1="${yScale(goal).toFixed(1)}" x2="${W-PR}" y2="${yScale(goal).toFixed(1)}" stroke="${colour}" stroke-width="1" stroke-dasharray="4,3" opacity="0.5"/>
-         <text x="${W-PR-2}" y="${(yScale(goal)-3).toFixed(1)}" text-anchor="end" font-size="8" fill="${colour}" opacity="0.7">goal</text>`
-      : '';
-
-    // Data points
-    const dots = points.map((p,i)=>`<circle cx="${xScale(i).toFixed(1)}" cy="${yScale(p.v).toFixed(1)}" r="3" fill="${colour}" stroke="#fff" stroke-width="1.5"/>`).join('');
-
-    // Latest value badge
-    const latest = points[points.length-1];
-    const latestStr = key==='hydration' ? latest.v.toFixed(1) : (Number.isInteger(latest.v)?latest.v:latest.v.toFixed(1));
-
-    // Trend arrow
-    const first = points[0].v, last_v = latest.v;
-    const trendUp = last_v > first;
-    const trendSame = Math.abs(last_v-first)<0.05*first;
-    const trendStr = trendSame ? '→' : (trendUp ? '↑' : '↓');
-    const trendCol = key==='weight'?(trendUp?T.rose:T.sage):(trendUp?T.sage:T.rose);
-
-    const [mKey,mLabel,mUnit,mCol,,mRef] = [key,label,unit,colour,null,metrics.find(m=>m[0]===key)?.[5]];
-    return `<div class="card" style="padding:12px 14px;margin-bottom:10px;overflow:hidden">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px">
-        <div style="font-weight:700;font-size:13px;color:${T.ink}">${label}</div>
-        <div style="display:flex;align-items:baseline;gap:6px">
-          <span style="font-size:18px;font-weight:800;color:${colour}">${latestStr}${unit}</span>
-          <span style="font-size:13px;font-weight:700;color:${trendCol}">${trendStr}</span>
-        </div>
-      </div>
-      <svg width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="overflow:visible">
-        <!-- Grid lines -->
-        <line x1="${PL}" y1="${PT}" x2="${PL}" y2="${PT+cH}" stroke="${T.border}" stroke-width="0.5"/>
-        <line x1="${PL}" y1="${PT+cH}" x2="${W-PR}" y2="${PT+cH}" stroke="${T.border}" stroke-width="0.5"/>
-        ${goalLine}
-        <!-- Fill -->
-        <path d="${fillD}" fill="${colour}" opacity="0.08"/>
-        <!-- Line -->
-        <path d="${pathD}" fill="none" stroke="${colour}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        <!-- Dots -->
-        ${dots}
-        <!-- Labels -->
-        ${yMin}${yMax}${xLabels}
-      </svg>
-      ${metrics.find(m=>m[0]===key)?.[5]?`<div style="font-size:10px;color:${T.muted};margin-top:4px;padding-top:4px;border-top:1px solid ${T.border}">ℹ️ ${metrics.find(m=>m[0]===key)[5]}</div>`:''}
-    </div>`;
-  }).join('');
-
-  cont.innerHTML = `
-    <div style="font-family:'Playfair Display',serif;font-size:17px;color:${T.ink};margin-bottom:12px">Trends</div>
-    ${charts || '<div style="color:'+T.muted+';font-size:13px">Not enough data for charts yet.</div>'}`;
-}
-window.renderInsightCharts = renderInsightCharts;
-
-function genInsights(wLogs,hEvs){
-  const ins=[];
-  const avg=(arr,k)=>{const v=arr.map(e=>parseFloat(e[k])).filter(v=>!isNaN(v)&&v>0);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;};
-  getMembers().forEach(m=>{
-    const logs=wLogs.filter(e=>e.member_id===m.id);
-    if(logs.length<2)return;
-    const aSlp=avg(logs,'sleep'),aHy=avg(logs,'hydration'),aEn=avg(logs,'energy');
-    const exPct=logs.filter(l=>l.exercised).length/logs.length;
-    if(aSlp&&aSlp<7)ins.push({icon:'😴',title:`${m.name} is sleeping less than recommended`,body:`Average sleep is ${aSlp.toFixed(1)}h — the goal is 7–9h. Even 30 extra minutes can improve mood and energy significantly!`,color:T.honey});
-    if(aHy&&aHy<1500)ins.push({icon:'💧',title:`${m.name} could drink more water`,body:`Average hydration is ${Math.round(aHy)}ml/day. Aim for 1800ml+. A visible water bottle nearby is a surprisingly effective habit.`,color:T.sky});
-    if(exPct<0.3&&logs.length>=3)ins.push({icon:'🏃',title:`${m.name}'s exercise consistency has room to grow`,body:`Only ${Math.round(exPct*100)}% of logged days included exercise. Even a 15-minute walk makes a real difference!`,color:T.sage});
-    if(aEn&&aEn<55)ins.push({icon:'⚡',title:`${m.name}'s energy levels seem low`,body:`Average energy is ${Math.round(aEn)}%. This often links to sleep or hydration — two quick wins if improved together.`,color:T.plum});
-  });
-  const ill=hEvs.filter(e=>e.appt_type==='Illness');
-  if(ill.length>=2)ins.push({icon:'🤒',title:`${ill.length} illness events recorded`,body:`Worth checking if these are recurring for the same person. Vitamin D, zinc, and consistent sleep all support immunity.`,color:T.rose});
-  if(!ins.length)ins.push({icon:'🌟',title:'Looking great overall!',body:"No major concerns in your family's wellness data. Keep logging consistently for richer, more personalised insights over time.",color:T.sage});
-  return ins;
-}
 
 
 // ── HOME PAGE ──────────────────────────────────────────────────────────────────
@@ -5678,13 +5822,11 @@ function renderHome(){
   const weekAhead = addDays(today, 7); weekAhead.setHours(23,59,59,999);
   // IDs already visible in Today / Coming Up — exclude these from Other Actions
   const todayUpcomingIds = new Set([...todayEvs.map(e=>e.id), ...upcomingEvs.map(e=>e.id)]);
-  // Calendar items: Tasks + non-task events with open actions — merged, sorted by date
-  const todoCalendar = [
-    // Incomplete Task events within scope, not already shown above
-    ...getEvents().filter(e => e.type === 'task' && !e.completed_at && new Date(e.date) <= weekAhead && !todayUpcomingIds.has(e.id)),
-    // Non-task calendar events with at least one open action item, within scope, not already shown above
-    ...getEvents().filter(e => e.type !== 'task' && e.actions?.length > 0 && e.actions.some(a => !a.done) && new Date(e.date) <= weekAhead && !todayUpcomingIds.has(e.id)),
-  ].sort((a,b) => new Date(a.date) - new Date(b.date));
+  // Calendar items: Tasks + non-task events with open actions — merged, sorted by date.
+  // v21: extracted into the shared _followUpCalendarItems() helper (defined
+  // near renderInsights()) so this and the Insights "Events to follow up on"
+  // count can never drift out of sync. Same exact filters as before.
+  const todoCalendar = _followUpCalendarItems(todayUpcomingIds);
   // Notebook notes with open checklist items (no date — sorted after calendar items)
   const todoNotes = getNotes()
     .filter(n => n.checklist?.length > 0 && n.checklist.some(c => !c.done));
@@ -5790,6 +5932,12 @@ function renderHome(){
       }).join('')}
       ` : ''}
 
+      <!-- v21: static Insights teaser — no live numbers, per spec. -->
+      <div onclick="goTo('insights')" style="cursor:pointer;background:linear-gradient(135deg,${T.sage},${T.sageMid});border-radius:14px;padding:14px 16px;margin-top:16px;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="font-size:13px;font-weight:700;line-height:1.4">See how your family's week is shaping up →</div>
+        <span style="font-size:20px;flex-shrink:0">🌿</span>
+      </div>
+
       <!-- v7: color-guide legend now always shown at the bottom of Home -->
       <div style="margin-top:16px;padding-top:10px;border-top:1px solid ${T.border};display:flex;gap:14px;flex-wrap:wrap;align-items:center">
         <span style="font-size:10px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.04em">Color guide</span>
@@ -5821,6 +5969,7 @@ function renderMeals(){
       <div class="page-title">Meals</div>
     </div>
     <div class="tabs">${TABS.map(t=>`<button class="tab ${A.mealsTab===t.id?'active':''}" onclick="A.mealsTab='${t.id}';renderMeals()">${t.label}</button>`).join('')}</div>
+    ${A.mealsTab==='shopping'?_usageBanner('shopping','Shopping Lists'):''}
     <div style="padding:14px 16px">${tc}</div>`;
   // Planner grid is filled with saved values once the table exists in the DOM
   if(A.mealsTab==='planner') setTimeout(populateMealPlanGrid,50);
@@ -6860,6 +7009,7 @@ function renderSettings(){
 
   if(A.settingsTab==='family'){
     tc=`
+      ${_renderPlanUsageCard()}
       <div class="card" style="padding:14px;margin-bottom:12px">
         <div class="lbl" style="margin-bottom:8px">Family Name</div>
         <div style="display:flex;gap:8px">
@@ -6867,6 +7017,7 @@ function renderSettings(){
           <button class="btn btn-primary btn-sm" onclick="saveFamName()">Save</button>
         </div>
       </div>
+      ${_usageBanner('members','Family Members')}
       <div class="card" style="padding:14px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <div class="lbl">Family Members</div>
@@ -7641,7 +7792,9 @@ function openProfileMenu() {
     </div>
     <div style="display:flex;flex-direction:column">
       ${row('🔔','Notifications',"closeModal();toggleNotifPanel();",false,hasUnread)}
+      ${row('📊','Insights',"closeModal();goTo('insights');")}
       ${row('⚙️','Settings',"closeModal();goTo('settings');")}
+      ${row('💬','Send Feedback',"closeModal();openFeedback();")}
       ${row('🚪','Sign out',"closeModal();doSignOut();",true)}
     </div>`);
 }
@@ -7803,6 +7956,230 @@ const FB_TYPES = [
   { value:'feature', icon:'✨', label:'Feature request',  desc:"Something you'd love to see added" },
   { value:'other',   icon:'📝', label:'Other',            desc:'' },
 ];
+
+// ── QUICK ADD (v21) ──────────────────────────────────────────────────────────
+// Global floating "+" button (.quick-add-fab, replacing the old feedback FAB
+// in this same bottom-right spot) — opens a 3-option menu for fast, minimal-
+// field capture of a Task, Note, or Shopping Item from anywhere in the app.
+// Each option creates a genuinely normal record afterward — same tables, same
+// columns as the full Calendar form / Notebook editor / Shopping list — fully
+// editable later through those, exactly as if created there. No new event
+// type, table, or column. See seamly_v17_quickadd_spec.md (assigned to V21).
+
+function openQuickAddMenu(){
+  showModal('Quick Add', `
+    <div style="display:flex;flex-direction:column;gap:8px;padding:2px 0">
+      <button class="btn btn-secondary btn-full" style="justify-content:flex-start;gap:10px" onclick="closeModal();openQuickTask();">✅&nbsp;&nbsp;Task</button>
+      <button class="btn btn-secondary btn-full" style="justify-content:flex-start;gap:10px" onclick="closeModal();openQuickNote();">📝&nbsp;&nbsp;Note</button>
+      <button class="btn btn-secondary btn-full" style="justify-content:flex-start;gap:10px" onclick="closeModal();openQuickShopItem();">🛒&nbsp;&nbsp;Shopping Item</button>
+    </div>`);
+}
+window.openQuickAddMenu = openQuickAddMenu;
+
+// Shared block-modal for Quick Add's three free-plan limit checks below —
+// same wording/pattern as the equivalent checks already in openEvForm(),
+// saveNote(), and createShoppingList(). Kept as one helper here since all
+// three Quick Add call sites are brand new — existing call sites elsewhere
+// are untouched, each keeps its own copy, out of scope for this change.
+function _quickLimitModal(kind){
+  const singular = kind==='Events' ? 'event' : kind==='Notes' ? 'note' : 'list';
+  showModal(`${kind} limit reached`, `
+    <div style="text-align:center;padding:6px 0 4px">
+      <div style="font-size:13px;color:${T.ink};line-height:1.5">
+        You've reached your ${kind} limit on the Free plan. Delete an existing ${singular} to add a new one, or upgrade for unlimited ${kind.toLowerCase()}.
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn btn-secondary btn-full" onclick="closeModal()">Manage existing</button>
+        <button class="btn btn-full" disabled style="background:#e5e0d5;color:#a89f8f;cursor:not-allowed;opacity:0.7">Upgrade — Coming soon</button>
+      </div>
+    </div>`);
+}
+
+// Shared "find or create by name" helpers — reused by Quick Note (group
+// "Quick Notes") and Quick Shopping Item (list "Quick Add"). Matches by
+// exact name within the family; if one already exists (including one a
+// user made manually for unrelated reasons) it's reused rather than
+// duplicated, per spec §8.
+async function getOrCreateGroup(name){
+  const existing=(A.noteGroups||[]).find(g=>g.name===name);
+  if(existing) return {data:existing, error:null};
+  const{data,error}=await sbWrite(()=>sb.from('note_groups').insert({family_id:A.family.id,name}).select().single());
+  if(!error && data) A.noteGroups.push(data);
+  return {data,error};
+}
+async function getOrCreateList(name){
+  const existing=(A.shoppingLists||[]).find(l=>l.name===name);
+  if(existing) return {data:existing, error:null, limited:false};
+  // Only creating a genuinely NEW list counts against the free-plan
+  // Shopping Lists limit — reusing an existing "Quick Add" list never does,
+  // matching how createShoppingList() only gates brand-new lists too.
+  if(_isAtShoppingListLimit()) return {data:null, error:null, limited:true};
+  const{data,error}=await sbWrite(()=>sb.from('shopping_lists').insert({family_id:A.family.id,name,items:[]}).select().single());
+  if(!error && data) A.shoppingLists.push(data);
+  return {data,error,limited:false};
+}
+
+// ── Quick Task ────────────────────────────────────────────────────────────────
+function openQuickTask(){
+  if(!A.family){toast('Set up your family first.',true);return;}
+  // Same free-plan Events limit check openEvForm() already uses — Quick Add
+  // creates a genuinely normal task event, so it must respect the same
+  // limit rather than becoming an accidental way around it.
+  if(_isAtEventLimit()){ _quickLimitModal('Events'); return; }
+  const nowD=new Date();
+  // v21 fix (found in staging testing): unlike the full Calendar form —
+  // where truncating to the current hour is fine, since the person is
+  // already looking at the form and can adjust it — Quick Add's whole
+  // point is that people save the suggested defaults without checking
+  // them. Truncating meant a task saved at 21:25 defaulted to 21:00,
+  // already in the past, so it never showed in Home's Today section. This
+  // genuinely rounds UP to the next full hour instead, rolling over to
+  // tomorrow if it's currently past 23:00. Deliberately NOT applied to
+  // openEvForm() itself — that's separate, established behavior elsewhere.
+  let defHour=nowD.getHours()+1;
+  let defDateD=nowD;
+  if(defHour>=24){ defHour=0; defDateD=addDays(nowD,1); }
+  const iDate=toISOLocal(defDateD);
+  const defTime=String(defHour).padStart(2,'0')+':00';
+  showModal('Quick Task', `
+    <div class="form-row"><label class="lbl">Title *</label><input class="inp" id="qt-title" placeholder="Task title" autofocus></div>
+    <div class="grid2">
+      <div class="form-row" style="margin:0"><label class="lbl">Date</label><input class="inp" type="date" id="qt-date" value="${iDate}"></div>
+      <div class="form-row" style="margin:0"><label class="lbl">Time</label><input class="inp" type="time" id="qt-time" value="${defTime}"></div>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="saveQuickTask()">Add Task</button>`);
+  setTimeout(()=>{ const el=document.getElementById('qt-title'); if(el){el.focus();} },80);
+}
+window.openQuickTask = openQuickTask;
+
+async function saveQuickTask(){
+  if(!A.family){toast('Set up your family first.',true);return;}
+  const title=document.getElementById('qt-title')?.value?.trim();
+  if(!title){toast('Please add a title.',true);return;}
+  const dateStr=document.getElementById('qt-date')?.value;
+  const timeStr=document.getElementById('qt-time')?.value||'12:00';
+  const date = dateStr ? localDT(dateStr,timeStr) : new Date().toISOString();
+  // A completely normal task event — same columns as the full Calendar
+  // form's Task save (saveEv()), just with every optional field left at
+  // its blank/default value, per spec §4.
+  const data={
+    family_id:A.family.id, type:'task', title, date,
+    end_date:null, all_day:false, member_id:null, location:null,
+    links:[], actions:[], tags:[], description:null,
+    recurrence:'None', recurrence_end_type:null, recurrence_end_count:null, recurrence_end_date:null,
+    is_private:false, created_by_user_id:A.user?.id||null,
+    updated_at:new Date().toISOString(), updated_by_name:getActorName(), updated_scope:null,
+  };
+  const _saveBtn=document.querySelector('.modal-body button.btn-primary');
+  if(_saveBtn){_saveBtn.disabled=true;_saveBtn.dataset.origText=_saveBtn.textContent;_saveBtn.textContent='Adding…';_saveBtn.style.opacity='0.7';}
+  showSavingToast();
+  let _saveOk=false;
+  try{
+    const{data:result,error}=await sbWrite(()=>sb.from('events').insert(data).select().single());
+    if(error){toast('Error adding task.',true);console.error(error);return;}
+    A.events.push(result);
+    _saveOk=true;
+    closeModal();toast('Task added! ✅');
+    renderPage();
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    hideSavingToast();
+    if(!_saveOk&&_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent=_saveBtn.dataset.origText||'Add Task';_saveBtn.style.opacity='';}
+  }
+}
+window.saveQuickTask = saveQuickTask;
+
+// ── Quick Note ────────────────────────────────────────────────────────────────
+function openQuickNote(){
+  if(!A.family){toast('Set up your family first.',true);return;}
+  if(_isAtNoteLimit()){ _quickLimitModal('Notes'); return; }
+  showModal('Quick Note', `
+    <div class="form-row"><label class="lbl">Title *</label><input class="inp" id="qn-title" placeholder="Note title" autofocus></div>
+    <div class="form-row"><label class="lbl">Body</label><textarea class="inp" id="qn-body" rows="4" placeholder="Write your note…"></textarea></div>
+    <button class="btn btn-primary btn-full" onclick="saveQuickNote()">Add Note</button>`);
+  setTimeout(()=>{ const el=document.getElementById('qn-title'); if(el){el.focus();} },80);
+}
+window.openQuickNote = openQuickNote;
+
+async function saveQuickNote(){
+  if(!A.family){toast('Set up your family first.',true);return;}
+  const title=document.getElementById('qn-title')?.value?.trim();
+  if(!title){toast('Please add a title.',true);return;}
+  const body=document.getElementById('qn-body')?.value?.trim()||'';
+  const _saveBtn=document.querySelector('.modal-body button.btn-primary');
+  if(_saveBtn){_saveBtn.disabled=true;_saveBtn.dataset.origText=_saveBtn.textContent;_saveBtn.textContent='Adding…';_saveBtn.style.opacity='0.7';}
+  showSavingToast();
+  let _saveOk=false;
+  try{
+    // Always filed into a fixed "Quick Notes" group, auto-created the first
+    // time it's needed (or reused if it already exists) — per spec §5.
+    const{data:group,error:grpErr}=await getOrCreateGroup('Quick Notes');
+    if(grpErr||!group){toast('Error adding note.',true);console.error(grpErr);return;}
+    const data={
+      family_id:A.family.id, title, content:body,
+      color:NOTE_COLORS[0], group_id:group.id, member_id:null,
+      pinned:false, checklist:[], is_private:false,
+      created_by_user_id:A.user?.id||null,
+      updated_at:new Date().toISOString(), updated_by_name:getActorName(),
+    };
+    const{data:result,error}=await sbWrite(()=>sb.from('notes').insert(data).select().single());
+    if(error){toast('Error adding note.',true);console.error(error);return;}
+    A.notes.push(result);
+    _saveOk=true;
+    closeModal();toast('Note added! 📝');
+    renderPage();
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    hideSavingToast();
+    if(!_saveOk&&_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent=_saveBtn.dataset.origText||'Add Note';_saveBtn.style.opacity='';}
+  }
+}
+window.saveQuickNote = saveQuickNote;
+
+// ── Quick Shopping Item ──────────────────────────────────────────────────────
+function openQuickShopItem(){
+  if(!A.family){toast('Set up your family first.',true);return;}
+  showModal('Quick Shopping Item', `
+    <div class="form-row"><label class="lbl">Item *</label><input class="inp" id="qs-item" placeholder="Item name" autofocus></div>
+    <button class="btn btn-primary btn-full" onclick="saveQuickShopItem()">Add Item</button>`);
+  setTimeout(()=>{ const el=document.getElementById('qs-item'); if(el){el.focus();} },80);
+}
+window.openQuickShopItem = openQuickShopItem;
+
+async function saveQuickShopItem(){
+  if(!A.family){toast('Set up your family first.',true);return;}
+  const text=document.getElementById('qs-item')?.value?.trim();
+  if(!text){toast('Please add an item name.',true);return;}
+  const _saveBtn=document.querySelector('.modal-body button.btn-primary');
+  if(_saveBtn){_saveBtn.disabled=true;_saveBtn.dataset.origText=_saveBtn.textContent;_saveBtn.textContent='Adding…';_saveBtn.style.opacity='0.7';}
+  showSavingToast();
+  let _saveOk=false;
+  try{
+    // Always filed into a fixed "Quick Add" list, auto-created the first
+    // time it's needed (or reused if it already exists) — per spec §6.
+    // Only a genuinely new list counts against the Free plan's Shopping
+    // Lists limit; items within an existing list are always unlimited.
+    const{data:list,error:listErr,limited}=await getOrCreateList('Quick Add');
+    if(limited){ hideSavingToast(); if(_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent=_saveBtn.dataset.origText||'Add Item';_saveBtn.style.opacity='';} closeModal(); _quickLimitModal('Shopping Lists'); return; }
+    if(listErr||!list){toast('Error adding item.',true);console.error(listErr);return;}
+    const newItem={id:(typeof crypto!=='undefined'&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2),text,done:false};
+    const items=[...(list.items||[]),newItem];
+    const{error}=await touchList(list.id,{items},{silent:true});
+    if(error){toast('Error adding item.',true);console.error(error);return;}
+    list.items=items;
+    _saveOk=true;
+    closeModal();toast('Item added! 🛒');
+    renderPage();
+  }catch(e){
+    toast('Something went wrong — please try again.',true);console.error(e);
+  }finally{
+    hideSavingToast();
+    if(!_saveOk&&_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent=_saveBtn.dataset.origText||'Add Item';_saveBtn.style.opacity='';}
+  }
+}
+window.saveQuickShopItem = saveQuickShopItem;
 
 function openFeedback() {
   showModal('Send Feedback 💬', `
@@ -7995,6 +8372,24 @@ async function handleSession(session){
 }
 
 async function boot(){
+  // v21: capture ?invite=token from the URL into localStorage BEFORE any
+  // auth/session logic runs, so it survives a signup confirmation-email
+  // redirect or a Google OAuth redirect (both reload the page fresh,
+  // losing any in-memory state). Cleans the param out of the visible URL
+  // immediately after capturing it. See accept_family_invite() (schema)
+  // and the new step in initApp() below for where this gets consumed.
+  try {
+    const _inviteParams = new URLSearchParams(window.location.search);
+    const _inviteToken = _inviteParams.get('invite');
+    if (_inviteToken) {
+      localStorage.setItem('ks_pending_invite', _inviteToken);
+      _inviteParams.delete('invite');
+      const _newSearch = _inviteParams.toString();
+      const _newUrl = window.location.pathname + (_newSearch ? '?'+_newSearch : '') + window.location.hash;
+      window.history.replaceState({}, '', _newUrl);
+    }
+  } catch(e) { console.error('Invite token capture error', e); }
+
   // ── PWA: service worker registration (v8) ────────────────────────────────
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/service-worker.js')
