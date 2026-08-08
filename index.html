@@ -3031,6 +3031,11 @@ async function sbWrite(operation) {
   } catch (e) {
     const isConn = ['timeout','fetch','network','Failed to fetch'].some(k=>e.message?.includes(k));
     if (isConn) {
+      // v22 diagnostics: log what we can about this event to the console so
+      // we can start building a real picture of why/when this happens,
+      // before deciding on an actual fix. Console-only — nothing leaves the
+      // browser. See _logConnIssue() just below.
+      _logConnIssue(operation, e, 'first-attempt-failed');
       toast('Connection issue — retrying…');
       await new Promise(r => setTimeout(r, 1000));
       // Force fresh Supabase client to break out of stale HTTP/2 connection pool
@@ -3040,8 +3045,13 @@ async function sbWrite(operation) {
           global: { fetch: (...a) => fetch(...a) }
         });
       } catch(_) {}
-      try { return await withTimeout(operation); }
+      try {
+        const result = await withTimeout(operation);
+        _logConnIssue(operation, null, 'retry-succeeded');
+        return result;
+      }
       catch (e2) {
+        _logConnIssue(operation, e2, 'retry-failed');
         toast('Save failed. Please refresh and try again.', true);
         return { error: { message: e2.message }, data: null };
       }
@@ -3049,6 +3059,40 @@ async function sbWrite(operation) {
     throw e;
   }
 }
+
+// v22 diagnostics: lightweight logger for sbWrite() connection issues.
+// Purely client-side (console only, nothing sent anywhere) — this exists so
+// we can start spotting patterns (which operation, what kind of error,
+// network/tab state, timing) instead of guessing at the cause of the
+// "Connection issue — retrying…" toast. See project notes for background.
+function _logConnIssue(operation, err, stage) {
+  try {
+    // Pull a short, readable snippet out of the operation's own source code
+    // (e.g. "sb.from('events').insert(...)") so we know WHAT was being
+    // saved without needing to touch every one of the 89 call sites that
+    // use sbWrite() — Function.prototype.toString() gives us the original
+    // source text of the passed-in arrow function for free.
+    let opSnippet = 'unknown';
+    try {
+      const src = operation.toString();
+      const match = src.match(/sb\.(from\('[^']+'\)[^;]*|rpc\('[^']+'\))/);
+      opSnippet = match ? match[0].slice(0, 80) : src.slice(0, 80);
+    } catch(_) {}
+
+    console.warn('[sbWrite diagnostics]', {
+      stage,                                      // 'first-attempt-failed' | 'retry-succeeded' | 'retry-failed'
+      operation: opSnippet,                        // which table/action was being written
+      errorMessage: err?.message || null,
+      time: new Date().toISOString(),
+      online: navigator.onLine,                     // browser's own network status
+      visibility: document.visibilityState,          // was the tab/app in the foreground?
+      connectionType: navigator.connection?.effectiveType || 'unknown', // e.g. '4g','wifi' (Chrome/Android only)
+      connectionRtt: navigator.connection?.rtt ?? null, // estimated round-trip latency, ms
+      userAgent: navigator.userAgent
+    });
+  } catch(_) { /* logging itself must never break the save flow */ }
+}
+window._logConnIssue = _logConnIssue;
 
 // Build a local datetime ISO string that preserves user's intended time
 function localDT(dateStr, timeStr) {
