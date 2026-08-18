@@ -17,6 +17,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Seamly">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
+<!-- v22 fix: explicit favicon so the browser doesn't fall back to guessing
+     /favicon.ico (which doesn't exist) on every page load. -->
+<link rel="icon" type="image/png" href="/icons/icon-192.png">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -338,7 +341,7 @@ try { sb = supabase.createClient(SB_URL, SB_KEY); } catch(e) { console.error('Su
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const T={sage:'#5e8b62',sageMid:'#8ab88e',sageLight:'#d4e8d6',terra:'#b85c38',terraLight:'#f2ddd4',sky:'#3a7ca5',skyLight:'#d0e4f0',plum:'#7c5c8a',plumLight:'#e8d8f0',honey:'#c4892a',honeyLight:'#f5e4c4',rose:'#b85070',roseLight:'#f0d4de',ink:'#1e1b16',muted:'#7a7060',border:'#e0d8cc',bg:'#f5f2ed',surface:'#fff',parchment:'#ede8df'};
-const ET={task:{label:'Task',icon:'✅',color:T.honey,bg:T.honeyLight,desc:'To-dos assigned to family members'},social:{label:'Social Event',icon:'👥',color:T.sky,bg:T.skyLight,desc:'Gatherings, outings, celebrations'},health:{label:'Health Event',icon:'❤️',color:T.rose,bg:T.roseLight,desc:'Appointments, treatments, check-ups'},wellness:{label:'Wellness Log',icon:'🌿',color:T.sage,bg:T.sageLight,desc:'Daily health summary — sleep, mood, exercise'}};
+const ET={task:{label:'Task',icon:'✅',color:T.honey,bg:T.honeyLight,desc:'To-dos assigned to family members'},social:{label:'Event',icon:'👥',color:T.sky,bg:T.skyLight,desc:'Gatherings, outings, celebrations'},health:{label:'Health Event',icon:'❤️',color:T.rose,bg:T.roseLight,desc:'Appointments, treatments, check-ups'},wellness:{label:'Wellness Log',icon:'🌿',color:T.sage,bg:T.sageLight,desc:'Daily health summary — sleep, mood, exercise'}};
 const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DN=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const DNF=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -346,6 +349,25 @@ const MOODS=['😄 Great','😊 Good','😐 Okay','😔 Low','😢 Sad','😤 St
 const MCOLORS=[T.sage,T.terra,T.sky,T.plum,T.honey,T.rose];
 const CURRENCIES=[{code:'EUR',sym:'€'},{code:'USD',sym:'$'},{code:'GBP',sym:'£'},{code:'RON',sym:'lei'},{code:'CHF',sym:'CHF'},{code:'CAD',sym:'CA$'},{code:'AUD',sym:'A$'},{code:'JPY',sym:'¥'},{code:'BRL',sym:'R$'},{code:'INR',sym:'₹'},{code:'SEK',sym:'kr'},{code:'NOK',sym:'kr'},{code:'DKK',sym:'kr'},{code:'PLN',sym:'zł'},{code:'HUF',sym:'Ft'},{code:'AED',sym:'د.إ'},{code:'SGD',sym:'S$'},{code:'HKD',sym:'HK$'}];
 const NOTE_COLORS=['#d4e8d6','#f0d4de','#f5e4c4','#d0e4f0','#e8d8f0','#ede8df','#f2ddd4'];
+
+// ── SHARED ICON SVGs (v22) — small line-icon set matching the bottom-nav's
+// 1.8px-stroke visual style, reused across Meals/Inventory tabs, Insights
+// section headers, and Home's Shopping button, so the same shopping cart /
+// meal / meds / product icon looks identical everywhere it appears. Calendar/
+// Notebook/Inventory here reuse the exact same path shapes already drawn in
+// the static bottom-nav markup (just JS-string versions, since the nav icons
+// themselves are static HTML, not generated) — cart, meal, pill, and package
+// are the 4 genuinely new icons this version adds.
+const ICONS = {
+  cart: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0;vertical-align:middle"><path d="M3 4H5L7 15C7.15 15.8 7.85 16.4 8.65 16.4H18C18.8 16.4 19.5 15.8 19.65 15L21 6.5H6.3"/><circle cx="9" cy="20" r="1.4" fill="currentColor" stroke="none"/><circle cx="17" cy="20" r="1.4" fill="currentColor" stroke="none"/></svg>`,
+  meal: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0;vertical-align:middle"><circle cx="13" cy="12" r="8"/><path d="M4 3v6c0 1.1.9 2 2 2s2-.9 2-2V3"/><path d="M6 11v10"/></svg>`,
+  pill: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0;vertical-align:middle"><rect x="3" y="9" width="18" height="6" rx="3" transform="rotate(-45 12 12)"/><line x1="12" y1="7.5" x2="12" y2="16.5" transform="rotate(-45 12 12)"/></svg>`,
+  package: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0;vertical-align:middle"><rect x="4" y="8" width="16" height="12" rx="1.5"/><path d="M4 8L8 4H16L20 8"/><line x1="12" y1="8" x2="12" y2="20"/></svg>`,
+  calendar: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0;vertical-align:middle"><rect x="4" y="5" width="16" height="15" rx="3"/><line x1="4" y1="10" x2="20" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/><circle cx="12" cy="15" r="1.4" fill="currentColor" stroke="none"/></svg>`,
+  notebook: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0;vertical-align:middle"><rect x="6" y="3" width="14" height="18" rx="2"/><circle cx="4" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="14" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1" fill="currentColor" stroke="none"/><line x1="9" y1="8" x2="17" y2="8"/><line x1="9" y1="12" x2="17" y2="12"/><line x1="9" y1="16" x2="14" y2="16"/></svg>`,
+  inventory: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0;vertical-align:middle"><path d="M3 8L12 4L21 8L12 12L3 8Z"/><path d="M3 8V16L12 20L21 16V8"/><line x1="12" y1="12" x2="12" y2="20"/></svg>`,
+};
+window.ICONS = ICONS;
 
 // 52 Weekly Challenges
 const CHALLENGES=[
@@ -423,7 +445,7 @@ const SD_MEMBERS = [
 ];
 
 const SD_EVENTS = [
-  {id:'se1',type:'social',title:"Leo's Birthday Party",social_type:'Birthday',date:new Date(_SD_Y,_SD_M,_SD_D+5,15,0).toISOString(),end_date:new Date(_SD_Y,_SD_M,_SD_D+5,18,0).toISOString(),location:'Home',participants:['sm1','sm2','sm3','sm4'],participants_all_family:false,description:'Leo turns 9! Dinosaur theme 🦕',recurrence:'None',actions:[{text:'Order cake',done:false},{text:'Decorate house',done:true}],tags:['birthday'],links:[]},
+  {id:'se1',type:'social',title:"Leo's Birthday Party",social_type:'Social',date:new Date(_SD_Y,_SD_M,_SD_D+5,15,0).toISOString(),end_date:new Date(_SD_Y,_SD_M,_SD_D+5,18,0).toISOString(),location:'Home',participants:['sm1','sm2','sm3','sm4'],participants_all_family:false,description:'Leo turns 9! Dinosaur theme 🦕',recurrence:'None',actions:[{text:'Order cake',done:false},{text:'Decorate house',done:true}],tags:['birthday'],links:[]},
   {id:'se2',type:'health',appt_type:'Appointment',title:'Mia – Orthodontist',date:new Date(_SD_Y,_SD_M,_SD_D+3,10,0).toISOString(),end_date:new Date(_SD_Y,_SD_M,_SD_D+3,11,0).toISOString(),location:'Smile Clinic',doctor:'Dr. Popescu',specialty:'Dentist',participants:['sm3'],participants_all_family:false,description:'Monthly braces adjustment',recurrence:'Monthly',recurrence_end_type:'count',recurrence_end_count:6,actions:[{text:'Bring retainer',done:false}],tags:['dental'],links:[]},
   {id:'se3',type:'health',appt_type:'Appointment',title:'David – Cardiologist',date:new Date(_SD_Y,_SD_M,_SD_D+8,9,0).toISOString(),end_date:new Date(_SD_Y,_SD_M,_SD_D+8,10,0).toISOString(),location:'City Heart Center',doctor:'Dr. Ionescu',specialty:'Cardiology',participants:['sm2'],participants_all_family:false,description:'Annual heart check',recurrence:'Yearly',recurrence_end_type:'none',actions:[{text:'Bring last ECG results',done:false},{text:'Prepare medication list',done:true}],tags:[],links:[]},
   {id:'se4',type:'wellness',title:'Elena · 62kg 😊 – Wellness Log',date:new Date(_SD_Y,_SD_M,_SD_D-1).toISOString(),member_id:'sm1',weight:62,height:168,hydration:2.1,exercised:true,activity:'Yoga',activity_mins:45,mood:'😊 Good',energy:75,sleep:7.5},
@@ -1555,7 +1577,7 @@ window.showPicker=showPicker;
 
 // ET is defined in constants above with 👥 social icon
 
-const SOCIAL_TYPES = ['Birthday','Family time','Work gathering','Party','Entertainment','Education','Other'];
+const SOCIAL_TYPES = ['Social','Personal time','Family time','Work','Education','Sport','Other'];
 const MEDICAL_SPECIALTIES = [
   'General Practice','Vaccination','Laboratory / Blood test','Dentist','Dermatology',
   'Gastroenterology','Cardiology','Neurology','Orthopaedics','Gynaecology',
@@ -1952,6 +1974,42 @@ function _renderPlanUsageCard(){
 }
 
 // ── OPEN EVENT FORM ───────────────────────────────────────────────────────────
+// ── SHOW MORE (v22) — progressive disclosure for the event form ────────────
+// Wraps a block of field HTML behind a "Show more ▾ / Show less ▴" toggle.
+// CSS-only show/hide: every field stays present in the DOM at all times
+// (just visually hidden by the wrapper div's display:none), so
+// saveEvDraft() (fires every 5s while the form is open), draft-restore, and
+// saveEv() all keep reading every field by document.getElementById() exactly
+// as they already do today — nothing about autosave or saving needed to
+// change for this feature. Mirrors two patterns already used elsewhere in
+// this function (the Wellness "Exercised today" row and the Recurrence "End
+// recurrence" sub-fields), which already use this exact display-toggle
+// technique.
+function showMoreWrap(hiddenHtml, isOpenByDefault){
+  const open = !!isOpenByDefault;
+  return `
+    <button type="button" onclick="toggleShowMore(this)" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:${T.sage};font-size:13px;font-weight:700;cursor:pointer;padding:4px 0 10px;width:100%;text-align:left">
+      <span class="sm-arrow" style="display:inline-block;font-size:11px;transition:transform .15s;transform:rotate(${open?90:0}deg)">▸</span>
+      <span class="sm-label">${open?'Show less':'Show more'}</span>
+    </button>
+    <div class="ef-showmore" style="display:${open?'block':'none'}">${hiddenHtml}</div>`;
+}
+window.showMoreWrap = showMoreWrap;
+
+// Toggles the wrapper div that immediately follows the tapped button — see
+// showMoreWrap() above, where that div is always the button's next sibling.
+function toggleShowMore(btn){
+  const wrap = btn.nextElementSibling;
+  if(!wrap) return;
+  const isOpen = wrap.style.display !== 'none';
+  wrap.style.display = isOpen ? 'none' : 'block';
+  const arrow = btn.querySelector('.sm-arrow');
+  const label = btn.querySelector('.sm-label');
+  if(arrow) arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
+  if(label) label.textContent = isOpen ? 'Show more' : 'Show less';
+}
+window.toggleShowMore = toggleShowMore;
+
 function openEvForm(type, evId, dateTs, duplicateId) {
   // v18 Pass D: Subscription block-modal check. Only gates a genuinely NEW
   // event action (creating fresh, or duplicating an existing one — both
@@ -2031,7 +2089,7 @@ function openEvForm(type, evId, dateTs, duplicateId) {
   // Helper: participant buttons
   const partButtons = () => `
     <div style="display:flex;gap:7px;flex-wrap:wrap" id="ef-parts">
-      <button type="button" data-mid="__family__" data-sel="${isFamilyAll}" onclick="togPart(this,'__family__')" style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;border:1.5px solid ${isFamilyAll?T.sage:T.border};background:${isFamilyAll?T.sageLight:'#fff'};cursor:pointer;font-size:12px;font-weight:600;color:${isFamilyAll?T.sage:T.muted}">👨‍👩‍👧‍👦 Entire Family</button>
+      <button type="button" data-mid="__family__" data-sel="${isFamilyAll}" onclick="togPart(this,'__family__')" style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;border:1.5px solid ${isFamilyAll?T.sage:T.border};background:${isFamilyAll?T.sageLight:'#fff'};cursor:pointer;font-size:12px;font-weight:600;color:${isFamilyAll?T.sage:T.muted}">👨‍👩‍👧‍👦 Anyone/All</button>
       ${A.members.map(m=>{const sel=partIds.includes(m.id);return`<button type="button" data-mid="${m.id}" data-sel="${sel}" onclick="togPart(this,'${m.id}')" style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;border:1.5px solid ${sel?m.color:T.border};background:${sel?m.color+'22':'#fff'};cursor:pointer;font-size:12px;font-weight:600;color:${sel?m.color:T.muted}">${av(m,18)} ${m.name}</button>`;}).join('')}
     </div>`;
 
@@ -2134,18 +2192,21 @@ function openEvForm(type, evId, dateTs, duplicateId) {
 
   // ── SOCIAL ──
   } else if (type === 'social') {
-    fields = `
+    // v22 (Show more): Main = Participants, Title, Location, Date/Time.
+    // Hidden = sub-type, Recurrence, Actions, Tags, Description, Attachments.
+    const _smMain = `
       <div class="form-row"><label class="lbl">Participants</label>${partButtons()}</div>
+      <div class="form-row"><label class="lbl">Title</label>
+        <div style="position:relative"><input class="inp" id="ef-title" value="${source?.title||''}" placeholder="Add a title…"></div></div>
+      <div class="form-row"><label class="lbl">Location</label>
+        <div style="position:relative"><input class="inp" id="ef-loc" value="${source?.location||''}" placeholder="Where?"></div></div>
+      ${dateTimeFields(isAllDay, startDate, startTime, endDate, endTime)}`;
+    const _smHidden = `
       <div class="form-row"><label class="lbl">Type</label>
         <select class="sel" id="ef-social-type">
           <option value="">Select…</option>
           ${SOCIAL_TYPES.map(t=>`<option value="${t}"${source?.social_type===t?' selected':''}>${t}</option>`).join('')}
         </select></div>
-      <div class="form-row"><label class="lbl">Title</label>
-        <div style="position:relative"><input class="inp" id="ef-title" value="${source?.title||''}" placeholder="Add a title…"></div></div>
-      <div class="form-row"><label class="lbl">Location</label>
-        <div style="position:relative"><input class="inp" id="ef-loc" value="${source?.location||''}" placeholder="Where?"></div></div>
-      ${dateTimeFields(isAllDay, startDate, startTime, endDate, endTime)}
       ${recurrenceFields(source?.recurrence, source?.recurrence_end_type, source?.recurrence_end_count, source?.recurrence_end_date)}
       <div class="form-row"><label class="lbl">Actions</label>
         <div id="ef-actions"></div>
@@ -2154,13 +2215,19 @@ function openEvForm(type, evId, dateTs, duplicateId) {
       <div class="form-row"><label class="lbl">Tags</label>${tagButtons()}</div>
       <div class="form-row"><label class="lbl">Description</label><textarea class="inp" id="ef-desc" rows="2" placeholder="Any notes…" style="resize:none">${source?.description||''}</textarea></div>
       ${attachmentField()}`;
+    // Auto-expand on edit if any hidden field already has real data, per spec.
+    const _smOpen = !!(source?.social_type || (source?.recurrence && source.recurrence!=='None') || (source?.actions&&source.actions.length) || (source?.tags&&source.tags.length) || source?.description || (source?.links&&source.links.length));
+    fields = _smMain + showMoreWrap(_smHidden, _smOpen);
 
   // ── HEALTH ──
   } else if (type === 'health') {
     const hType = apptType;
 
     if (hType === 'Appointment') {
-      fields = `
+      // v22 (Show more): Main = sub-type switcher, Participants, Title,
+      // Doctor, Location, Date/Time. Hidden = Specialty, Recurrence, Cost,
+      // Actions, Tags, Description, Attachments.
+      const _smMain = `
         <div class="form-row"><label class="lbl">Health Event Type</label>
           <select class="sel" id="ef-apt" onchange="confirmHealthSubTypeSwitch(this.value,'${hType}','${evId||''}',${dateTs||'null'})">
             ${['Appointment','Treatment','Illness'].map(t=>`<option${hType===t?' selected':''}>${t}</option>`).join('')}
@@ -2169,14 +2236,15 @@ function openEvForm(type, evId, dateTs, duplicateId) {
         <div class="form-row"><label class="lbl">Title</label>
           <div style="position:relative"><input class="inp" id="ef-title" value="${source?.title||''}" placeholder="e.g. Annual check-up"></div></div>
         <div class="form-row"><label class="lbl">Doctor / Practitioner</label><input class="inp" id="ef-doctor" value="${source?.doctor||''}" placeholder="Dr. Smith"></div>
+        <div class="form-row"><label class="lbl">Location</label>
+          <div style="position:relative"><input class="inp" id="ef-loc" value="${source?.location||''}" placeholder="Clinic / Hospital name"></div></div>
+        ${dateTimeFields(isAllDay, startDate, startTime, endDate, endTime)}`;
+      const _smHidden = `
         <div class="form-row"><label class="lbl">Specialty</label>
           <select class="sel" id="ef-specialty">
             <option value="">Select…</option>
             ${MEDICAL_SPECIALTIES.map(s=>`<option${source?.specialty===s?' selected':''}>${s}</option>`).join('')}
           </select></div>
-        <div class="form-row"><label class="lbl">Location</label>
-          <div style="position:relative"><input class="inp" id="ef-loc" value="${source?.location||''}" placeholder="Clinic / Hospital name"></div></div>
-        ${dateTimeFields(isAllDay, startDate, startTime, endDate, endTime)}
         ${recurrenceFields(source?.recurrence, source?.recurrence_end_type, source?.recurrence_end_count, source?.recurrence_end_date)}
         <div class="grid2">
           <div class="form-row" style="margin:0"><label class="lbl">Cost</label><input class="inp" type="number" id="ef-cost" value="${source?.cost||''}" placeholder="0.00" step="0.01"></div>
@@ -2192,9 +2260,16 @@ function openEvForm(type, evId, dateTs, duplicateId) {
         <div class="form-row"><label class="lbl">Tags</label>${tagButtons()}</div>
         <div class="form-row"><label class="lbl">Description</label><textarea class="inp" id="ef-desc" rows="2" style="resize:none">${source?.description||''}</textarea></div>
         ${attachmentField()}`;
+      const _smOpen = !!(source?.specialty || (source?.recurrence && source.recurrence!=='None') || source?.cost || (source?.actions&&source.actions.length) || (source?.tags&&source.tags.length) || source?.description || (source?.links&&source.links.length));
+      fields = _smMain + showMoreWrap(_smHidden, _smOpen);
 
     } else if (hType === 'Treatment') {
-      fields = `
+      // v22 (Show more): Main = sub-type switcher, Participants, Title,
+      // Start/End Date, Administration. Hidden = Recurrence, Recommended by,
+      // Considerations, Tags, Attachments. (Administration is Main, so it
+      // now renders right after Dates; Recurrence moves into the hidden
+      // group instead of sitting between them, per spec.)
+      const _smMain = `
         <div class="form-row"><label class="lbl">Health Event Type</label>
           <select class="sel" id="ef-apt" onchange="confirmHealthSubTypeSwitch(this.value,'${hType}','${evId||''}',${dateTs||'null'})">
             ${['Appointment','Treatment','Illness'].map(t=>`<option${hType===t?' selected':''}>${t}</option>`).join('')}
@@ -2206,18 +2281,23 @@ function openEvForm(type, evId, dateTs, duplicateId) {
           <div class="form-row" style="margin:0"><label class="lbl">Start Date</label><input class="inp" type="date" id="ef-date" value="${startDate}" onchange="syncEndDate(this.value)"></div>
           <div class="form-row" style="margin:0"><label class="lbl">End Date</label><input class="inp" type="date" id="ef-enddate" value="${endDate}"></div>
         </div>
-        ${recurrenceFields(source?.recurrence, source?.recurrence_end_type, source?.recurrence_end_count, source?.recurrence_end_date)}
         <div class="form-row"><label class="lbl">Administration</label>
           <div id="ef-admin"></div>
           <button type="button" onclick="addAdminRow('ef-admin')" style="font-size:12px;color:${T.sage};background:none;border:1px dashed ${T.sageMid};border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:600;margin-top:4px">+ Add dosage</button>
-        </div>
+        </div>`;
+      const _smHidden = `
+        ${recurrenceFields(source?.recurrence, source?.recurrence_end_type, source?.recurrence_end_count, source?.recurrence_end_date)}
         <div class="form-row"><label class="lbl">Recommended by</label><input class="inp" id="ef-recby" value="${source?.recommended_by||''}" placeholder="Dr. name"></div>
         <div class="form-row"><label class="lbl">Considerations</label><textarea class="inp" id="ef-considerations" rows="2" placeholder="Reactions, restrictions (e.g. take with food)…" style="resize:none">${source?.considerations||''}</textarea></div>
         <div class="form-row"><label class="lbl">Tags</label>${tagButtons()}</div>
         ${attachmentField()}`;
+      const _smOpen = !!((source?.recurrence && source.recurrence!=='None') || source?.recommended_by || source?.considerations || (source?.tags&&source.tags.length) || (source?.links&&source.links.length));
+      fields = _smMain + showMoreWrap(_smHidden, _smOpen);
 
     } else { // Illness
-      fields = `
+      // v22 (Show more): Main = sub-type switcher, Participants, Title,
+      // Start/End Date, Symptoms. Hidden = Cure/Treatment, Tags, Attachments.
+      const _smMain = `
         <div class="form-row"><label class="lbl">Health Event Type</label>
           <select class="sel" id="ef-apt" onchange="confirmHealthSubTypeSwitch(this.value,'${hType}','${evId||''}',${dateTs||'null'})">
             ${['Appointment','Treatment','Illness'].map(t=>`<option${hType===t?' selected':''}>${t}</option>`).join('')}
@@ -2229,17 +2309,24 @@ function openEvForm(type, evId, dateTs, duplicateId) {
           <div class="form-row" style="margin:0"><label class="lbl">Start Date</label><input class="inp" type="date" id="ef-date" value="${startDate}" onchange="syncEndDate(this.value)"></div>
           <div class="form-row" style="margin:0"><label class="lbl">End Date</label><input class="inp" type="date" id="ef-enddate" value="${endDate}"></div>
         </div>
-        <div class="form-row"><label class="lbl">Symptoms</label><textarea class="inp" id="ef-symptoms" rows="2" placeholder="Describe symptoms…" style="resize:none">${source?.symptoms||''}</textarea></div>
+        <div class="form-row"><label class="lbl">Symptoms</label><textarea class="inp" id="ef-symptoms" rows="2" placeholder="Describe symptoms…" style="resize:none">${source?.symptoms||''}</textarea></div>`;
+      const _smHidden = `
         <div class="form-row"><label class="lbl">Cure / Treatment</label><textarea class="inp" id="ef-cure" rows="2" placeholder="Treatment applied…" style="resize:none">${source?.cure||''}</textarea></div>
         <div class="form-row"><label class="lbl">Tags</label>${tagButtons()}</div>
         ${attachmentField()}`;
+      const _smOpen = !!(source?.cure || (source?.tags&&source.tags.length) || (source?.links&&source.links.length));
+      fields = _smMain + showMoreWrap(_smHidden, _smOpen);
     }
 
   // ── TASK ──
   } else if (type === 'task') {
-    fields = `
-      <div class="form-row"><label class="lbl">Assign To</label>
-        <select class="sel" id="ef-mem"><option value="">Anyone</option>${A.members.map(m=>`<option value="${m.id}"${source?.member_id===m.id?' selected':''}>${m.name}</option>`).join('')}</select></div>
+    // v22 (Anyone/All unification): Task now uses the same
+    // participants[]/participants_all_family model and partButtons() UI as
+    // Social/Health — one person, several people, or the whole family —
+    // instead of the old single-assignee dropdown. Label changed from
+    // "Assign To" to "Participants" to match exactly.
+    const _smMain = `
+      <div class="form-row"><label class="lbl">Participants</label>${partButtons()}</div>
       <div class="form-row"><label class="lbl">Title</label>
         <div style="position:relative"><input class="inp" id="ef-title" value="${source?.title||''}" placeholder="Add a title…"></div></div>
       <div class="form-row"><label class="lbl">Location</label>
@@ -2253,14 +2340,17 @@ function openEvForm(type, evId, dateTs, duplicateId) {
         <div class="form-row" style="margin:0" id="ef-stime-row"><label class="lbl">Time</label>
           ${buildTimeSelect('ef-stime', source?.date&&!source?.all_day?new Date(source.date).toTimeString().slice(0,5):defST)}</div>
       </div>
-      ${recurrenceFields(source?.recurrence, source?.recurrence_end_type, source?.recurrence_end_count, source?.recurrence_end_date)}
       <div class="form-row"><label class="lbl">Actions / Subtasks</label>
         <div id="ef-actions"></div>
         <button type="button" onclick="addChecklistRow('ef-actions')" style="font-size:12px;color:${T.sage};background:none;border:1px dashed ${T.sageMid};border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:600;margin-top:4px">+ Add item</button>
-      </div>
+      </div>`;
+    const _smHidden = `
+      ${recurrenceFields(source?.recurrence, source?.recurrence_end_type, source?.recurrence_end_count, source?.recurrence_end_date)}
       <div class="form-row"><label class="lbl">Tags</label>${tagButtons()}</div>
       <div class="form-row"><label class="lbl">Description</label><textarea class="inp" id="ef-desc" rows="2" placeholder="Any notes…" style="resize:none">${source?.description||''}</textarea></div>
       ${attachmentField()}`;
+    const _smOpen = !!((source?.recurrence && source.recurrence!=='None') || (source?.tags&&source.tags.length) || source?.description || (source?.links&&source.links.length));
+    fields = _smMain + showMoreWrap(_smHidden, _smOpen);
   }
 
   // v18 (Event Type Switcher): a dropdown to switch this event between
@@ -2273,7 +2363,7 @@ function openEvForm(type, evId, dateTs, duplicateId) {
       <div class="form-row"><label class="lbl">Event Type</label>
         <select class="sel" id="ef-type-switch" onchange="confirmTypeSwitch(this.value,'${type}','${evId||''}',${dateTs||'null'})">
           <option value="task"${type==='task'?' selected':''}>Task</option>
-          <option value="social"${type==='social'?' selected':''}>Social Event</option>
+          <option value="social"${type==='social'?' selected':''}>Event</option>
           <option value="health"${type==='health'?' selected':''}>Health Event</option>
         </select></div>`;
     fields = typeSwitcherHtml + fields;
@@ -2796,33 +2886,18 @@ function switchEventType(newType, oldType, evId, dateTs){
   src.actions = snap.actions || [];
   src.links = snap.links || [];
 
-  // Assignee conversion (§3.2)
-  if (newType === 'task') {
-    if (oldType === 'task') {
-      src.member_id = f['ef-mem'] || null;
-    } else {
-      const parts = snap.participants || [];
-      const isFamily = parts.includes('__family__');
-      const memberIds = parts.filter(p=>p!=='__family__');
-      // Exactly one participant (and not "entire family") carries over;
-      // multiple participants or "entire family" -> Task left unassigned
-      // ("Anyone"), per confirmed interim behavior.
-      src.member_id = (!isFamily && memberIds.length===1) ? memberIds[0] : null;
-    }
-    src.participants = [];
-    src.participants_all_family = false;
-  } else {
-    if (oldType === 'task') {
-      const mid = f['ef-mem'] || '';
-      src.participants = mid ? [mid] : [];
-      src.participants_all_family = false;
-    } else {
-      const parts = snap.participants || [];
-      src.participants_all_family = parts.includes('__family__');
-      src.participants = parts.filter(p=>p!=='__family__');
-    }
-    src.member_id = null;
-  }
+  // Assignee conversion (§3.2) — v22 (Anyone/All unification): Task now
+  // uses the exact same participants[]/participants_all_family model as
+  // Social/Health, so participants carry straight across for EVERY type
+  // combination with no lossy conversion needed anymore. The old
+  // "only a single specific participant carries over, multi/family
+  // dropped" special-case for switching TO Task is gone — switching a
+  // multi-person or Anyone/All event to Task no longer silently loses who
+  // was assigned.
+  const _srcParts = snap.participants || [];
+  src.participants_all_family = _srcParts.includes('__family__');
+  src.participants = _srcParts.filter(p=>p!=='__family__');
+  src.member_id = null;
 
   // Recurrence (§3.5) — only carried over when editing the FULL series.
   // A single-occurrence type switch on a recurring event detaches that
@@ -3038,13 +3113,15 @@ async function sbWrite(operation) {
       _logConnIssue(operation, e, 'first-attempt-failed');
       toast('Connection issue — retrying…');
       await new Promise(r => setTimeout(r, 1000));
-      // Force fresh Supabase client to break out of stale HTTP/2 connection pool
-      try {
-        sb = supabase.createClient(SB_URL, SB_KEY, {
-          auth: { persistSession: true, autoRefreshToken: true },
-          global: { fetch: (...a) => fetch(...a) }
-        });
-      } catch(_) {}
+      // v22 fix: no longer creates a second Supabase client here. Retrying
+      // against the SAME client removes a confirmed "Multiple GoTrueClient
+      // instances" bug — 3 real diagnostic captures (different networks/app
+      // contexts) all showed this warning firing every time the old
+      // client-recreation code ran, and all 3 retries succeeded in ~1-2s
+      // regardless, meaning the fresh client wasn't why the retry worked.
+      // The old client was never shut down either, so every retry in a
+      // session left one more zombie client running in the background,
+      // sharing the same storage key — that's the actual bug this removes.
       try {
         const result = await withTimeout(operation);
         _logConnIssue(operation, null, 'retry-succeeded');
@@ -3169,7 +3246,14 @@ async function saveEv(type, evId, dateTs) {
         data.date = dv ? localDT(dv, tv) : new Date().toISOString();
       }
       data.end_date = null;
-      data.member_id = document.getElementById('ef-mem')?.value || null;
+      // v22 (Anyone/All unification): Task now reads the same
+      // participants[]/participants_all_family pair Social/Health already
+      // read, via the same #ef-parts pill buttons. Task stops WRITING to
+      // member_id going forward — the column stays in the schema (Wellness
+      // still uses it), it's just never set by this branch anymore.
+      const partBtns = Array.from(document.querySelectorAll('#ef-parts button[data-sel="true"]'));
+      data.participants_all_family = partBtns.some(b=>b.dataset.mid==='__family__');
+      data.participants = partBtns.filter(b=>b.dataset.mid!=='__family__').map(b=>b.dataset.mid).filter(Boolean);
       // v18 (Event Type Switcher §3.4): Task gains Location + Attachments,
       // so these aren't lost when converting Social/Health -> Task.
       data.location = document.getElementById('ef-loc')?.value || null;
@@ -3459,6 +3543,130 @@ async function saveEv(type, evId, dateTs) {
             succeeded.forEach(r => { byId[r.data.id] = r.data; });
             A.events = A.events.map(e => byId[e.id] ? byId[e.id] : e);
             A._seriesUpdateMsg = `Series updated! ✅ (${succeeded.length + 1} occurrence${succeeded.length+1!==1?'s':''})`;
+          }
+        }
+
+        // ── v22: RECURRENCE COUNT FIX ──────────────────────────────────
+        // Editing the full series can change how many occurrences the
+        // series SHOULD have (a new count, a new end date, or a new end
+        // type) — but nothing above this point ever added or removed
+        // actual event rows to match; it only ever updated rows that
+        // already existed. This compares the just-saved recurrence
+        // settings against what's actually in the database and grows or
+        // shrinks the series to match, reusing the same date-stepping
+        // rules generateRecurrences() uses for brand-new series, so a
+        // grown series looks identical to one created that size from the
+        // start. Reads A.events fresh (after the sibling date-shift
+        // update above), so it always compares against the real,
+        // just-saved state. Only runs when recurrence is still active —
+        // a single-occurrence edit never reaches this branch at all, and
+        // clearing recurrence entirely on a full-series edit is left
+        // alone (out of scope for this fix).
+        if (data.recurrence && data.recurrence !== 'None') {
+          const currentSeriesEvents = A.events
+            .filter(e => e.series_id === editSeriesId)
+            .sort((a,b) => new Date(a.date) - new Date(b.date));
+          const currentCount = currentSeriesEvents.length;
+
+          const stepDate = d => {
+            const next = new Date(d);
+            if (data.recurrence === 'Monthly') next.setMonth(next.getMonth() + 1);
+            else if (data.recurrence === 'Yearly') next.setFullYear(next.getFullYear() + 1);
+            else if (data.recurrence === 'Daily') next.setDate(next.getDate() + 1);
+            else if (data.recurrence === 'Weekly') next.setDate(next.getDate() + 7);
+            else if (data.recurrence === 'Bi-weekly') next.setDate(next.getDate() + 14);
+            return next;
+          };
+
+          // Resolve how many occurrences the series SHOULD have, per the
+          // just-saved recurrence settings — mirrors generateRecurrences()'s
+          // own totalCount/endDateLimit resolution.
+          const endType = data.recurrence_end_type || 'none';
+          let targetCount = currentCount; // default: no change if unresolved
+          if (endType === 'count') {
+            targetCount = Math.max(1, data.recurrence_end_count || 1);
+          } else if (endType === 'date' && data.recurrence_end_date) {
+            const endDateLimit = new Date(data.recurrence_end_date + 'T23:59:59');
+            let count = 1;
+            let cursor = new Date(currentSeriesEvents[0]?.date || cleanedData.date);
+            while (count <= 200) {
+              const next = stepDate(cursor);
+              if (next > endDateLimit) break;
+              cursor = next;
+              count++;
+            }
+            targetCount = count;
+          } else if (endType === 'none') {
+            // "Repeat forever" — same practical cap generateRecurrences()
+            // uses for brand-new series. Only ever GROWS toward this cap
+            // if the series is currently smaller — never shrinks an
+            // existing longer series just because it's now "forever".
+            targetCount = Math.max(currentCount, 365);
+          }
+
+          if (targetCount > currentCount) {
+            // ── GROW: generate the missing occurrence(s), continuing from
+            // the LAST existing occurrence's date. Every new row gets the
+            // same shared fields just saved on this edit (same exclusion
+            // set already used for siblings above: everything except
+            // identity/date fields).
+            const EXCLUDE_FROM_NEW = new Set(['family_id','date','end_date','series_id','created_by_user_id','id']);
+            const templateFields = {};
+            Object.keys(cleanedData).forEach(k => { if (!EXCLUDE_FROM_NEW.has(k)) templateFields[k] = cleanedData[k]; });
+            const lastEv = currentSeriesEvents[currentSeriesEvents.length - 1];
+            const lastDate = new Date(lastEv.date);
+            const lastEndDate = lastEv.end_date ? new Date(lastEv.end_date) : null;
+            const duration = lastEndDate ? (lastEndDate - lastDate) : 0;
+            const newRows = [];
+            let cursor = lastDate;
+            for (let i = 0; i < targetCount - currentCount; i++) {
+              cursor = stepDate(cursor);
+              newRows.push({
+                family_id: A.family.id,
+                created_by_user_id: lastEv.created_by_user_id || null,
+                series_id: editSeriesId,
+                date: cursor.toISOString(),
+                end_date: duration ? new Date(cursor.getTime() + duration).toISOString() : null,
+                ...templateFields,
+              });
+            }
+            if (newRows.length) {
+              const insRes = await sbWrite(() => sb.from('events').insert(newRows).select());
+              if (insRes.error) {
+                toast('Series updated, but adding the new occurrence(s) failed — please try again.', true);
+                console.error('Series growth insert error', insRes.error);
+              } else if (insRes.data) {
+                A.events.push(...insRes.data);
+                A._seriesUpdateMsg = `Series updated! ✅ (${targetCount} occurrence${targetCount!==1?'s':''})`;
+              }
+            }
+          } else if (targetCount < currentCount) {
+            // ── SHRINK: delete excess occurrences from the LATEST date
+            // backward. The occurrence actively being edited (evId) is
+            // NEVER deleted, even if that means the series can't shrink
+            // all the way down to the requested count — the count is
+            // floored at whatever number keeps the edited occurrence in
+            // the series, and a toast explains why.
+            const deletable = currentSeriesEvents.filter(e => e.id !== evId);
+            const deleteCount = Math.min(currentCount - targetCount, deletable.length);
+            const toDelete = deletable
+              .slice()
+              .sort((a,b) => new Date(b.date) - new Date(a.date))
+              .slice(0, deleteCount);
+            if (toDelete.length) {
+              const delIds = toDelete.map(e => e.id);
+              const delRes = await sbWrite(() => sb.from('events').delete().in('id', delIds));
+              if (delRes.error) {
+                toast('Series updated, but removing extra occurrence(s) failed — please try again.', true);
+                console.error('Series shrink delete error', delRes.error);
+              } else {
+                A.events = A.events.filter(e => !delIds.includes(e.id));
+                const finalCount = currentCount - toDelete.length;
+                A._seriesUpdateMsg = finalCount > targetCount
+                  ? `Series shortened to ${finalCount}x to keep the occurrence you edited.`
+                  : `Series updated! ✅ (${finalCount} occurrence${finalCount!==1?'s':''})`;
+              }
+            }
           }
         }
       }
@@ -3854,7 +4062,7 @@ function viewEv(id) {
   if (allMembers || ev.participants?.length) {
     body += `<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:${T.muted};margin-bottom:5px">PARTICIPANTS</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        ${allMembers?`<div style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600">👨‍👩‍👧‍👦 Entire Family</div>`:''}
+        ${allMembers?`<div style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600">👨‍👩‍👧‍👦 Anyone/All</div>`:''}
         ${(ev.participants||[]).map(pid=>{const m=getMem(pid);return m?`<div style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600">${av(m,22)} ${m.name}</div>`:''}).join('')}
       </div></div>`;
   }
@@ -4055,12 +4263,19 @@ function renderNB(){
   // Expanded: tap selects the group.
   // Collapsed: tap expands the ribbon (stopPropagation so outer div doesn't double-fire).
   // v7: user-created groups also get a small ✏️ edit icon when ribbon is open.
+  // v22: curated groups get a small × "hide" icon in that same slot instead
+  // (Batch 1 spec item 3) — tapping it calls the existing, unmodified
+  // toggleCuratedContent(key, false) to hide the group from the Notebook.
+  // No "show again from here" control needed: a hidden group isn't visible
+  // in the ribbon to tap in the first place, so turning it back on stays a
+  // Settings action (Settings → Notebook settings), which makes sense since
+  // you're re-discovering it, not managing something already in front of you.
   // v9: `color` is kept in the signature (some callers still pass a group's
   // color field) but is intentionally NOT used for any visual styling —
   // note_groups.color was never meant to drive ribbon appearance and can be
   // too light to read against the ribbon background. Selected/unselected
   // states now always use fixed sage-green styling instead.
-  const rSection=(id,name,color,isUserGroup=false)=>{
+  const rSection=(id,name,color,isUserGroup=false,curatedKey=null)=>{
     const isActive=A.noteFGroup===id;
     const clickAction=ribbonOpen
       ? `A.noteFGroup='${id}';renderNB()`
@@ -4071,11 +4286,12 @@ function renderNB(){
         ${ribbonOpen?`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:9px;line-height:1.4">${name}</span>`:''}
       </button>
       ${ribbonOpen&&isUserGroup&&!isSampleMode()?`<button onclick="event.stopPropagation();openEditGroup('${id}')" title="Edit group" style="background:none;border:none;color:${T.muted};cursor:pointer;font-size:11px;padding:4px 8px 4px 2px;-webkit-tap-highlight-color:transparent">✏️</button>`:''}
+      ${ribbonOpen&&curatedKey&&!isSampleMode()?`<button onclick="event.stopPropagation();toggleCuratedContent('${curatedKey}',false)" title="Hide from Notebook — re-enable anytime in Settings → Notebook settings" style="background:none;border:none;color:${T.muted};cursor:pointer;font-size:14px;padding:4px 8px 4px 2px;-webkit-tap-highlight-color:transparent">×</button>`:''}
     </div>`;
   };
 
   // Section order: user groups first, then a divider, then All Notes + Uncategorized at bottom
-  const userGroupSections=groups.map(g=>rSection(g.id,g.name,g.color||T.sage,!g.is_curated)).join('');
+  const userGroupSections=groups.map(g=>rSection(g.id,g.name,g.color||T.sage,!g.is_curated,g.is_curated?g.curated_key:null)).join('');
   // Divider only rendered when user has at least one group (separates user groups from defaults)
   const dividerEl=groups.length>0
     ? `<div style="height:1px;background:${T.border};margin:${ribbonOpen?'3px 8px 3px 12px':'3px 0'};opacity:.5"></div>`
@@ -5715,6 +5931,37 @@ function _insightsMealPlanCompletion(){
   return total ? Math.round((filled/total)*100) : 0;
 }
 
+// v22 (Insights Clickability): list-reveal modal for "Events to follow up
+// on" — the one Insights card that's a mix of tasks and non-task events
+// with open actions, so no single existing page shows exactly this set.
+// Reuses the exact same _followUpCalendarItems() data already powering
+// both this card and Home's "Other Actions" section, so the count shown
+// on the card can never disagree with what's shown in this list. Each row
+// closes the sheet and opens the real event/task via the existing,
+// unmodified viewEv().
+function _showFollowUpListModal(){
+  const items = _followUpCalendarItems();
+  const today = todayD();
+  const rows = items.map(e=>{
+    const isTask = e.type === 'task';
+    const isOverdue = new Date(e.date) < today;
+    const openCount = (e.actions||[]).filter(a=>!a.done).length;
+    const icon = isTask ? '✅' : ET[e.type].icon;
+    const subtitle = isTask
+      ? `${isOverdue?'⚠️ Overdue · ':''}Due: ${fmt(e.date)} · ${openCount} open item${openCount!==1?'s':''}`
+      : `${fmt(e.date)} · ${openCount} open item${openCount!==1?'s':''}`;
+    return `<div onclick="closeModal();setTimeout(()=>viewEv('${e.id}'),50)" style="display:flex;align-items:center;gap:10px;padding:10px 11px;border-radius:10px;background:#fff;border-left:3px solid ${T.sky};margin-bottom:6px;cursor:pointer">
+      <span style="font-size:16px">${icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.series_id?'🔁 ':''}${e.title||(isTask?'Untitled Task':ET[e.type].label)}</div>
+        <div style="font-size:11px;color:${isTask&&isOverdue?T.rose:T.muted}">${subtitle}</div>
+      </div>
+    </div>`;
+  }).join('');
+  showModal('Events to follow up on', items.length ? rows : `<div style="text-align:center;color:${T.muted};padding:20px 0;font-size:13px">Nothing to follow up on right now 🎉</div>`);
+}
+window._showFollowUpListModal = _showFollowUpListModal;
+
 function renderInsights(){
   // Weekly Family Challenge — unchanged selection logic, just repositioned
   // above the module sections below instead of above the old Wellness
@@ -5743,9 +5990,20 @@ function renderInsights(){
   const mealCompletion=_insightsMealPlanCompletion();
 
   const sectionTitle=(icon,label)=>`<div style="font-family:'Playfair Display',serif;font-size:16px;color:${T.ink};margin:18px 0 10px;display:flex;align-items:center;gap:7px">${icon} ${label}</div>`;
-  const lineCard=html=>`<div class="card" style="padding:12px 14px;margin-bottom:8px;font-size:13px;color:${T.ink};line-height:1.5">${html}</div>`;
+  // v22 (Insights Clickability): lineCard/memberRow both take an optional
+  // onclick string. When provided, the whole card/row becomes tappable —
+  // cursor:pointer, a trailing "›" affordance matching the style already
+  // used on event/note cards elsewhere in the app (e.g. Home's sky-left-
+  // border cards) — and the onclick fires. When omitted (the default),
+  // both render exactly as they did before this pass: plain, non-interactive.
+  const lineCard=(html,onclick=null)=>`<div class="card" style="padding:12px 14px;margin-bottom:8px;font-size:13px;color:${T.ink};line-height:1.5;${onclick?'cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px':''}"${onclick?` onclick="${onclick}"`:''}><div style="flex:1;min-width:0">${html}</div>${onclick?`<span style="color:${T.muted};font-size:16px;flex-shrink:0">›</span>`:''}</div>`;
   const emptyLine=text=>`<div style="font-size:12px;color:${T.muted};padding:2px 0">${text}</div>`;
-  const memberRow=(name,valueHtml)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:3px 0"><span>${name}</span><span style="color:${T.muted};text-align:right">${valueHtml}</span></div>`;
+  const memberRow=(name,valueHtml,onclick=null)=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:3px 0;${onclick?'cursor:pointer':''}"${onclick?` onclick="${onclick}"`:''}><span>${name}</span><span style="display:flex;align-items:center;gap:5px;color:${T.muted};text-align:right"><span>${valueHtml}</span>${onclick?`<span style="font-size:13px">›</span>`:''}</span></div>`;
+  // Tier 3 (Busiest day / Busiest member): tap toggles a short inline
+  // explanation open/closed directly under the card — no modal, no
+  // navigation. A couple of lines flipping one wrapper div's display is
+  // all this needs, per spec — no separate named function per card.
+  const infoToggle=(domId,explainText)=>`<button type="button" onclick="event.stopPropagation();const el=document.getElementById('${domId}');if(el)el.style.display=el.style.display==='none'?'block':'none';" style="background:none;border:none;color:${T.muted};font-size:13px;cursor:pointer;padding:0 0 0 4px;vertical-align:middle" title="How is this calculated?">ⓘ</button><div id="${domId}" style="display:none;font-size:11px;color:${T.muted};margin-top:6px;line-height:1.5">${explainText}</div>`;
 
   document.getElementById('page-insights').innerHTML=`
     <div class="page-header">
@@ -5760,25 +6018,25 @@ function renderInsights(){
         <div style="display:flex;gap:6px;flex-wrap:wrap">${challenge.tips.map(t=>`<span style="background:rgba(255,255,255,.2);border-radius:99px;padding:3px 10px;font-size:11px;font-weight:600">💡 ${t}</span>`).join('')}</div>
       </div>
 
-      ${sectionTitle('📅','Calendar')}
-      ${lineCard(busiestDay?`<b>${busiestDay}</b> are usually your busiest day.`:emptyLine('Not enough events yet to spot a pattern.'))}
-      ${lineCard(busiestMember?`<b>${busiestMember.name}</b> has the most on their plate this month (${busiestMember.count} event${busiestMember.count===1?'':'s'}).`:emptyLine('No events assigned to a member in the last 30 days.'))}
-      ${lineCard(`<div style="font-weight:700;margin-bottom:6px">Last health event per member</div>${lastHealthPerMember.length?lastHealthPerMember.map(({member,event})=>memberRow(member.name, event?`${event.title||'Health event'}, ${fmt(event.date)}`:'No health events logged')).join(''):emptyLine('No family members yet.')}`)}
-      ${lineCard(`Events to follow up on: <b>${followUpCount}</b>`)}
+      ${sectionTitle(ICONS.calendar,'Calendar')}
+      ${lineCard(busiestDay?`<b>${busiestDay}</b> are usually your busiest day.${infoToggle('insight-busiest-day-info','Based on how many events fall on each weekday over the last 30 days.')}`:emptyLine('Not enough events yet to spot a pattern.'))}
+      ${lineCard(busiestMember?`<b>${busiestMember.name}</b> has the most on their plate this month (${busiestMember.count} event${busiestMember.count===1?'':'s'}).${infoToggle('insight-busiest-member-info','Based on how many events are assigned to each member over the last 30 days.')}`:emptyLine('No events assigned to a member in the last 30 days.'))}
+      ${lineCard(`<div style="font-weight:700;margin-bottom:6px">Last health event per member</div>${lastHealthPerMember.length?lastHealthPerMember.map(({member,event})=>memberRow(member.name, event?`${event.title||'Health event'}, ${fmt(event.date)}`:'No health events logged', event?`viewEv('${event.id}')`:null)).join(''):emptyLine('No family members yet.')}`)}
+      ${lineCard(`Events to follow up on: <b>${followUpCount}</b>`, followUpCount>0?`_showFollowUpListModal()`:null)}
 
-      ${sectionTitle('📓','Notebook')}
-      ${lineCard(`Notes with open checklist items: <b>${openChecklistCount}</b>`)}
+      ${sectionTitle(ICONS.notebook,'Notebook')}
+      ${lineCard(`Notes with open checklist items: <b>${openChecklistCount}</b>`, openChecklistCount>0?`goTo('notebook')`:null)}
 
-      ${sectionTitle('💊','Inventory')}
-      ${lineCard(`<div style="font-weight:700;margin-bottom:6px">Meds assigned per member</div>${medsPerMember.length?medsPerMember.map(({member,count})=>memberRow(member.name, count)).join(''):emptyLine('No family members yet.')}`)}
-      ${lineCard(`<div style="font-weight:700;margin-bottom:6px">Runs out first, per member</div>${medRunsOutFirst.length?medRunsOutFirst.map(({member,med,daysLeft})=>memberRow(member.name, med?`<span style="color:${daysLeft!==null&&daysLeft<=7?T.rose:T.muted}">${med.name} — ${daysLeft}d left</span>`:'No meds assigned')).join(''):emptyLine('No family members yet.')}`)}
-      ${lineCard(expiringProducts.length?`<div style="font-weight:700;margin-bottom:6px">Products expiring within ${INSIGHTS_EXPIRY_WINDOW_DAYS} days</div>${expiringProducts.map(p=>memberRow(p.name, `<span style="color:${T.rose}">${fmt(p.expiry)}</span>`)).join('')}`:emptyLine('Nothing expiring in the next '+INSIGHTS_EXPIRY_WINDOW_DAYS+' days.'))}
+      ${sectionTitle(ICONS.inventory,'Inventory')}
+      ${lineCard(`<div style="font-weight:700;margin-bottom:6px">Meds assigned per member</div>${medsPerMember.length?medsPerMember.map(({member,count})=>memberRow(member.name, count, count>0?`A.invTab='treatments';goTo('inventory')`:null)).join(''):emptyLine('No family members yet.')}`)}
+      ${lineCard(`<div style="font-weight:700;margin-bottom:6px">Runs out first, per member</div>${medRunsOutFirst.length?medRunsOutFirst.map(({member,med,daysLeft})=>memberRow(member.name, med?`<span style="color:${daysLeft!==null&&daysLeft<=7?T.rose:T.muted}">${med.name} — ${daysLeft}d left</span>`:'No meds assigned', med?`openEditDM('${med.id}')`:null)).join(''):emptyLine('No family members yet.')}`)}
+      ${lineCard(expiringProducts.length?`<div style="font-weight:700;margin-bottom:6px">Products expiring within ${INSIGHTS_EXPIRY_WINDOW_DAYS} days</div>${expiringProducts.map(p=>memberRow(p.name, `<span style="color:${T.rose}">${fmt(p.expiry)}</span>`, `openEditProduct('${p.id}')`)).join('')}`:emptyLine('Nothing expiring in the next '+INSIGHTS_EXPIRY_WINDOW_DAYS+' days.'))}
 
-      ${sectionTitle('🛒','Shopping')}
-      ${lineCard(`Items still to be bought: <b>${uncheckedShoppingCount}</b>`)}
+      ${sectionTitle(ICONS.cart,'Shopping')}
+      ${lineCard(`Items still to be bought: <b>${uncheckedShoppingCount}</b>`, uncheckedShoppingCount>0?`A.mealsTab='shopping';goTo('meals')`:null)}
 
-      ${sectionTitle('🍽️','Meals')}
-      ${lineCard(`This week's meal plan is <b>${mealCompletion}%</b> filled in.`)}
+      ${sectionTitle(ICONS.meal,'Meals')}
+      ${lineCard(`This week's meal plan is <b>${mealCompletion}%</b> filled in.`, `A.mealsTab='planner';goTo('meals')`)}
     </div>`;
 }
 
@@ -5924,7 +6182,7 @@ function renderHome(){
 
       <div style="display:flex;gap:8px;margin-bottom:14px">
         <button onclick="showPicker(new Date())" style="flex:1;padding:12px;border-radius:12px;background:${T.sage};color:#fff;border:none;font-weight:700;font-size:13px;cursor:pointer">+ Calendar Entry</button>
-        <button onclick="A.mealsTab='shopping';goTo('meals')" style="flex:1;padding:12px;border-radius:12px;background:${T.honeyLight};color:${T.honey};border:1px solid ${T.honey}44;font-weight:700;font-size:13px;cursor:pointer">🛒 Shopping</button>
+        <button onclick="A.mealsTab='shopping';goTo('meals')" style="flex:1;padding:12px;border-radius:12px;background:${T.honeyLight};color:${T.honey};border:1px solid ${T.honey}44;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px">${ICONS.cart} Shopping</button>
       </div>
 
       <div style="font-weight:800;font-size:14px;color:${T.ink};margin-bottom:8px">Today — ${fmt(today)}</div>
@@ -6001,7 +6259,11 @@ const MEAL_PLAN_ROWS=['Breakfast','Lunch','Snack','Dinner'];
 
 function renderMeals(){
   if(!A.mealsTab||A.mealsTab==='ideas') A.mealsTab='planner';
-  const TABS=[{id:'planner',label:'📅 Meal Planner'},{id:'shopping',label:'🛒 Shopping'}];
+  // v22: icon separated from label so the tab button can render an inline
+  // SVG (matching the bottom-nav's visual style) instead of an emoji —
+  // also fixes the pre-existing Meal Planner icon mismatch (was a 📅
+  // calendar emoji, unrelated to meals).
+  const TABS=[{id:'planner',icon:ICONS.meal,label:'Meal Planner'},{id:'shopping',icon:ICONS.cart,label:'Shopping'}];
   let tc='';
   if(A.mealsTab==='shopping'){
     tc=renderShoppingTab();
@@ -6012,7 +6274,7 @@ function renderMeals(){
     <div class="page-header">
       <div class="page-title">Meals</div>
     </div>
-    <div class="tabs">${TABS.map(t=>`<button class="tab ${A.mealsTab===t.id?'active':''}" onclick="A.mealsTab='${t.id}';renderMeals()">${t.label}</button>`).join('')}</div>
+    <div class="tabs">${TABS.map(t=>`<button class="tab ${A.mealsTab===t.id?'active':''}" onclick="A.mealsTab='${t.id}';renderMeals()" style="display:flex;align-items:center;gap:6px">${t.icon} ${t.label}</button>`).join('')}</div>
     ${A.mealsTab==='shopping'?_usageBanner('shopping','Shopping Lists'):''}
     <div style="padding:14px 16px">${tc}</div>`;
   // Planner grid is filled with saved values once the table exists in the DOM
@@ -6427,11 +6689,30 @@ async function reorderShoppingItems(listId,cont){
   const list=A.shoppingLists.find(l=>l.id===listId);
   if(!list)return;
   const items=list.items||[];
+  // v22 fix: previously this always pushed every HIDDEN item (filtered out
+  // by "Hide completed" or the per-list search box) to the very END of the
+  // array — silently relocating items the user never touched, and worse
+  // every time a drag happened under these conditions. Fixed merge
+  // strategy: hidden items keep their EXACT original index; only the
+  // indices that belonged to visible items get refilled, in order, with
+  // the drag-resulting visible order — so nothing outside the drag
+  // selection ever moves.
   const shownIdx=Array.from(cont.querySelectorAll('.shop-item-row')).map(row=>parseInt(row.dataset.idx));
   const shownSet=new Set(shownIdx);
-  const hiddenIdx=items.map((_,i)=>i).filter(i=>!shownSet.has(i));
-  const finalOrder=[...shownIdx,...hiddenIdx];
-  const newItems=finalOrder.map(i=>items[i]);
+  const newItems=new Array(items.length);
+  let visiblePtr=0;
+  for(let i=0;i<items.length;i++){
+    if(shownSet.has(i)){
+      // This original slot belonged to a visible item — fill it with the
+      // next item from the drag-resulting visible order.
+      newItems[i]=items[shownIdx[visiblePtr]];
+      visiblePtr++;
+    }else{
+      // This original slot belonged to a hidden item — leave it exactly
+      // where it was.
+      newItems[i]=items[i];
+    }
+  }
   list.items=newItems;
   // v10 (UX hardening): sbWrite() + error toast. No loading state — drag-to-
   // reorder should feel instant. Always re-render regardless of outcome.
@@ -6530,6 +6811,14 @@ async function toggleShoppingItem(listId,idx,checked){
     return;
   }
   list.items=items;
+  // v22: notify the family when an item is CHECKED (not unchecked) — same
+  // asymmetry already used for the urgent-flag toggle just below in this
+  // file. Reuses the existing notif_shopping preference; no new Settings
+  // toggle needed, and respects that preference automatically if a family
+  // has already turned Shopping notifications off.
+  if(checked){
+    writeNotif('shopping','updated',`${getActorName()} checked off a shopping item`,items[idx].text||'');
+  }
   if(checked) showShopUndoToast(listId,idx);
   // v14: keep the Shopping tab page behind this modal in sync too.
   renderMeals();
@@ -6833,7 +7122,10 @@ window.restoreMealPlanDraftLS=restoreMealPlanDraftLS;
 // ── INVENTORY PAGE ─────────────────────────────────────────────────────────────
 function renderInventory(){
   if(!A.invTab) A.invTab='treatments';
-  const TABS=[{id:'treatments',label:'💊 Frequent meds'},{id:'products',label:'📦 Products'}];
+  // v22: icon separated from label, two distinct new icons (pill/package)
+  // give each sub-tab its own visual identity instead of both implicitly
+  // sharing the module's crate icon.
+  const TABS=[{id:'treatments',icon:ICONS.pill,label:'Frequent meds'},{id:'products',icon:ICONS.package,label:'Products'}];
   let tc='';
   if(A.invTab==='treatments'){
     // Placeholder container — filled directly by renderMeds('inv-meds-container')
@@ -6873,7 +7165,7 @@ function renderInventory(){
     <div class="page-header">
       <div class="page-title">Inventory</div>
     </div>
-    <div class="tabs">${TABS.map(t=>`<button class="tab ${A.invTab===t.id?'active':''}" onclick="A.invTab='${t.id}';renderInventory()">${t.label}</button>`).join('')}</div>
+    <div class="tabs">${TABS.map(t=>`<button class="tab ${A.invTab===t.id?'active':''}" onclick="A.invTab='${t.id}';renderInventory()" style="display:flex;align-items:center;gap:6px">${t.icon} ${t.label}</button>`).join('')}</div>
     <div style="padding:14px 16px">${tc}</div>`;
 
   // If treatments tab, render meds directly into the now-visible Inventory
@@ -7994,11 +8286,14 @@ window.toggleCuratedContent=toggleCuratedContent;
 // ── FEEDBACK ──────────────────────────────────────────────────────────────────
 // Floating 💬 button → modal form → saves to `feedback` table in Supabase.
 
+// v22: 'other' type removed per Roxana's decision — 'general feedback' already
+// covers that ground. Historic feedback rows saved with type='other' are left
+// untouched in Supabase and still visible in Table Editor / the future Admin
+// feedback viewer — this only removes the option going forward.
 const FB_TYPES = [
   { value:'general', icon:'💬', label:'General feedback', desc:'Share your thoughts on the app' },
   { value:'bug',     icon:'🐛', label:'Report a bug',     desc:"Something isn't working right" },
   { value:'feature', icon:'✨', label:'Feature request',  desc:"Something you'd love to see added" },
-  { value:'other',   icon:'📝', label:'Other',            desc:'' },
 ];
 
 // ── QUICK ADD (v21) ──────────────────────────────────────────────────────────
@@ -8108,7 +8403,7 @@ async function saveQuickTask(){
   // its blank/default value, per spec §4.
   const data={
     family_id:A.family.id, type:'task', title, date,
-    end_date:null, all_day:false, member_id:null, location:null,
+    end_date:null, all_day:false, participants:[], participants_all_family:false, location:null,
     links:[], actions:[], tags:[], description:null,
     recurrence:'None', recurrence_end_type:null, recurrence_end_count:null, recurrence_end_date:null,
     is_private:false, created_by_user_id:A.user?.id||null,
