@@ -1,4 +1,4 @@
-<!-- Seamly v21 | STAGING | 04 Aug 2026 -->
+<!-- Seamly v22 (Passes A–E + fixes, interim) | STAGING | 18 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -184,7 +184,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div class="auth-card">
     <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">Seamly</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v21 — 04 Aug 2026</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v22 · Passes A–E (interim) — 18 Aug 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -235,7 +235,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v21</span>
+      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·E</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sample-btn" onclick="A.family?toggleSampleMode():goTo('settings')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:var(--honey-light);color:var(--honey);border:1px solid var(--honey)44;cursor:pointer;display:none">📋 Sample</button>
@@ -275,7 +275,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v21</span>
+      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·E</span>
     </div>
     <button class="nav-btn" data-page="home" onclick="goTo('home')">
       <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0">
@@ -2192,15 +2192,19 @@ function openEvForm(type, evId, dateTs, duplicateId) {
 
   // ── SOCIAL ──
   } else if (type === 'social') {
-    // v22 (Show more): Main = Participants, Title, Location, Date/Time.
-    // Hidden = sub-type, Recurrence, Actions, Tags, Description, Attachments.
+    // v22.1 (testing feedback): Description moved into Main — always
+    // visible right after the dates, matching Illness's Symptoms field —
+    // per Roxana's testing feedback on the initial Show More split.
+    // Main = Participants, Title, Location, Date/Time, Description.
+    // Hidden = sub-type, Recurrence, Actions, Tags, Attachments.
     const _smMain = `
       <div class="form-row"><label class="lbl">Participants</label>${partButtons()}</div>
       <div class="form-row"><label class="lbl">Title</label>
         <div style="position:relative"><input class="inp" id="ef-title" value="${source?.title||''}" placeholder="Add a title…"></div></div>
       <div class="form-row"><label class="lbl">Location</label>
         <div style="position:relative"><input class="inp" id="ef-loc" value="${source?.location||''}" placeholder="Where?"></div></div>
-      ${dateTimeFields(isAllDay, startDate, startTime, endDate, endTime)}`;
+      ${dateTimeFields(isAllDay, startDate, startTime, endDate, endTime)}
+      <div class="form-row"><label class="lbl">Description</label><textarea class="inp" id="ef-desc" rows="2" placeholder="Any notes…" style="resize:none">${source?.description||''}</textarea></div>`;
     const _smHidden = `
       <div class="form-row"><label class="lbl">Type</label>
         <select class="sel" id="ef-social-type">
@@ -2213,10 +2217,9 @@ function openEvForm(type, evId, dateTs, duplicateId) {
         <button type="button" onclick="addChecklistRow('ef-actions')" style="font-size:12px;color:${T.sage};background:none;border:1px dashed ${T.sageMid};border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:600;margin-top:4px">+ Add action</button>
       </div>
       <div class="form-row"><label class="lbl">Tags</label>${tagButtons()}</div>
-      <div class="form-row"><label class="lbl">Description</label><textarea class="inp" id="ef-desc" rows="2" placeholder="Any notes…" style="resize:none">${source?.description||''}</textarea></div>
       ${attachmentField()}`;
     // Auto-expand on edit if any hidden field already has real data, per spec.
-    const _smOpen = !!(source?.social_type || (source?.recurrence && source.recurrence!=='None') || (source?.actions&&source.actions.length) || (source?.tags&&source.tags.length) || source?.description || (source?.links&&source.links.length));
+    const _smOpen = !!(source?.social_type || (source?.recurrence && source.recurrence!=='None') || (source?.actions&&source.actions.length) || (source?.tags&&source.tags.length) || (source?.links&&source.links.length));
     fields = _smMain + showMoreWrap(_smHidden, _smOpen);
 
   // ── HEALTH ──
@@ -2224,9 +2227,11 @@ function openEvForm(type, evId, dateTs, duplicateId) {
     const hType = apptType;
 
     if (hType === 'Appointment') {
-      // v22 (Show more): Main = sub-type switcher, Participants, Title,
-      // Doctor, Location, Date/Time. Hidden = Specialty, Recurrence, Cost,
-      // Actions, Tags, Description, Attachments.
+      // v22.1 (testing feedback): Description moved into Main — always
+      // visible right after the dates, matching Illness's Symptoms field.
+      // Main = sub-type switcher, Participants, Title, Doctor, Location,
+      // Date/Time, Description. Hidden = Specialty, Recurrence, Cost,
+      // Actions, Tags, Attachments.
       const _smMain = `
         <div class="form-row"><label class="lbl">Health Event Type</label>
           <select class="sel" id="ef-apt" onchange="confirmHealthSubTypeSwitch(this.value,'${hType}','${evId||''}',${dateTs||'null'})">
@@ -2238,7 +2243,8 @@ function openEvForm(type, evId, dateTs, duplicateId) {
         <div class="form-row"><label class="lbl">Doctor / Practitioner</label><input class="inp" id="ef-doctor" value="${source?.doctor||''}" placeholder="Dr. Smith"></div>
         <div class="form-row"><label class="lbl">Location</label>
           <div style="position:relative"><input class="inp" id="ef-loc" value="${source?.location||''}" placeholder="Clinic / Hospital name"></div></div>
-        ${dateTimeFields(isAllDay, startDate, startTime, endDate, endTime)}`;
+        ${dateTimeFields(isAllDay, startDate, startTime, endDate, endTime)}
+        <div class="form-row"><label class="lbl">Description</label><textarea class="inp" id="ef-desc" rows="2" style="resize:none">${source?.description||''}</textarea></div>`;
       const _smHidden = `
         <div class="form-row"><label class="lbl">Specialty</label>
           <select class="sel" id="ef-specialty">
@@ -2258,17 +2264,17 @@ function openEvForm(type, evId, dateTs, duplicateId) {
           <button type="button" onclick="addChecklistRow('ef-actions')" style="font-size:12px;color:${T.sage};background:none;border:1px dashed ${T.sageMid};border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:600;margin-top:4px">+ Add action</button>
         </div>
         <div class="form-row"><label class="lbl">Tags</label>${tagButtons()}</div>
-        <div class="form-row"><label class="lbl">Description</label><textarea class="inp" id="ef-desc" rows="2" style="resize:none">${source?.description||''}</textarea></div>
         ${attachmentField()}`;
-      const _smOpen = !!(source?.specialty || (source?.recurrence && source.recurrence!=='None') || source?.cost || (source?.actions&&source.actions.length) || (source?.tags&&source.tags.length) || source?.description || (source?.links&&source.links.length));
+      const _smOpen = !!(source?.specialty || (source?.recurrence && source.recurrence!=='None') || source?.cost || (source?.actions&&source.actions.length) || (source?.tags&&source.tags.length) || (source?.links&&source.links.length));
       fields = _smMain + showMoreWrap(_smHidden, _smOpen);
 
     } else if (hType === 'Treatment') {
-      // v22 (Show more): Main = sub-type switcher, Participants, Title,
-      // Start/End Date, Administration. Hidden = Recurrence, Recommended by,
-      // Considerations, Tags, Attachments. (Administration is Main, so it
-      // now renders right after Dates; Recurrence moves into the hidden
-      // group instead of sitting between them, per spec.)
+      // v22.1 (testing feedback): Considerations moved into Main — always
+      // visible right after the dates (Treatment's closest equivalent to a
+      // "Description" field), matching Illness's Symptoms field. Main =
+      // sub-type switcher, Participants, Title, Start/End Date,
+      // Considerations, Administration. Hidden = Recurrence,
+      // Recommended by, Tags, Attachments.
       const _smMain = `
         <div class="form-row"><label class="lbl">Health Event Type</label>
           <select class="sel" id="ef-apt" onchange="confirmHealthSubTypeSwitch(this.value,'${hType}','${evId||''}',${dateTs||'null'})">
@@ -2281,6 +2287,7 @@ function openEvForm(type, evId, dateTs, duplicateId) {
           <div class="form-row" style="margin:0"><label class="lbl">Start Date</label><input class="inp" type="date" id="ef-date" value="${startDate}" onchange="syncEndDate(this.value)"></div>
           <div class="form-row" style="margin:0"><label class="lbl">End Date</label><input class="inp" type="date" id="ef-enddate" value="${endDate}"></div>
         </div>
+        <div class="form-row"><label class="lbl">Considerations</label><textarea class="inp" id="ef-considerations" rows="2" placeholder="Reactions, restrictions (e.g. take with food)…" style="resize:none">${source?.considerations||''}</textarea></div>
         <div class="form-row"><label class="lbl">Administration</label>
           <div id="ef-admin"></div>
           <button type="button" onclick="addAdminRow('ef-admin')" style="font-size:12px;color:${T.sage};background:none;border:1px dashed ${T.sageMid};border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:600;margin-top:4px">+ Add dosage</button>
@@ -2288,10 +2295,9 @@ function openEvForm(type, evId, dateTs, duplicateId) {
       const _smHidden = `
         ${recurrenceFields(source?.recurrence, source?.recurrence_end_type, source?.recurrence_end_count, source?.recurrence_end_date)}
         <div class="form-row"><label class="lbl">Recommended by</label><input class="inp" id="ef-recby" value="${source?.recommended_by||''}" placeholder="Dr. name"></div>
-        <div class="form-row"><label class="lbl">Considerations</label><textarea class="inp" id="ef-considerations" rows="2" placeholder="Reactions, restrictions (e.g. take with food)…" style="resize:none">${source?.considerations||''}</textarea></div>
         <div class="form-row"><label class="lbl">Tags</label>${tagButtons()}</div>
         ${attachmentField()}`;
-      const _smOpen = !!((source?.recurrence && source.recurrence!=='None') || source?.recommended_by || source?.considerations || (source?.tags&&source.tags.length) || (source?.links&&source.links.length));
+      const _smOpen = !!((source?.recurrence && source.recurrence!=='None') || source?.recommended_by || (source?.tags&&source.tags.length) || (source?.links&&source.links.length));
       fields = _smMain + showMoreWrap(_smHidden, _smOpen);
 
     } else { // Illness
@@ -3641,18 +3647,24 @@ async function saveEv(type, evId, dateTs) {
               }
             }
           } else if (targetCount < currentCount) {
-            // ── SHRINK: delete excess occurrences from the LATEST date
-            // backward. The occurrence actively being edited (evId) is
-            // NEVER deleted, even if that means the series can't shrink
-            // all the way down to the requested count — the count is
-            // floored at whatever number keeps the edited occurrence in
-            // the series, and a toast explains why.
-            const deletable = currentSeriesEvents.filter(e => e.id !== evId);
-            const deleteCount = Math.min(currentCount - targetCount, deletable.length);
-            const toDelete = deletable
-              .slice()
-              .sort((a,b) => new Date(b.date) - new Date(a.date))
-              .slice(0, deleteCount);
+            // ── SHRINK (v22.1, corrected per testing feedback): keep the
+            // EARLIEST `targetCount` occurrences, delete the rest. An
+            // earlier version of this logic tried to protect the actively-
+            // edited occurrence (evId) from ever being deleted — this
+            // produced a confusing, non-contiguous kept set whenever the
+            // edited occurrence wasn't among the ones a straightforward
+            // date-based trim would keep (e.g. editing the LAST occurrence
+            // of a 5x series and shrinking to 3x kept an arbitrary
+            // Mon/Tue/Fri mix instead of a clean "first 3" trim). That
+            // protection turns out to be unnecessary: the edited field
+            // VALUES already propagated to every surviving sibling via the
+            // sharedUpdate sync above, so which literal database row
+            // survives doesn't matter to the user — only "does the series
+            // end up with the right occurrences, correct dates, correct
+            // values" does. currentSeriesEvents is already sorted ascending
+            // by date (see its definition above), so this is now a
+            // straightforward slice.
+            const toDelete = currentSeriesEvents.slice(targetCount);
             if (toDelete.length) {
               const delIds = toDelete.map(e => e.id);
               const delRes = await sbWrite(() => sb.from('events').delete().in('id', delIds));
@@ -3661,10 +3673,7 @@ async function saveEv(type, evId, dateTs) {
                 console.error('Series shrink delete error', delRes.error);
               } else {
                 A.events = A.events.filter(e => !delIds.includes(e.id));
-                const finalCount = currentCount - toDelete.length;
-                A._seriesUpdateMsg = finalCount > targetCount
-                  ? `Series shortened to ${finalCount}x to keep the occurrence you edited.`
-                  : `Series updated! ✅ (${finalCount} occurrence${finalCount!==1?'s':''})`;
+                A._seriesUpdateMsg = `Series updated! ✅ (${targetCount} occurrence${targetCount!==1?'s':''})`;
               }
             }
           }
@@ -8384,7 +8393,7 @@ function openQuickTask(){
     <div class="form-row"><label class="lbl">Title *</label><input class="inp" id="qt-title" placeholder="Task title" autofocus></div>
     <div class="grid2">
       <div class="form-row" style="margin:0"><label class="lbl">Date</label><input class="inp" type="date" id="qt-date" value="${iDate}"></div>
-      <div class="form-row" style="margin:0"><label class="lbl">Time</label><input class="inp" type="time" id="qt-time" value="${defTime}"></div>
+      <div class="form-row" style="margin:0" id="qt-time-row"><label class="lbl">Time</label>${buildTimeSelect('qt-time', defTime)}</div>
     </div>
     <button class="btn btn-primary btn-full" onclick="saveQuickTask()">Add Task</button>`);
   setTimeout(()=>{ const el=document.getElementById('qt-title'); if(el){el.focus();} },80);
@@ -8396,7 +8405,7 @@ async function saveQuickTask(){
   const title=document.getElementById('qt-title')?.value?.trim();
   if(!title){toast('Please add a title.',true);return;}
   const dateStr=document.getElementById('qt-date')?.value;
-  const timeStr=document.getElementById('qt-time')?.value||'12:00';
+  const timeStr=getTimeVal('qt-time')||'12:00';
   const date = dateStr ? localDT(dateStr,timeStr) : new Date().toISOString();
   // A completely normal task event — same columns as the full Calendar
   // form's Task save (saveEv()), just with every optional field left at
