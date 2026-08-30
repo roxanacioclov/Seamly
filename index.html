@@ -1,4 +1,4 @@
-<!-- Seamly v22 (A–E + testing fixes round 2) | STAGING | 18 Aug 2026 -->
+<!-- Seamly v22 (A–E + Pass F) | STAGING | 18 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -125,12 +125,13 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
 /* ── Notification bell & badge (v8) ──────────────────────── */
 /* v12: profile-btn replaces the old notif-btn (bell); profile-dot replaces
    notif-badge — a plain unread dot instead of a numeric count, since the
-   button now opens the consolidated My Profile menu, not just Notifications. */
+   button opens Settings (v22, Pass F — was the consolidated My Profile
+   menu before that), not just Notifications. */
 #profile-btn{position:relative;background:none;border:none;font-size:20px;cursor:pointer;padding:2px 6px;color:var(--muted);-webkit-tap-highlight-color:transparent}
 #profile-dot{position:absolute;top:1px;right:3px;background:var(--rose);border-radius:99px;width:9px;height:9px;display:none;box-sizing:border-box}
 /* ── Quick Add floating action button (v21) ─────────────────────── */
 /* Replaces the old .feedback-fab in this same bottom-right spot — Send
-   Feedback moved into the Profile Menu instead (see openProfileMenu()). */
+   Feedback is now a Settings section (v22, Pass F) instead. */
 .quick-add-fab{position:fixed;bottom:80px;right:16px;z-index:100;width:48px;height:48px;border-radius:50%;background:var(--sage);color:#fff;border:none;font-size:24px;font-weight:400;line-height:1;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;transition:transform .2s,box-shadow .2s;-webkit-tap-highlight-color:transparent}
 .quick-add-fab:active{transform:scale(.93);box-shadow:0 2px 8px rgba(0,0,0,.15)}
 @media (min-width:768px){
@@ -184,7 +185,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div class="auth-card">
     <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">Seamly</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v22 · Testing fixes round 2 — 30 Aug 2026</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v22 (A–E + Pass F) — 18 Aug 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -235,13 +236,14 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·F2</span>
+      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·F</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sample-btn" onclick="A.family?toggleSampleMode():goTo('settings')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:var(--honey-light);color:var(--honey);border:1px solid var(--honey)44;cursor:pointer;display:none">📋 Sample</button>
       <span id="fam-badge" style="font-size:11px;font-weight:700;color:var(--muted)"></span>
-      <!-- v12: consolidated Notifications + Settings + Sign out into one My Profile entry point -->
-      <button id="profile-btn" onclick="openProfileMenu()" title="My Profile" style="display:none">
+      <!-- v22 (Pass F): goes directly to Settings, which is now also the
+           Profile home. The old My Profile bottom-sheet is retired. -->
+      <button id="profile-btn" onclick="goTo('settings')" title="My Profile" style="display:none">
         <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="vertical-align:middle">
           <circle cx="12" cy="8" r="3.6"/>
           <path d="M4.5 20C4.5 16.3 7.8 13.5 12 13.5C16.2 13.5 19.5 16.3 19.5 20"/>
@@ -275,7 +277,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·F2</span>
+      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·F</span>
     </div>
     <button class="nav-btn" data-page="home" onclick="goTo('home')">
       <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0">
@@ -6350,13 +6352,23 @@ function renderMeals(){
     <div class="page-header">
       <div class="page-title">Meals</div>
     </div>
-    <div class="tabs">${TABS.map(t=>`<button class="tab ${A.mealsTab===t.id?'active':''}" onclick="A.mealsTab='${t.id}';renderMeals()" style="display:flex;align-items:center;gap:6px">${t.icon} ${t.label}</button>`).join('')}</div>
+    ${sectionSelectorTrigger(TABS.find(t=>t.id===A.mealsTab)||TABS[0], '_openMealsSectionPicker')}
     ${A.mealsTab==='shopping'?_usageBanner('shopping','Shopping Lists'):''}
     <div style="padding:14px 16px">${tc}</div>`;
   // Planner grid is filled with saved values once the table exists in the DOM
   if(A.mealsTab==='planner') setTimeout(populateMealPlanGrid,50);
 }
 window.renderMeals=renderMeals;
+
+// v22 (Pass F): dropdown section picker for Meals, replacing the old
+// horizontal tabs row.
+function _openMealsSectionPicker(){
+  const TABS=[{id:'planner',icon:ICONS.meal,label:'Meal Planner'},{id:'shopping',icon:ICONS.cart,label:'Shopping'}];
+  _showSectionPicker('Meals', TABS, A.mealsTab, 'switchMealsSection');
+}
+window._openMealsSectionPicker = _openMealsSectionPicker;
+function switchMealsSection(id){ A.mealsTab = id; renderMeals(); }
+window.switchMealsSection = switchMealsSection;
 
 // ── SHOPPING TAB ──────────────────────────────────────────────────────────────
 function renderShoppingTab(){
@@ -7241,7 +7253,7 @@ function renderInventory(){
     <div class="page-header">
       <div class="page-title">Inventory</div>
     </div>
-    <div class="tabs">${TABS.map(t=>`<button class="tab ${A.invTab===t.id?'active':''}" onclick="A.invTab='${t.id}';renderInventory()" style="display:flex;align-items:center;gap:6px">${t.icon} ${t.label}</button>`).join('')}</div>
+    ${sectionSelectorTrigger(TABS.find(t=>t.id===A.invTab)||TABS[0], '_openInventorySectionPicker')}
     <div style="padding:14px 16px">${tc}</div>`;
 
   // If treatments tab, render meds directly into the now-visible Inventory
@@ -7249,6 +7261,16 @@ function renderInventory(){
   // no copying, so it can re-render itself in place after any edit/delete.
   if(A.invTab==='treatments') renderMeds('inv-meds-container');
 }
+
+// v22 (Pass F): dropdown section picker for Inventory, replacing the old
+// horizontal tabs row.
+function _openInventorySectionPicker(){
+  const TABS=[{id:'treatments',icon:ICONS.pill,label:'Frequent meds'},{id:'products',icon:ICONS.package,label:'Products'}];
+  _showSectionPicker('Inventory', TABS, A.invTab, 'switchInventorySection');
+}
+window._openInventorySectionPicker = _openInventorySectionPicker;
+function switchInventorySection(id){ A.invTab = id; renderInventory(); }
+window.switchInventorySection = switchInventorySection;
 window.renderInventory=renderInventory;
 
 function openAddProduct(){
@@ -7416,40 +7438,20 @@ window.saveEditProduct=saveEditProduct;
 // ── SETTINGS ──────────────────────────────────────────────────────────────────
 function renderSettings(){
   const fam=getFamily(),members=getMembers();
-  const TABS=[{id:'family',label:'👨‍👩‍👧‍👦 Family'},{id:'calendar',label:'🗓 Calendar'},{id:'content',label:'📖 Curated Content'},{id:'notifs',label:'🔔 Notifications'}];
+  // v22 (Pass F): Profile → Settings consolidation. `family` stays the
+  // default landing view (A.settingsTab defaults to it) but is no longer a
+  // visible menu entry — it's simply what's shown until another section is
+  // picked. The 4 sections below are what the new dropdown selector offers.
+  const hasUnread = _hasUnreadNotifs();
+  const SETTINGS_SECTIONS = [
+    {id:'notifs', icon:'🔔', label:'Notifications', showDot:hasUnread},
+    {id:'calendar', icon:'🗓', label:'Calendar settings'},
+    {id:'content', icon:'📖', label:'Notebook settings'},
+    {id:'feedback', icon:'💬', label:'Feedback'},
+  ];
   let tc='';
 
-  if(A.settingsTab==='family'){
-    tc=`
-      ${_renderPlanUsageCard()}
-      <div class="card" style="padding:14px;margin-bottom:12px">
-        <div class="lbl" style="margin-bottom:8px">Family Name</div>
-        <div style="display:flex;gap:8px">
-          <input class="inp" id="s-fn" value="${fam?.name||''}" style="flex:1;font-size:15px;font-weight:700" placeholder="Family name">
-          <button class="btn btn-primary btn-sm" onclick="saveFamName()">Save</button>
-        </div>
-      </div>
-      ${_usageBanner('members','Family Members')}
-      <div class="card" style="padding:14px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <div class="lbl">Family Members</div>
-          <button class="btn btn-primary btn-sm" onclick="openAddMem()">+ Add Member</button>
-        </div>
-        ${members.map(m=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid ${T.border}">
-          ${av(m,40)}
-          <div style="flex:1">
-            <div style="font-weight:700;font-size:14px">${m.name}</div>
-            <div style="font-size:12px;color:${T.muted}">${m.role||''}${m.age?` · Age ${m.age}`:''}${m.gender?` · ${m.gender}`:''}</div>
-            ${m.email?`<div style="font-size:11px;color:${T.sky}">${m.email}</div>`:''}
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
-            ${m.is_owner?`<span class="chip" style="background:${T.sageLight};color:${T.sage}">Owner</span>`:''}
-            <button onclick="openEditMem('${m.id}')" style="background:${T.parchment};border:1px solid ${T.border};border-radius:7px;padding:3px 9px;font-size:11px;font-weight:700;cursor:pointer;color:${T.muted}">✏️ Edit</button>
-            ${m.email&&!m.is_owner?`<button onclick="sendInvite('${m.email}','${m.id}')" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px 9px">🔗 Invite</button>`:''}
-          </div>
-        </div>`).join('')}
-      </div>`;
-  } else if(A.settingsTab==='calendar'){
+  if(A.settingsTab==='calendar'){
     tc=`<div class="card" style="padding:14px">
       <div class="lbl" style="margin-bottom:10px">Custom Tags</div>
       <p style="font-size:12px;color:${T.muted};margin-bottom:12px">These tags appear when creating calendar entries, letting you quickly categorise and search events.</p>
@@ -7480,52 +7482,88 @@ function renderSettings(){
           </div>
         </label>`).join('')}
     </div>`;
+  } else if(A.settingsTab==='notifs'){
+    // Same trigger point the old toggleNotifPanel() used ("opening" the
+    // panel) — now it's navigating into this section instead.
+    markAllNotifsRead();
+    tc = `
+      ${_notifActivityListHtml()}
+      <button type="button" onclick="_openNotifPrefsModal()" style="margin-top:14px;width:100%;padding:11px;border-radius:10px;background:${T.parchment};border:1px solid ${T.border};color:${T.ink};font-weight:700;font-size:13px;cursor:pointer">⚙️ Manage notification settings</button>`;
+  } else if(A.settingsTab==='feedback'){
+    tc = _feedbackFormHtml();
   } else {
-    const prefs = getNotifPrefs();
-    const prefRow = (key, icon, label) => `
-      <label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid ${T.border};cursor:pointer">
-        <input type="checkbox" ${prefs[key]!==false?'checked':''} onchange="updateNotifPref('${key}',this.checked)">
-        <span style="font-size:16px;flex-shrink:0">${icon}</span>
-        <span style="font-size:14px;font-weight:600">${label}</span>
-      </label>`;
+    // Default landing view ("family" / Profile home) — unchanged content.
     tc=`
+      ${_renderPlanUsageCard()}
       <div class="card" style="padding:14px;margin-bottom:12px">
-        <div class="lbl" style="margin-bottom:10px">Family Activity — what to track</div>
-        <p style="font-size:12px;color:${T.muted};margin-bottom:12px">Shown in the 🔔 panel whenever another family member makes a change.</p>
-        ${prefRow('notif_event','🗓','Calendar events added or changed')}
-        ${prefRow('notif_note','📓','Notes added or changed')}
-        ${prefRow('notif_shopping','🛒','Shopping list items added')}
-        ${prefRow('notif_meal','🍽','Meal planner updated')}
-        ${prefRow('notif_inventory_meds','💊','Medications added or changed')}
-        ${prefRow('notif_inventory_products','📦','Products added or changed')}
+        <div class="lbl" style="margin-bottom:8px">Family Name</div>
+        <div style="display:flex;gap:8px">
+          <input class="inp" id="s-fn" value="${fam?.name||''}" style="flex:1;font-size:15px;font-weight:700" placeholder="Family name">
+          <button class="btn btn-primary btn-sm" onclick="saveFamName()">Save</button>
+        </div>
       </div>
-      <div class="card" style="padding:14px;margin-bottom:12px">
-        <div class="lbl" style="margin-bottom:10px">Smart Alerts — computed from your data</div>
-        <p style="font-size:12px;color:${T.muted};margin-bottom:12px">Shown each time you open the notification panel.</p>
-        ${prefRow('alert_low_stock','💊','Low medication stock (≤ 7 days left)')}
-        ${prefRow('alert_expiring','⏰','Products expiring within 30 days')}
-        ${prefRow('alert_overdue','⚠️','Overdue tasks with open items')}
-        ${prefRow('alert_event_start','🔔','Events starting within the next hour')}
-      </div>
+      ${_usageBanner('members','Family Members')}
       <div class="card" style="padding:14px">
-        <div class="lbl" style="margin-bottom:10px">Push notifications — coming soon</div>
-        <p style="font-size:12px;color:${T.muted};margin-bottom:12px;line-height:1.6">Get device-level alerts for upcoming events, low stock, and family activity. Your preferences above will activate automatically when push notifications launch.</p>
-        <div style="background:${T.honeyLight};border-radius:9px;padding:10px 12px;font-size:12px;color:${T.honey};font-weight:600">📱 Available in the Seamly PWA — install the app on your home screen to be first to get them.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="lbl">Family Members</div>
+          <button class="btn btn-primary btn-sm" onclick="openAddMem()">+ Add Member</button>
+        </div>
+        ${members.map(m=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid ${T.border}">
+          ${av(m,40)}
+          <div style="flex:1">
+            <div style="font-weight:700;font-size:14px">${m.name}</div>
+            <div style="font-size:12px;color:${T.muted}">${m.role||''}${m.age?` · Age ${m.age}`:''}${m.gender?` · ${m.gender}`:''}</div>
+            ${m.email?`<div style="font-size:11px;color:${T.sky}">${m.email}</div>`:''}
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
+            ${m.is_owner?`<span class="chip" style="background:${T.sageLight};color:${T.sage}">Owner</span>`:''}
+            <button onclick="openEditMem('${m.id}')" style="background:${T.parchment};border:1px solid ${T.border};border-radius:7px;padding:3px 9px;font-size:11px;font-weight:700;cursor:pointer;color:${T.muted}">✏️ Edit</button>
+            ${m.email&&!m.is_owner?`<button onclick="sendInvite('${m.email}','${m.id}')" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px 9px">🔗 Invite</button>`:''}
+          </div>
+        </div>`).join('')}
       </div>`;
   }
 
   const cu=A.user;
+  // v22 (Pass F): the trigger's "current" display. Family/Profile home
+  // isn't in SETTINGS_SECTIONS (no visible list entry, per spec) so it
+  // needs its own small stand-in object here just for the trigger label.
+  const _settingsCurrent = (A.settingsTab && A.settingsTab!=='family')
+    ? (SETTINGS_SECTIONS.find(s=>s.id===A.settingsTab) || {icon:'👨‍👩‍👧‍👦', label:'Family'})
+    : {icon:'👨‍👩‍👧‍👦', label:'Family'};
+
   document.getElementById('page-settings').innerHTML=`
     <div class="page-header">
       <div class="page-title">Settings</div>
     </div>
     ${cu?`<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:${T.sageLight};border-bottom:1px solid ${T.border}">
-      <div style="width:36px;height:36px;border-radius:50%;background:${T.sage};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px;flex-shrink:0">${(cu.user_metadata?.name||cu.email||'U')[0].toUpperCase()}</div>
-      <div><div style="font-weight:700;font-size:13px;color:${T.ink}">${cu.user_metadata?.name||'My Account'}</div><div style="font-size:11px;color:${T.muted}">${cu.email||''}</div></div>
+      <div onclick="A.settingsTab='family';renderSettings()" style="cursor:pointer;display:flex;align-items:center;gap:10px;flex:1;min-width:0" title="Back to Family &amp; Profile">
+        <div style="width:36px;height:36px;border-radius:50%;background:${T.sage};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px;flex-shrink:0">${(cu.user_metadata?.name||cu.email||'U')[0].toUpperCase()}</div>
+        <div style="min-width:0"><div style="font-weight:700;font-size:13px;color:${T.ink};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cu.user_metadata?.name||'My Account'}</div><div style="font-size:11px;color:${T.muted};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cu.email||''}</div></div>
+      </div>
+      <button type="button" onclick="doSignOut()" style="background:#fff;border:1px solid ${T.border};border-radius:8px;padding:6px 11px;font-size:11px;font-weight:700;color:${T.muted};cursor:pointer;flex-shrink:0;white-space:nowrap">🚪 Sign out</button>
     </div>`:''}
-    <div class="tabs">${TABS.map(t=>`<button class="tab ${A.settingsTab===t.id?'active':''}" onclick="A.settingsTab='${t.id}';renderSettings()">${t.label}</button>`).join('')}</div>
+    ${sectionSelectorTrigger(_settingsCurrent, '_openSettingsSectionPicker', hasUnread)}
     <div style="padding:14px 16px">${tc}</div>`;
 }
+
+// v22 (Pass F): opens the "jump to section" picker for Settings, using
+// the same SETTINGS_SECTIONS list renderSettings() itself uses — rebuilt
+// here since this is a separate onclick-triggered function, not something
+// renderSettings() can hand a closure to through an HTML attribute.
+function _openSettingsSectionPicker(){
+  const hasUnread = _hasUnreadNotifs();
+  const SECTIONS = [
+    {id:'notifs', icon:'🔔', label:'Notifications', showDot:hasUnread},
+    {id:'calendar', icon:'🗓', label:'Calendar settings'},
+    {id:'content', icon:'📖', label:'Notebook settings'},
+    {id:'feedback', icon:'💬', label:'Feedback'},
+  ];
+  _showSectionPicker('Settings', SECTIONS, A.settingsTab, 'switchSettingsSection');
+}
+window._openSettingsSectionPicker = _openSettingsSectionPicker;
+function switchSettingsSection(id){ A.settingsTab = id; renderSettings(); }
+window.switchSettingsSection = switchSettingsSection;
 
 async function saveFamName(){
   const name=document.getElementById('s-fn')?.value?.trim();
@@ -8154,6 +8192,21 @@ function notifIcon(category, action) {
 }
 
 // Updates the red badge on the bell icon.
+// v22 (Pass F): shared unread-notifications check — was previously
+// duplicated between refreshNotifBadge() and openProfileMenu(). Now the
+// one canonical version; openProfileMenu() is retired this pass, and
+// refreshNotifBadge() below is refactored to call this instead of
+// repeating the same calculation inline.
+function _hasUnreadNotifs() {
+  const prefs = getNotifPrefs();
+  const lastRead = parseInt(localStorage.getItem('ks_notif_last_read_' + (A.user?.id || '')) || '0');
+  return _notifications.some(n => {
+    const prefKey = n.category === 'member' ? 'notif_member_join' : 'notif_' + n.category;
+    if (prefs[prefKey] === false) return false;
+    return new Date(n.created_at).getTime() > lastRead;
+  });
+}
+
 function refreshNotifBadge() {
   // v12: target renamed from #notif-badge (numeric badge on old bell) to
   // #profile-dot (plain dot on the new My Profile button). The unread-
@@ -8161,14 +8214,7 @@ function refreshNotifBadge() {
   // result changed (show/hide a dot instead of setting a number).
   const dot = document.getElementById('profile-dot');
   if (!dot) return;
-  const prefs = getNotifPrefs();
-  const lastRead = parseInt(localStorage.getItem('ks_notif_last_read_' + (A.user?.id || '')) || '0');
-  const unread = _notifications.filter(n => {
-    const prefKey = n.category === 'member' ? 'notif_member_join' : 'notif_' + n.category;
-    if (prefs[prefKey] === false) return false;
-    return new Date(n.created_at).getTime() > lastRead;
-  }).length;
-  dot.style.display = unread > 0 ? 'block' : 'none';
+  dot.style.display = _hasUnreadNotifs() ? 'block' : 'none';
 }
 
 // Stamps "last read" timestamp so the badge clears on next refresh
@@ -8179,57 +8225,51 @@ function markAllNotifsRead() {
   refreshNotifBadge();
 }
 
-// v12: My Profile bottom sheet — consolidates what used to be three separate
-// top-bar controls (🔔 Notifications, ⚙️ Settings, Sign out) behind one 👤
-// entry point. Reuses the existing showModal() bottom-sheet system and the
-// same account-info header markup already shown at the top of Settings.
-// Rows close the sheet first, then call the existing, unmodified functions
-// that already do these jobs — nothing about Notifications, Settings, or
-// Sign-out behaviour itself changes.
-function openProfileMenu() {
-  const cu = A.user;
-  const initial = (cu?.user_metadata?.name || cu?.email || 'U')[0].toUpperCase();
-  const name = cu?.user_metadata?.name || 'My Account';
-  const email = cu?.email || '';
-  // v15: mirror refreshNotifBadge()'s unread calculation so the Notifications
-  // row inside this menu shows the same red dot as the outer profile button.
-  // Previously only #profile-dot (the button itself) reflected unread state —
-  // opening the menu showed no indicator on the Notifications row itself.
-  const prefs = getNotifPrefs();
-  const lastRead = parseInt(localStorage.getItem('ks_notif_last_read_' + (A.user?.id || '')) || '0');
-  const hasUnread = _notifications.some(n => {
-    const prefKey = n.category === 'member' ? 'notif_member_join' : 'notif_' + n.category;
-    if (prefs[prefKey] === false) return false;
-    return new Date(n.created_at).getTime() > lastRead;
-  });
-  // Helper: one tappable row (icon + label + chevron); showDot adds a small
-  // red unread indicator on the icon, same visual language as #profile-dot.
-  const row = (icon, label, onclick, isLast, showDot) => `
-    <button type="button" onclick="${onclick}" style="display:flex;align-items:center;gap:12px;width:100%;padding:13px 4px;background:none;border:none;${isLast?'':`border-bottom:1px solid ${T.border};`}cursor:pointer;text-align:left;font-family:inherit;-webkit-tap-highlight-color:transparent">
-      <span style="font-size:19px;width:24px;text-align:center;flex-shrink:0;position:relative">${icon}${showDot?`<span style="position:absolute;top:-1px;right:1px;background:var(--rose);border-radius:99px;width:8px;height:8px;box-sizing:border-box"></span>`:''}</span>
-      <span style="flex:1;font-size:14px;font-weight:600;color:${T.ink}">${label}</span>
-      <span style="color:${T.muted};font-size:15px">›</span>
+// ── SHARED DROPDOWN SECTION SELECTOR (v22, Pass F) ──────────────────────────
+// Replaces the horizontal .tabs/.tab row wherever a page has multiple
+// sub-sections (Settings, Inventory, Meals). Renders as a single trigger
+// button (current section's icon + label + optional unread dot + ▾
+// chevron); tapping it opens the OTHER sections as a showModal() bottom-
+// sheet — reusing the app's existing modal system for free outside-tap-to-
+// close behavior, rather than inventing a new floating-menu style.
+// Icons are raw SVG strings in some callers (ICONS.*), which can't safely
+// be serialized through an onclick attribute — so this trigger takes the
+// name of a small page-specific "open" function (already in scope, no
+// serialization needed) rather than the section list itself.
+function sectionSelectorTrigger(current, openFnName, showDot) {
+  return `
+    <button type="button" onclick="${openFnName}()" style="display:flex;align-items:center;gap:8px;width:100%;padding:12px 16px;background:none;border:none;border-bottom:1px solid ${T.border};cursor:pointer;text-align:left;-webkit-tap-highlight-color:transparent">
+      <span style="display:flex;align-items:center;flex-shrink:0">${current.icon}</span>
+      <span style="flex:1;font-size:14px;font-weight:700;color:${T.ink};display:flex;align-items:center;gap:6px">${current.label}${showDot?`<span style="background:${T.rose};border-radius:99px;width:7px;height:7px;display:inline-block;flex-shrink:0"></span>`:''}</span>
+      <span style="color:${T.muted};font-size:12px;flex-shrink:0">▾</span>
     </button>`;
-  showModal('My Profile', `
-    <div style="display:flex;align-items:center;gap:12px;padding:2px 4px 18px">
-      <div style="width:44px;height:44px;border-radius:50%;background:${T.sage};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:17px;flex-shrink:0">${initial}</div>
-      <div style="min-width:0">
-        <div style="font-weight:700;font-size:15px;color:${T.ink};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
-        <div style="font-size:12px;color:${T.muted};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${email}</div>
-      </div>
-    </div>
-    <div style="display:flex;flex-direction:column">
-      ${row('🔔','Notifications',"closeModal();toggleNotifPanel();",false,hasUnread)}
-      ${row('📊','Insights',"closeModal();goTo('insights');")}
-      ${row('⚙️','Settings',"closeModal();goTo('settings');")}
-      ${row('💬','Send Feedback',"closeModal();openFeedback();")}
-      ${row('🚪','Sign out',"closeModal();doSignOut();",true)}
-    </div>`);
 }
-window.openProfileMenu = openProfileMenu;
+window.sectionSelectorTrigger = sectionSelectorTrigger;
 
-// Renders the notification bottom sheet into #notif-root
-function renderNotifPanel() {
+// Shared bottom-sheet listing the OTHER sections (excludes currentId).
+// Tapping a row closes the sheet and calls the given onSelect function
+// name with that section's id — same underlying `A.xTab = id; renderX()`
+// pattern every page already used with the old tabs, only the trigger UI
+// changed.
+function _showSectionPicker(title, sections, currentId, onSelectFnName) {
+  const others = sections.filter(s => s.id !== currentId);
+  const rows = others.map(s => `
+    <button type="button" onclick="closeModal();${onSelectFnName}('${s.id}')" style="display:flex;align-items:center;gap:12px;width:100%;padding:13px 4px;background:none;border:none;border-bottom:1px solid ${T.border};cursor:pointer;text-align:left;-webkit-tap-highlight-color:transparent">
+      <span style="flex-shrink:0;display:flex;align-items:center">${s.icon}</span>
+      <span style="flex:1;font-size:14px;font-weight:600;color:${T.ink};display:flex;align-items:center;gap:6px">${s.label}${s.showDot?`<span style="background:${T.rose};border-radius:99px;width:7px;height:7px;display:inline-block;flex-shrink:0"></span>`:''}</span>
+    </button>`).join('');
+  showModal(title, `<div style="display:flex;flex-direction:column">${rows}</div>`);
+}
+window._showSectionPicker = _showSectionPicker;
+
+// v22 (Pass F): shared activity+alerts list markup, now rendered INLINE
+// inside Settings → Notifications instead of the retired toggleNotifPanel()
+// bottom-sheet. Same data sources (_notifications, computeAlerts()) and the
+// same visual rows as before; the only content change is dropping the
+// "push notifications coming soon" banner from the bottom of the list,
+// since that content now lives in the notification-preferences modal
+// instead (see _openNotifPrefsModal() below).
+function _notifActivityListHtml(){
   const alerts = computeAlerts();
   const prefs = getNotifPrefs();
   const filtered = _notifications.filter(n => {
@@ -8245,65 +8285,76 @@ function renderNotifPanel() {
     if (hrs < 24) return `${hrs}h ago`;
     return `${Math.floor(hrs / 24)}d ago`;
   };
-  const hasContent = alerts.length > 0 || filtered.length > 0;
-  const root = document.getElementById('notif-root');
-  if (!root) return;
-  root.innerHTML = `
-    <div class="modal-bg" onclick="if(event.target.classList.contains('modal-bg'))toggleNotifPanel()">
-      <div class="modal-sheet">
-        <div class="modal-head">
-          <div class="modal-title">🔔 Notifications</div>
-          <button class="modal-close" onclick="toggleNotifPanel()">×</button>
+  return `
+    <div style="font-size:10px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Family Activity</div>
+    ${filtered.length ? filtered.map(n => `
+      <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:11px;background:${T.parchment};margin-bottom:8px">
+        <span style="font-size:18px;flex-shrink:0;margin-top:1px">${notifIcon(n.category, n.action)}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:13px;color:${T.ink}">${n.title || ''}</div>
+          ${n.body ? `<div style="font-size:12px;color:${T.muted};margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.body}</div>` : ''}
+          <div style="font-size:10px;color:${T.muted};margin-top:4px;font-weight:600">${fmtRel(n.created_at)}</div>
         </div>
-        <div class="modal-body">
-          <div style="font-size:10px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Family Activity</div>
-          ${filtered.length ? filtered.map(n => `
-            <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:11px;background:${T.parchment};margin-bottom:8px">
-              <span style="font-size:18px;flex-shrink:0;margin-top:1px">${notifIcon(n.category, n.action)}</span>
-              <div style="flex:1;min-width:0">
-                <div style="font-weight:700;font-size:13px;color:${T.ink}">${n.title || ''}</div>
-                ${n.body ? `<div style="font-size:12px;color:${T.muted};margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.body}</div>` : ''}
-                <div style="font-size:10px;color:${T.muted};margin-top:4px;font-weight:600">${fmtRel(n.created_at)}</div>
-              </div>
-            </div>`).join('') : `
-            <div style="text-align:center;padding:20px 0;color:${T.muted}">
-              <div style="font-size:32px;margin-bottom:8px">🤝</div>
-              <div style="font-size:13px;font-weight:600;margin-bottom:4px">No activity yet</div>
-              <div style="font-size:12px">Changes made by other family members will appear here.</div>
-            </div>`}
-          ${alerts.length ? `
-            <div style="height:1px;background:${T.border};margin:14px 0 12px"></div>
-            <div style="font-size:10px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Alerts</div>
-            ${alerts.map(a => `
-              <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:11px;background:${a.color}18;border-left:3px solid ${a.color};margin-bottom:8px">
-                <span style="font-size:18px;flex-shrink:0;margin-top:1px">${a.icon}</span>
-                <div>
-                  <div style="font-weight:700;font-size:13px;color:${T.ink}">${a.title}</div>
-                  <div style="font-size:12px;color:${T.muted};margin-top:2px">${a.body}</div>
-                </div>
-              </div>`).join('')}
-          ` : ''}
-          <div style="background:${T.honeyLight};border-radius:10px;padding:12px 14px;margin-top:${hasContent ? '16' : '8'}px">
-            <div style="font-size:12px;color:${T.honey};font-weight:700;margin-bottom:4px">📱 Push notifications — coming soon</div>
-            <div style="font-size:11px;color:${T.muted};line-height:1.5">Get device alerts for events, reminders, and family activity. Manage your preferences in <button onclick="toggleNotifPanel();goTo('settings');A.settingsTab='notifs';renderSettings()" style="background:none;border:none;color:${T.sage};font-weight:700;cursor:pointer;font-size:11px;padding:0;text-decoration:underline">Settings → Notifications</button>.</div>
+      </div>`).join('') : `
+      <div style="text-align:center;padding:20px 0;color:${T.muted}">
+        <div style="font-size:32px;margin-bottom:8px">🤝</div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">No activity yet</div>
+        <div style="font-size:12px">Changes made by other family members will appear here.</div>
+      </div>`}
+    ${alerts.length ? `
+      <div style="height:1px;background:${T.border};margin:14px 0 12px"></div>
+      <div style="font-size:10px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Alerts</div>
+      ${alerts.map(a => `
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:11px;background:${a.color}18;border-left:3px solid ${a.color};margin-bottom:8px">
+          <span style="font-size:18px;flex-shrink:0;margin-top:1px">${a.icon}</span>
+          <div>
+            <div style="font-weight:700;font-size:13px;color:${T.ink}">${a.title}</div>
+            <div style="font-size:12px;color:${T.muted};margin-top:2px">${a.body}</div>
           </div>
-        </div>
-      </div>
-    </div>`;
+        </div>`).join('')}
+    ` : ''}`;
 }
+window._notifActivityListHtml = _notifActivityListHtml;
 
-// Opens or closes the notification panel.
-async function toggleNotifPanel() {
-  _notifPanelOpen = !_notifPanelOpen;
-  if (_notifPanelOpen) {
-    await loadNotifications();
-    renderNotifPanel();
-    markAllNotifsRead();
-  } else {
-    document.getElementById('notif-root').innerHTML = '';
-  }
+// v22 (Pass F): notification PREFERENCES modal — reuses the exact three
+// cards (Family Activity, Smart Alerts, Push-coming-soon) that used to be
+// the "Notifications" Settings TAB content verbatim, just moved into
+// showModal() instead of a tab pane. Opened via "Manage notification
+// settings" below the activity list in Settings → Notifications.
+function _openNotifPrefsModal(){
+  const prefs = getNotifPrefs();
+  const prefRow = (key, icon, label) => `
+    <label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid ${T.border};cursor:pointer">
+      <input type="checkbox" ${prefs[key]!==false?'checked':''} onchange="updateNotifPref('${key}',this.checked)">
+      <span style="font-size:16px;flex-shrink:0">${icon}</span>
+      <span style="font-size:14px;font-weight:600">${label}</span>
+    </label>`;
+  showModal('Notification settings', `
+    <div class="card" style="padding:14px;margin-bottom:12px">
+      <div class="lbl" style="margin-bottom:10px">Family Activity — what to track</div>
+      <p style="font-size:12px;color:${T.muted};margin-bottom:12px">Shown in your Notifications section whenever another family member makes a change.</p>
+      ${prefRow('notif_event','🗓','Calendar events added or changed')}
+      ${prefRow('notif_note','📓','Notes added or changed')}
+      ${prefRow('notif_shopping','🛒','Shopping list items added')}
+      ${prefRow('notif_meal','🍽','Meal planner updated')}
+      ${prefRow('notif_inventory_meds','💊','Medications added or changed')}
+      ${prefRow('notif_inventory_products','📦','Products added or changed')}
+    </div>
+    <div class="card" style="padding:14px;margin-bottom:12px">
+      <div class="lbl" style="margin-bottom:10px">Smart Alerts — computed from your data</div>
+      <p style="font-size:12px;color:${T.muted};margin-bottom:12px">Shown at the top of your Notifications section.</p>
+      ${prefRow('alert_low_stock','💊','Low medication stock (≤ 7 days left)')}
+      ${prefRow('alert_expiring','⏰','Products expiring within 30 days')}
+      ${prefRow('alert_overdue','⚠️','Overdue tasks with open items')}
+      ${prefRow('alert_event_start','🔔','Events starting within the next hour')}
+    </div>
+    <div class="card" style="padding:14px">
+      <div class="lbl" style="margin-bottom:10px">Push notifications — coming soon</div>
+      <p style="font-size:12px;color:${T.muted};margin-bottom:12px;line-height:1.6">Get device-level alerts for upcoming events, low stock, and family activity. Your preferences above will activate automatically when push notifications launch.</p>
+      <div style="background:${T.honeyLight};border-radius:9px;padding:10px 12px;font-size:12px;color:${T.honey};font-weight:600">📱 Available in the Seamly PWA — install the app on your home screen to be first to get them.</div>
+    </div>`);
 }
-window.toggleNotifPanel = toggleNotifPanel;
+window._openNotifPrefsModal = _openNotifPrefsModal;
 
 // Saves a single notification preference key into families.notif_preferences (JSONB).
 async function updateNotifPref(key, val) {
@@ -8317,7 +8368,7 @@ async function updateNotifPref(key, val) {
     .update({ notif_preferences: prefs })
     .eq('id', A.family.id)
     .select().single());
-  if (error) { toast('Error saving preference.', true); console.error(error); renderSettings(); return; }
+  if (error) { toast('Error saving preference.', true); console.error(error); _openNotifPrefsModal(); return; }
   A.family = data;
 }
 window.updateNotifPref = updateNotifPref;
@@ -8612,8 +8663,16 @@ async function saveQuickShopItem(){
 }
 window.saveQuickShopItem = saveQuickShopItem;
 
-function openFeedback() {
-  showModal('Send Feedback 💬', `
+// v22 (Pass F): Feedback moved from a modal (openFeedback()) into an
+// inline Settings section. This returns just the form markup — no modal
+// title/wrapper, since Settings already has its own page header.
+// selFbType()/saveFeedback() below are otherwise unchanged; only the
+// "area" dropdown's "Settings" option is renamed to "Profile & Settings",
+// reflecting that Settings is now also the Profile home, and the Save
+// button gets a stable id (was previously found via a modal-scoped
+// selector that would silently no-op once this moved out of a modal).
+function _feedbackFormHtml() {
+  return `
     <div style="font-size:13px;color:${T.muted};margin-bottom:14px;line-height:1.6">
       Help us improve Seamly — tell us what's working, what isn't, or what you'd love to see next. We read every message.
     </div>
@@ -8643,18 +8702,18 @@ function openFeedback() {
       <label class="lbl">Which area of the app? (optional)</label>
       <select class="sel" id="fb-page">
         <option value="">Select…</option>
-        ${['Home','Calendar','Notebook','Inventory','Meals','Settings','General / Other']
+        ${['Home','Calendar','Notebook','Inventory','Meals','Profile & Settings','General / Other']
           .map(p=>`<option value="${p}">${p}</option>`).join('')}
       </select>
     </div>
-    <button class="btn btn-primary btn-full btn-lg" style="margin-top:4px" onclick="saveFeedback()">
+    <button id="fb-save-btn" class="btn btn-primary btn-full btn-lg" style="margin-top:4px" onclick="saveFeedback()">
       Send Feedback 💚
     </button>
     <div style="font-size:11px;color:${T.muted};text-align:center;margin-top:10px;line-height:1.5">
       Your feedback goes directly to the Seamly team.
-    </div>`);
+    </div>`;
 }
-window.openFeedback = openFeedback;
+window._feedbackFormHtml = _feedbackFormHtml;
 
 function selFbType(btn, type) {
   document.querySelectorAll('#fb-types button').forEach(b => {
@@ -8684,7 +8743,11 @@ async function saveFeedback() {
   // v10 (UX hardening): sbWrite() already present — adding Pattern B on top
   // (button-disable, saving toast, try/catch/finally). Button text is
   // "Sending…" rather than "Saving…" to match the feedback context.
-  const _saveBtn=document.querySelector('.modal-body button.btn-primary');
+  // v22 (Pass F): selector changed from a modal-scoped query to a stable
+  // id — this form now lives inline in Settings, not always inside a
+  // modal, and the old '.modal-body button.btn-primary' selector would
+  // have silently found nothing there.
+  const _saveBtn=document.getElementById('fb-save-btn');
   if(_saveBtn){_saveBtn.disabled=true;_saveBtn.dataset.origText=_saveBtn.textContent;_saveBtn.textContent='Sending…';_saveBtn.style.opacity='0.7';}
   showSavingToast();
   let _saveOk=false;
@@ -8698,6 +8761,10 @@ async function saveFeedback() {
     _saveOk=true;
     closeModal();
     toast('Feedback sent! Thank you 💚');
+    // v22 (Pass F): re-render so the form clears for next time, now that
+    // it's a persistent inline section rather than a modal that gets
+    // dismissed (which used to discard the filled-in fields automatically).
+    if (A.settingsTab === 'feedback') renderSettings();
   }catch(e){
     toast('Something went wrong — please try again.',true);console.error(e);
   }finally{
