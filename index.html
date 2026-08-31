@@ -1,4 +1,4 @@
-<!-- Seamly v22 (A–E, F, G + hotfixes) | PROD | 18 Aug 2026 -->
+<!-- Seamly v22 (A–E, F, G + hotfix 2) | PROD | 18 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -189,7 +189,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div class="auth-card">
     <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">Seamly</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v22 (A–E, F, G + hotfixes) — 18 Aug 2026</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v22 (A–E, F, G + hotfix 2) — 18 Aug 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -240,7 +240,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·G2</span>
+      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·G3</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sample-btn" onclick="A.family?toggleSampleMode():goTo('settings')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:var(--honey-light);color:var(--honey);border:1px solid var(--honey)44;cursor:pointer;display:none">📋 Sample</button>
@@ -283,7 +283,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·G2</span>
+      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·G3</span>
     </div>
     <button class="nav-btn" data-page="home" onclick="goTo('home')">
       <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0">
@@ -7653,16 +7653,22 @@ window.renderAdmin = renderAdmin;
 async function _renderAdminOverview(){
   const root = document.getElementById('admin-content');
   try {
+    // v22 HOTFIX: switched from direct sb.from(...) calls (which relied on
+    // broad admin RLS policies that leaked into the app's own regular,
+    // everyday queries — see seamly_schema_v22_HOTFIX_admin_rls.sql) to
+    // dedicated SECURITY DEFINER functions. These check admin status
+    // internally and only bypass RLS for their own single call — being an
+    // admin no longer changes what any OTHER query in the app returns.
     const [famRes, memRes, subRes, fbRes, evtRes, noteRes, shopRes, medRes, mealRes] = await Promise.all([
-      sb.from('families').select('id,created_at'),
-      sb.from('family_members').select('id,family_id,user_id'),
-      sb.from('family_subscription').select('family_id,plan_name'),
-      sb.from('feedback').select('type,created_at'),
-      sb.from('events').select('family_id'),
-      sb.from('notes').select('family_id'),
-      sb.from('shopping_lists').select('family_id'),
-      sb.from('daily_meds').select('family_id'),
-      sb.from('meal_plans').select('family_id'),
+      sb.rpc('admin_get_families'),
+      sb.rpc('admin_get_family_members'),
+      sb.rpc('admin_get_family_subscriptions'),
+      sb.rpc('admin_get_feedback'),
+      sb.rpc('admin_get_event_family_ids'),
+      sb.rpc('admin_get_note_family_ids'),
+      sb.rpc('admin_get_shopping_list_family_ids'),
+      sb.rpc('admin_get_daily_med_family_ids'),
+      sb.rpc('admin_get_meal_plan_family_ids'),
     ]);
     const families = famRes.data || [];
     const members = memRes.data || [];
@@ -7746,10 +7752,12 @@ window._renderAdminOverview = _renderAdminOverview;
 async function _renderAdminFamilies(){
   const root = document.getElementById('admin-content');
   try {
+    // v22 HOTFIX: see _renderAdminOverview()'s comment — now via
+    // SECURITY DEFINER functions instead of RLS-gated direct table reads.
     const [famRes, memRes, subRes] = await Promise.all([
-      sb.from('families').select('id,name,created_at'),
-      sb.from('family_members').select('id,family_id,name,email,is_owner,user_id'),
-      sb.from('family_subscription').select('family_id,plan_name'),
+      sb.rpc('admin_get_families'),
+      sb.rpc('admin_get_family_members'),
+      sb.rpc('admin_get_family_subscriptions'),
     ]);
     A._adminFamilies = famRes.data || [];
     A._adminMembers = memRes.data || [];
@@ -7819,7 +7827,10 @@ async function _saveAdminFamilyPlan(familyId){
   const plan = document.getElementById('admin-plan-select')?.value;
   if (!plan) return;
   try {
-    const { error } = await sbWrite(() => sb.from('family_subscription').update({ plan_name: plan }).eq('family_id', familyId));
+    // v22 HOTFIX: was a direct UPDATE relying on a dropped admin RLS
+    // policy — now via admin_update_family_plan(), a SECURITY DEFINER
+    // function scoped to this one call only.
+    const { error } = await sbWrite(() => sb.rpc('admin_update_family_plan', { target_family_id: familyId, new_plan: plan }));
     if (error) { toast('Error updating plan: ' + error.message, true); return; }
     toast('Plan updated ✅');
     closeModal();
@@ -7837,7 +7848,9 @@ window._saveAdminFamilyPlan = _saveAdminFamilyPlan;
 async function _renderAdminFeedback(){
   const root = document.getElementById('admin-content');
   try {
-    const { data, error } = await sb.from('feedback').select('*').order('created_at', {ascending:false});
+    // v22 HOTFIX: via admin_get_feedback(), which already sorts
+    // newest-first internally — no .order() needed on the client side.
+    const { data, error } = await sb.rpc('admin_get_feedback');
     if (error) throw error;
     A._adminFeedback = data || [];
     _renderAdminFeedbackList();
