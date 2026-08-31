@@ -1,4 +1,4 @@
-// ── Seamly Service Worker — v8 ────────────────────────────────────────────────
+// ── Seamly Service Worker — v22 ───────────────────────────────────────────────
 //
 // Strategy: Approach A — App shell caching only.
 //
@@ -17,9 +17,12 @@
 // ── UPDATING BETWEEN VERSIONS ────────────────────────────────────────────────
 // Increment CACHE_VERSION on every new Seamly release (v9, v10, …).
 // The activate handler automatically deletes the old cache on next load.
+// This was left un-bumped since v8 through V21 and most of V22 — flagged
+// during a V22 connection-flakiness investigation and corrected here. Bump
+// it on every future release, per this file's own original instruction.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const CACHE_VERSION = 'seamly-v8';
+const CACHE_VERSION = 'seamly-v22';
 
 // Resources to pre-cache on install (app shell only)
 const APP_SHELL = [
@@ -103,8 +106,21 @@ self.addEventListener('fetch', event => {
       const networkFetch = fetch(event.request)
         .then(response => {
           if (response && response.status === 200 && response.type !== 'opaque') {
+            // v22 fix: clone the response IMMEDIATELY, synchronously, the
+            // moment it's available — NOT deferred behind the async
+            // caches.open() call below. The previous version called
+            // response.clone() only after caches.open() resolved; by then,
+            // this same `response` object may already have been handed to
+            // the browser (via the return value flowing to
+            // event.respondWith()) and had its body read/consumed — making
+            // the delayed .clone() throw "Failed to execute 'clone' on
+            // 'Response': Response body is already used", exactly as seen
+            // in a real staging console capture during testing. Cloning
+            // right here, before `response` can be consumed by anything
+            // else, removes the race entirely.
+            const responseToCache = response.clone();
             caches.open(CACHE_VERSION).then(cache =>
-              cache.put(event.request, response.clone())
+              cache.put(event.request, responseToCache)
             );
           }
           return response;

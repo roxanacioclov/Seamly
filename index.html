@@ -1,4 +1,4 @@
-<!-- Seamly v22 (A–E + Pass F) | STAGING | 18 Aug 2026 -->
+<!-- Seamly v22 (A–E, F, G) | STAGING | 18 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,6 +14,10 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#5e8b62">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<!-- v22 (Pass G): apple-mobile-web-app-capable is deprecated per Chrome's
+     own DevTools warning; the standard replacement is added alongside it
+     (not instead of it — Safari/iOS still needs the apple-prefixed one). -->
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Seamly">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
@@ -185,7 +189,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div class="auth-card">
     <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">Seamly</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v22 (A–E + Pass F) — 18 Aug 2026</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v22 (A–E, F, G) — 18 Aug 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -236,14 +240,15 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·F</span>
+      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·G</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sample-btn" onclick="A.family?toggleSampleMode():goTo('settings')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:var(--honey-light);color:var(--honey);border:1px solid var(--honey)44;cursor:pointer;display:none">📋 Sample</button>
       <span id="fam-badge" style="font-size:11px;font-weight:700;color:var(--muted)"></span>
-      <!-- v22 (Pass F): goes directly to Settings, which is now also the
-           Profile home. The old My Profile bottom-sheet is retired. -->
-      <button id="profile-btn" onclick="goTo('settings')" title="My Profile" style="display:none">
+      <!-- v22 (Pass G): reintroduces the Profile Menu — testing feedback found
+           going straight to Settings with no obvious way to see other
+           sections wasn't intuitive. See openProfileMenu(). -->
+      <button id="profile-btn" onclick="openProfileMenu()" title="My Profile" style="display:none">
         <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="vertical-align:middle">
           <circle cx="12" cy="8" r="3.6"/>
           <path d="M4.5 20C4.5 16.3 7.8 13.5 12 13.5C16.2 13.5 19.5 16.3 19.5 20"/>
@@ -261,6 +266,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
     <div id="page-meals" class="page"></div>
     <div id="page-insights" class="page"></div>
     <div id="page-settings" class="page"></div>
+    <div id="page-admin" class="page"></div>
   </div>
   <nav class="bottom-nav">
     <div class="nav-wordmark">
@@ -277,7 +283,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·F</span>
+      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·G</span>
     </div>
     <button class="nav-btn" data-page="home" onclick="goTo('home')">
       <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0">
@@ -904,6 +910,18 @@ async function initApp(user){
     try{await loadAll();}catch(e){console.error('Load error',e);}
   }
 
+  // v22 (Pass G): Admin check — a single row-exists query against the new
+  // `admins` table for the signed-in user. Gates both the Admin entry in
+  // the Settings section list and whether the Admin page is reachable at
+  // all. Guarded the same way as loadAll() above — only needs to run once
+  // per true session start, not on every silent reconnect re-fire.
+  if (!A._appInitialized) {
+    try {
+      const { data: adminRow } = await sb.from('admins').select('user_id').eq('user_id', user.id).maybeSingle();
+      A.isAdmin = !!adminRow;
+    } catch(e) { A.isAdmin = false; console.warn('Admin check failed', e); }
+  }
+
   // v20: Curated Content Library — hide any curated group/notes the family
   // hasn't opted into (Settings toggle). Replaces the old always-on
   // seedMedicalGroup() auto-seed from earlier versions — nothing curated
@@ -1074,11 +1092,17 @@ window.addEventListener('pagehide',_flushDraftsOnHide);
 
 // ── NAV ───────────────────────────────────────────────────────────────────────
 function goTo(page){
+  // v22 (Pass G): admin-only route guard — a non-admin can't reach the
+  // Admin page even by calling goTo('admin') directly (e.g. console,
+  // guessed link), since the UI entry point is already hidden but this is
+  // the actual enforcement point. Real data protection is the RLS
+  // policies on the admin-scoped tables; this is just the UI-level guard.
+  if (page === 'admin' && !A.isAdmin) { toast("You don't have access to that.", true); return; }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
   A.page=page;
-  ({home:renderHome,calendar:renderCal,notebook:renderNB,meds:renderMeds,inventory:renderInventory,meals:renderMeals,insights:renderInsights,settings:renderSettings}[page])?.();
+  ({home:renderHome,calendar:renderCal,notebook:renderNB,meds:renderMeds,inventory:renderInventory,meals:renderMeals,insights:renderInsights,settings:renderSettings,admin:renderAdmin}[page])?.();
 }
 
 // ── MODAL ─────────────────────────────────────────────────────────────────────
@@ -6341,6 +6365,11 @@ function renderMeals(){
   // SVG (matching the bottom-nav's visual style) instead of an emoji —
   // also fixes the pre-existing Meal Planner icon mismatch (was a 📅
   // calendar emoji, unrelated to meals).
+  // v22 (Pass G): reverted from the Pass F dropdown selector back to plain
+  // horizontal tabs — per testing feedback, a selector makes sense for
+  // longer lists (Settings), but for exactly 2 always-visible options it
+  // added a tap for no benefit and was flagged as the same kind of
+  // friction Pass F was trying to fix elsewhere.
   const TABS=[{id:'planner',icon:ICONS.meal,label:'Meal Planner'},{id:'shopping',icon:ICONS.cart,label:'Shopping'}];
   let tc='';
   if(A.mealsTab==='shopping'){
@@ -6352,23 +6381,13 @@ function renderMeals(){
     <div class="page-header">
       <div class="page-title">Meals</div>
     </div>
-    ${sectionSelectorTrigger(TABS.find(t=>t.id===A.mealsTab)||TABS[0], '_openMealsSectionPicker')}
+    <div class="tabs">${TABS.map(t=>`<button class="tab ${A.mealsTab===t.id?'active':''}" onclick="A.mealsTab='${t.id}';renderMeals()" style="display:flex;align-items:center;gap:6px">${t.icon} ${t.label}</button>`).join('')}</div>
     ${A.mealsTab==='shopping'?_usageBanner('shopping','Shopping Lists'):''}
     <div style="padding:14px 16px">${tc}</div>`;
   // Planner grid is filled with saved values once the table exists in the DOM
   if(A.mealsTab==='planner') setTimeout(populateMealPlanGrid,50);
 }
 window.renderMeals=renderMeals;
-
-// v22 (Pass F): dropdown section picker for Meals, replacing the old
-// horizontal tabs row.
-function _openMealsSectionPicker(){
-  const TABS=[{id:'planner',icon:ICONS.meal,label:'Meal Planner'},{id:'shopping',icon:ICONS.cart,label:'Shopping'}];
-  _showSectionPicker('Meals', TABS, A.mealsTab, 'switchMealsSection');
-}
-window._openMealsSectionPicker = _openMealsSectionPicker;
-function switchMealsSection(id){ A.mealsTab = id; renderMeals(); }
-window.switchMealsSection = switchMealsSection;
 
 // ── SHOPPING TAB ──────────────────────────────────────────────────────────────
 function renderShoppingTab(){
@@ -7253,7 +7272,7 @@ function renderInventory(){
     <div class="page-header">
       <div class="page-title">Inventory</div>
     </div>
-    ${sectionSelectorTrigger(TABS.find(t=>t.id===A.invTab)||TABS[0], '_openInventorySectionPicker')}
+    <div class="tabs">${TABS.map(t=>`<button class="tab ${A.invTab===t.id?'active':''}" onclick="A.invTab='${t.id}';renderInventory()" style="display:flex;align-items:center;gap:6px">${t.icon} ${t.label}</button>`).join('')}</div>
     <div style="padding:14px 16px">${tc}</div>`;
 
   // If treatments tab, render meds directly into the now-visible Inventory
@@ -7261,16 +7280,6 @@ function renderInventory(){
   // no copying, so it can re-render itself in place after any edit/delete.
   if(A.invTab==='treatments') renderMeds('inv-meds-container');
 }
-
-// v22 (Pass F): dropdown section picker for Inventory, replacing the old
-// horizontal tabs row.
-function _openInventorySectionPicker(){
-  const TABS=[{id:'treatments',icon:ICONS.pill,label:'Frequent meds'},{id:'products',icon:ICONS.package,label:'Products'}];
-  _showSectionPicker('Inventory', TABS, A.invTab, 'switchInventorySection');
-}
-window._openInventorySectionPicker = _openInventorySectionPicker;
-function switchInventorySection(id){ A.invTab = id; renderInventory(); }
-window.switchInventorySection = switchInventorySection;
 window.renderInventory=renderInventory;
 
 function openAddProduct(){
@@ -7438,17 +7447,10 @@ window.saveEditProduct=saveEditProduct;
 // ── SETTINGS ──────────────────────────────────────────────────────────────────
 function renderSettings(){
   const fam=getFamily(),members=getMembers();
-  // v22 (Pass F): Profile → Settings consolidation. `family` stays the
-  // default landing view (A.settingsTab defaults to it) but is no longer a
-  // visible menu entry — it's simply what's shown until another section is
-  // picked. The 4 sections below are what the new dropdown selector offers.
-  const hasUnread = _hasUnreadNotifs();
-  const SETTINGS_SECTIONS = [
-    {id:'notifs', icon:'🔔', label:'Notifications', showDot:hasUnread},
-    {id:'calendar', icon:'🗓', label:'Calendar settings'},
-    {id:'content', icon:'📖', label:'Notebook settings'},
-    {id:'feedback', icon:'💬', label:'Feedback'},
-  ];
+  // v22 (Pass G): now built from the shared _settingsSectionsList() helper
+  // — 'family' is a normal entry in it (see that function's comment for
+  // why this changed from Pass F's original "no visible entry" approach).
+  const SETTINGS_SECTIONS = _settingsSectionsList();
   let tc='';
 
   if(A.settingsTab==='calendar'){
@@ -7525,12 +7527,10 @@ function renderSettings(){
   }
 
   const cu=A.user;
-  // v22 (Pass F): the trigger's "current" display. Family/Profile home
-  // isn't in SETTINGS_SECTIONS (no visible list entry, per spec) so it
-  // needs its own small stand-in object here just for the trigger label.
-  const _settingsCurrent = (A.settingsTab && A.settingsTab!=='family')
-    ? (SETTINGS_SECTIONS.find(s=>s.id===A.settingsTab) || {icon:'👨‍👩‍👧‍👦', label:'Family'})
-    : {icon:'👨‍👩‍👧‍👦', label:'Family'};
+  // v22 (Pass G): now a plain lookup — 'family' is a normal entry in
+  // SETTINGS_SECTIONS, so no special-case stand-in object is needed here
+  // anymore (Pass F originally needed one; see _settingsSectionsList()).
+  const _settingsCurrent = SETTINGS_SECTIONS.find(s=>s.id===A.settingsTab) || SETTINGS_SECTIONS[0];
 
   document.getElementById('page-settings').innerHTML=`
     <div class="page-header">
@@ -7543,27 +7543,321 @@ function renderSettings(){
       </div>
       <button type="button" onclick="doSignOut()" style="background:#fff;border:1px solid ${T.border};border-radius:8px;padding:6px 11px;font-size:11px;font-weight:700;color:${T.muted};cursor:pointer;flex-shrink:0;white-space:nowrap">🚪 Sign out</button>
     </div>`:''}
-    ${sectionSelectorTrigger(_settingsCurrent, '_openSettingsSectionPicker', hasUnread)}
+    ${sectionSelectorTrigger(_settingsCurrent, '_openSettingsSectionPicker', _hasUnreadNotifs())}
     <div style="padding:14px 16px">${tc}</div>`;
 }
 
-// v22 (Pass F): opens the "jump to section" picker for Settings, using
-// the same SETTINGS_SECTIONS list renderSettings() itself uses — rebuilt
-// here since this is a separate onclick-triggered function, not something
-// renderSettings() can hand a closure to through an HTML attribute.
-function _openSettingsSectionPicker(){
+// v22 (Pass F/G): shared section list used by renderSettings()'s in-page
+// selector, its own picker, AND the top-bar Profile Menu (reintroduced in
+// Pass G) — one canonical place to add/remove a Settings destination.
+// 'family' is a normal list entry (not a special-cased default anymore —
+// Pass F originally excluded it from the list; Pass G testing feedback
+// found that confusing, since there was then no obvious way back to it).
+// Admin is included only when A.isAdmin is true (Pass G's admins-table
+// check, set once at load).
+function _settingsSectionsList(){
   const hasUnread = _hasUnreadNotifs();
-  const SECTIONS = [
+  const sections = [
+    {id:'family', icon:'👨‍👩‍👧‍👦', label:'Family'},
     {id:'notifs', icon:'🔔', label:'Notifications', showDot:hasUnread},
     {id:'calendar', icon:'🗓', label:'Calendar settings'},
     {id:'content', icon:'📖', label:'Notebook settings'},
     {id:'feedback', icon:'💬', label:'Feedback'},
   ];
-  _showSectionPicker('Settings', SECTIONS, A.settingsTab, 'switchSettingsSection');
+  if (A.isAdmin) sections.push({id:'admin', icon:'🛠', label:'Admin'});
+  return sections;
+}
+window._settingsSectionsList = _settingsSectionsList;
+
+// v22 (Pass F): opens the "jump to section" picker from WITHIN Settings —
+// excludes the currently-viewed section from the list, per the shared
+// _showSectionPicker() convention.
+function _openSettingsSectionPicker(){
+  _showSectionPicker('Settings', _settingsSectionsList(), A.settingsTab, 'switchSettingsSection');
 }
 window._openSettingsSectionPicker = _openSettingsSectionPicker;
-function switchSettingsSection(id){ A.settingsTab = id; renderSettings(); }
+
+// v22 (Pass G): reintroduces a dedicated top-bar entry point — tapping 👤
+// now opens the same picker Settings' own in-page trigger uses. Per
+// testing feedback, Pass F's "tap profile icon → land directly on
+// whatever Settings section you last had open, with no obvious way to see
+// the OTHER sections" wasn't intuitive. This restores a clear, familiar
+// "tap profile icon → pick where to go" flow. '__none__' is passed as the
+// currentId since there's no "current" section to exclude when opening
+// from outside Settings — every section shows.
+function openProfileMenu(){
+  _showSectionPicker('My Profile', _settingsSectionsList(), '__none__', 'switchSettingsSection');
+}
+window.openProfileMenu = openProfileMenu;
+
+// Routes 'admin' straight to the Admin page; every other id switches
+// A.settingsTab and goes to Settings. Uses goTo('settings') (not a direct
+// renderSettings() call) so this works correctly whether the person is
+// already on Settings or navigating there from anywhere else in the app
+// (e.g. from the top-bar Profile Menu).
+function switchSettingsSection(id){
+  if (id === 'admin') { goTo('admin'); return; }
+  A.settingsTab = id;
+  goTo('settings');
+}
 window.switchSettingsSection = switchSettingsSection;
+
+// ── ADMIN (v22, Pass G) ──────────────────────────────────────────────────────
+// Admin-only usage/adoption dashboard. Gated by A.isAdmin (set once at load,
+// see initApp()) both at the UI level (entry point hidden, goTo('admin')
+// guarded) and at the data level (new admin-scoped RLS policies — see the
+// accompanying schema file). 3 plain tabs, matching the "small fixed number
+// of options" pattern Roxana asked to keep as simple horizontal tabs rather
+// than a dropdown selector (same reasoning as the Inventory/Meals revert).
+function renderAdmin(){
+  if (!A.isAdmin) { goTo('home'); return; }
+  if (!A.adminTab) A.adminTab = 'overview';
+  const TABS = [
+    {id:'overview', label:'Overview'},
+    {id:'families', label:'Families & Users'},
+    {id:'feedback', label:'Feedback'},
+  ];
+  document.getElementById('page-admin').innerHTML = `
+    <div class="page-header"><div class="page-title">🛠 Admin</div></div>
+    <div class="tabs">${TABS.map(t=>`<button class="tab ${A.adminTab===t.id?'active':''}" onclick="A.adminTab='${t.id}';renderAdmin()">${t.label}</button>`).join('')}</div>
+    <div id="admin-content" style="padding:14px 16px"><div style="text-align:center;padding:30px;color:${T.muted}">Loading…</div></div>`;
+  if (A.adminTab === 'overview') _renderAdminOverview();
+  else if (A.adminTab === 'families') _renderAdminFamilies();
+  else if (A.adminTab === 'feedback') _renderAdminFeedback();
+}
+window.renderAdmin = renderAdmin;
+
+// Tab 1 — Overview. Simple counting queries computed client-side from full
+// table scans, matching the spec's own stated "simple counting, same spirit
+// as _familyEventCount()-style helpers" scope — no background jobs, no new
+// tables. Table names below (daily_meds, meal_plans, shopping_lists, etc.)
+// were confirmed against actual sb.from(...) calls already in this file,
+// not guessed.
+async function _renderAdminOverview(){
+  const root = document.getElementById('admin-content');
+  try {
+    const [famRes, memRes, subRes, fbRes, evtRes, noteRes, shopRes, medRes, mealRes] = await Promise.all([
+      sb.from('families').select('id,created_at'),
+      sb.from('family_members').select('id,family_id,user_id'),
+      sb.from('family_subscription').select('family_id,plan_name'),
+      sb.from('feedback').select('type,created_at'),
+      sb.from('events').select('family_id'),
+      sb.from('notes').select('family_id'),
+      sb.from('shopping_lists').select('family_id'),
+      sb.from('daily_meds').select('family_id'),
+      sb.from('meal_plans').select('family_id'),
+    ]);
+    const families = famRes.data || [];
+    const members = memRes.data || [];
+    const subs = subRes.data || [];
+    const feedback = fbRes.data || [];
+    const events = evtRes.data || [];
+    const notes = noteRes.data || [];
+    const shopLists = shopRes.data || [];
+    const meds = medRes.data || [];
+    const meals = mealRes.data || [];
+
+    const totalFamilies = families.length;
+    const linkedUsers = members.filter(m=>m.user_id).length;
+    const now = new Date();
+    const weekAgo = new Date(now - 7*86400000);
+    const monthAgo = new Date(now - 30*86400000);
+    const newThisWeek = families.filter(f=>new Date(f.created_at) >= weekAgo).length;
+    const newThisMonth = families.filter(f=>new Date(f.created_at) >= monthAgo).length;
+
+    const planCounts = {};
+    subs.forEach(s => { const p = s.plan_name || 'free'; planCounts[p] = (planCounts[p]||0)+1; });
+
+    const famIdsWith = (rows) => new Set(rows.map(r=>r.family_id));
+    const pct = (set) => totalFamilies ? Math.round(set.size / totalFamilies * 100) : 0;
+
+    const countByType = (rows) => { const c = {}; rows.forEach(r=>{ c[r.type] = (c[r.type]||0)+1; }); return c; };
+    const fb7dCounts = countByType(feedback.filter(f=>new Date(f.created_at) >= weekAgo));
+    const fb30dCounts = countByType(feedback.filter(f=>new Date(f.created_at) >= monthAgo));
+
+    const metricCard = (label, value) => `
+      <div style="background:${T.parchment};border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:22px;font-weight:800;color:${T.sage}">${value}</div>
+        <div style="font-size:11px;color:${T.muted};margin-top:2px">${label}</div>
+      </div>`;
+
+    root.innerHTML = `
+      <div class="card" style="padding:14px;margin-bottom:12px">
+        <div class="lbl" style="margin-bottom:10px">Adoption &amp; Growth</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          ${metricCard('Total Families', totalFamilies)}
+          ${metricCard('Linked Users', linkedUsers)}
+          ${metricCard('New This Week', newThisWeek)}
+          ${metricCard('New This Month', newThisMonth)}
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:${T.muted};font-weight:700;margin-bottom:6px">Plan breakdown</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${Object.entries(planCounts).map(([plan,count])=>`<span class="chip" style="background:${T.sageLight};color:${T.sage}">${plan}: ${count}</span>`).join('') || `<span style="font-size:12px;color:${T.muted}">No subscription rows yet.</span>`}
+        </div>
+      </div>
+      <div class="card" style="padding:14px;margin-bottom:12px">
+        <div class="lbl" style="margin-bottom:10px">Engagement</div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+          <div style="display:flex;justify-content:space-between"><span>Families with ≥1 event</span><b>${pct(famIdsWith(events))}%</b></div>
+          <div style="display:flex;justify-content:space-between"><span>Families with ≥1 note</span><b>${pct(famIdsWith(notes))}%</b></div>
+          <div style="display:flex;justify-content:space-between"><span>Families with ≥1 shopping list</span><b>${pct(famIdsWith(shopLists))}%</b></div>
+          <div style="display:flex;justify-content:space-between"><span>Families with ≥1 medication tracked</span><b>${pct(famIdsWith(meds))}%</b></div>
+          <div style="display:flex;justify-content:space-between"><span>Families with a meal plan started</span><b>${pct(famIdsWith(meals))}%</b></div>
+        </div>
+      </div>
+      <div class="card" style="padding:14px;margin-bottom:12px">
+        <div class="lbl" style="margin-bottom:10px">Feedback signal</div>
+        <div style="font-size:12px;color:${T.muted};margin-bottom:8px">Last 7 days / Last 30 days, by type</div>
+        ${FB_TYPES.map(t=>`
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid ${T.border};font-size:13px">
+            <span>${t.icon} ${t.label}</span>
+            <span><b>${fb7dCounts[t.value]||0}</b> / ${fb30dCounts[t.value]||0}</span>
+          </div>`).join('')}
+      </div>
+      <div class="card" style="padding:14px">
+        <div class="lbl" style="margin-bottom:6px">Reliability metrics</div>
+        <div style="font-size:12px;color:${T.muted}">Coming soon — tied to the ongoing connection-flakiness investigation.</div>
+      </div>`;
+  } catch(e) {
+    console.error('Admin overview load error', e);
+    root.innerHTML = `<div style="text-align:center;padding:30px;color:${T.muted}">Couldn't load admin metrics — check console for details.</div>`;
+  }
+}
+window._renderAdminOverview = _renderAdminOverview;
+
+// Tab 2 — Families & Users
+async function _renderAdminFamilies(){
+  const root = document.getElementById('admin-content');
+  try {
+    const [famRes, memRes, subRes] = await Promise.all([
+      sb.from('families').select('id,name,created_at'),
+      sb.from('family_members').select('id,family_id,name,email,is_owner,user_id'),
+      sb.from('family_subscription').select('family_id,plan_name'),
+    ]);
+    A._adminFamilies = famRes.data || [];
+    A._adminMembers = memRes.data || [];
+    A._adminSubs = subRes.data || [];
+    _renderAdminFamiliesList();
+  } catch(e) {
+    console.error('Admin families load error', e);
+    root.innerHTML = `<div style="text-align:center;padding:30px;color:${T.muted}">Couldn't load families — check console for details.</div>`;
+  }
+}
+window._renderAdminFamilies = _renderAdminFamilies;
+
+function _renderAdminFamiliesList(){
+  const root = document.getElementById('admin-content');
+  if (!root) return;
+  const families = A._adminFamilies || [];
+  const members = A._adminMembers || [];
+  const subs = A._adminSubs || [];
+  const search = (A._adminFamSearch || '').toLowerCase();
+  const rows = families
+    .map(f => {
+      const famMembers = members.filter(m => m.family_id === f.id);
+      const owner = famMembers.find(m => m.is_owner);
+      const sub = subs.find(s => s.family_id === f.id);
+      return { family: f, members: famMembers, owner, plan: sub?.plan_name || 'free' };
+    })
+    .filter(r => !search || r.family.name?.toLowerCase().includes(search) || r.owner?.email?.toLowerCase().includes(search))
+    .sort((a,b) => new Date(b.family.created_at) - new Date(a.family.created_at));
+
+  root.innerHTML = `
+    <input class="inp" placeholder="Search by family name or owner email…" value="${A._adminFamSearch||''}" oninput="A._adminFamSearch=this.value;_renderAdminFamiliesList()" style="margin-bottom:12px">
+    ${rows.length ? rows.map(r => `
+      <div onclick="_openAdminFamilyDetail('${r.family.id}')" class="card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div style="min-width:0">
+          <div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.family.name || 'Unnamed family'}</div>
+          <div style="font-size:12px;color:${T.muted};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.owner?.email || 'No owner email'} · ${r.members.length} member${r.members.length!==1?'s':''} · ${fmt(r.family.created_at)}</div>
+        </div>
+        <span class="chip" style="background:${T.sageLight};color:${T.sage};flex-shrink:0">${r.plan}</span>
+      </div>`).join('') : `<div style="text-align:center;padding:30px;color:${T.muted}">No families match your search.</div>`}`;
+}
+window._renderAdminFamiliesList = _renderAdminFamiliesList;
+
+function _openAdminFamilyDetail(familyId){
+  const family = (A._adminFamilies||[]).find(f=>f.id===familyId);
+  const members = (A._adminMembers||[]).filter(m=>m.family_id===familyId);
+  const sub = (A._adminSubs||[]).find(s=>s.family_id===familyId);
+  if (!family) return;
+  showModal(family.name || 'Family detail', `
+    <div style="font-size:12px;color:${T.muted};margin-bottom:14px">Created ${fmt(family.created_at)}</div>
+    <div class="lbl" style="margin-bottom:8px">Members</div>
+    ${members.map(m=>`
+      <div style="padding:8px 0;border-bottom:1px solid ${T.border};font-size:13px">
+        <div style="font-weight:700">${m.name}${m.is_owner?` <span style="color:${T.sage};font-size:11px;font-weight:700">(Owner)</span>`:''}</div>
+        <div style="color:${T.muted};font-size:11px">${m.email||'—'}</div>
+      </div>`).join('') || `<div style="font-size:12px;color:${T.muted}">No members found.</div>`}
+    <div class="lbl" style="margin:16px 0 8px">Plan</div>
+    <div style="display:flex;gap:8px">
+      <select class="sel" id="admin-plan-select" style="flex:1">
+        ${['free','early_adopter','premium'].map(p=>`<option value="${p}"${(sub?.plan_name||'free')===p?' selected':''}>${p}</option>`).join('')}
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="_saveAdminFamilyPlan('${familyId}')">Save</button>
+    </div>`);
+}
+window._openAdminFamilyDetail = _openAdminFamilyDetail;
+
+async function _saveAdminFamilyPlan(familyId){
+  const plan = document.getElementById('admin-plan-select')?.value;
+  if (!plan) return;
+  try {
+    const { error } = await sbWrite(() => sb.from('family_subscription').update({ plan_name: plan }).eq('family_id', familyId));
+    if (error) { toast('Error updating plan: ' + error.message, true); return; }
+    toast('Plan updated ✅');
+    closeModal();
+    const sub = (A._adminSubs||[]).find(s=>s.family_id===familyId);
+    if (sub) sub.plan_name = plan; else (A._adminSubs=A._adminSubs||[]).push({family_id:familyId, plan_name:plan});
+    _renderAdminFamiliesList();
+  } catch(e) {
+    toast('Something went wrong — please try again.', true);
+    console.error(e);
+  }
+}
+window._saveAdminFamilyPlan = _saveAdminFamilyPlan;
+
+// Tab 3 — Feedback (read-only, per spec — no reply/resolve workflow this pass)
+async function _renderAdminFeedback(){
+  const root = document.getElementById('admin-content');
+  try {
+    const { data, error } = await sb.from('feedback').select('*').order('created_at', {ascending:false});
+    if (error) throw error;
+    A._adminFeedback = data || [];
+    _renderAdminFeedbackList();
+  } catch(e) {
+    console.error('Admin feedback load error', e);
+    root.innerHTML = `<div style="text-align:center;padding:30px;color:${T.muted}">Couldn't load feedback — check console for details.</div>`;
+  }
+}
+window._renderAdminFeedback = _renderAdminFeedback;
+
+function _renderAdminFeedbackList(){
+  const root = document.getElementById('admin-content');
+  if (!root) return;
+  const all = A._adminFeedback || [];
+  const typeFilter = A._adminFbTypeFilter || '';
+  const search = (A._adminFbSearch || '').toLowerCase();
+  const filtered = all
+    .filter(f => !typeFilter || f.type === typeFilter)
+    .filter(f => !search || f.message?.toLowerCase().includes(search));
+
+  root.innerHTML = `
+    <select class="sel" style="margin-bottom:8px;width:100%" onchange="A._adminFbTypeFilter=this.value;_renderAdminFeedbackList()">
+      <option value="">All types</option>
+      ${FB_TYPES.map(t=>`<option value="${t.value}"${typeFilter===t.value?' selected':''}>${t.label}</option>`).join('')}
+    </select>
+    <input class="inp" placeholder="Search message text…" value="${A._adminFbSearch||''}" oninput="A._adminFbSearch=this.value;_renderAdminFeedbackList()" style="margin-bottom:12px">
+    ${filtered.length ? filtered.map(f => `
+      <div class="card" style="padding:12px 14px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px">
+          <span class="chip" style="background:${T.sageLight};color:${T.sage}">${FB_TYPES.find(t=>t.value===f.type)?.icon||''} ${FB_TYPES.find(t=>t.value===f.type)?.label||f.type}</span>
+          <span style="font-size:11px;color:${T.muted};flex-shrink:0">${fmt(f.created_at)}</span>
+        </div>
+        <div style="font-size:13px;margin-bottom:6px">${f.message}</div>
+        <div style="font-size:11px;color:${T.muted}">${f.family_name||'Unknown family'} · ${f.user_email||'—'}${f.page?' · '+f.page:''}</div>
+      </div>`).join('') : `<div style="text-align:center;padding:30px;color:${T.muted}">No feedback matches your filters.</div>`}`;
+}
+window._renderAdminFeedbackList = _renderAdminFeedbackList;
 
 async function saveFamName(){
   const name=document.getElementById('s-fn')?.value?.trim();
@@ -8351,7 +8645,7 @@ function _openNotifPrefsModal(){
     <div class="card" style="padding:14px">
       <div class="lbl" style="margin-bottom:10px">Push notifications — coming soon</div>
       <p style="font-size:12px;color:${T.muted};margin-bottom:12px;line-height:1.6">Get device-level alerts for upcoming events, low stock, and family activity. Your preferences above will activate automatically when push notifications launch.</p>
-      <div style="background:${T.honeyLight};border-radius:9px;padding:10px 12px;font-size:12px;color:${T.honey};font-weight:600">📱 Available in the Seamly PWA — install the app on your home screen to be first to get them.</div>
+      <div style="background:${T.honeyLight};border-radius:9px;padding:10px 12px;font-size:12px;color:${T.honey};font-weight:600">📱 Not available yet — we'll let you know as soon as push notifications launch.</div>
     </div>`);
 }
 window._openNotifPrefsModal = _openNotifPrefsModal;
