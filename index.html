@@ -1,4 +1,4 @@
-<!-- Seamly v22 (A–E, F, G) | STAGING | 18 Aug 2026 -->
+<!-- Seamly v22 (A–E, F, G + hotfixes) | STAGING | 18 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -189,7 +189,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div class="auth-card">
     <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">Seamly</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v22 (A–E, F, G) — 18 Aug 2026</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v22 (A–E, F, G + hotfixes) — 18 Aug 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -240,7 +240,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·G</span>
+      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·G2</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sample-btn" onclick="A.family?toggleSampleMode():goTo('settings')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:var(--honey-light);color:var(--honey);border:1px solid var(--honey)44;cursor:pointer;display:none">📋 Sample</button>
@@ -283,7 +283,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·G</span>
+      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·G2</span>
     </div>
     <button class="nav-btn" data-page="home" onclick="goTo('home')">
       <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0">
@@ -747,7 +747,23 @@ async function doSignOut(){
 // ── DATA LOADING ──────────────────────────────────────────────────────────────
 async function loadAll(){
   const[fam,mems,evts,ngrps,nts,dm,ip,sl,mp,famSub,planLim]=await Promise.all([
-    sb.from('families').select('*').maybeSingle(),
+    // v22.2 fix: wrapped in sbWrite({silent:true}) — confirmed root cause of
+    // a real bug where the header showed "📋 Sample" (as if the user had no
+    // family at all) even though the rest of their real family data
+    // (events, notes, etc.) loaded and rendered correctly underneath. This
+    // query used to be a bare, unprotected sb.from(...) call — if it
+    // specifically timed out (the same connection flakiness under
+    // investigation elsewhere), Promise.all() still resolved successfully
+    // overall (Supabase queries resolve with {data:null, error:{...}}
+    // rather than rejecting), so every OTHER query in this same batch could
+    // succeed independently while fam.data silently stayed null, with
+    // nothing surfacing the failure or retrying it. sbWrite()'s existing
+    // timeout + fresh-client-retry logic (already confirmed working via
+    // real staging testing) now protects this query the same way every
+    // write in the app already is. {silent:true} because this fires during
+    // background app-load, not a user-initiated save — no "Connection
+    // issue…" toast should interrupt startup.
+    sbWrite(() => sb.from('families').select('*').maybeSingle(), {silent:true}),
     sb.from('family_members').select('*').order('created_at'),
     sb.from('events').select('*').order('date'),
     sb.from('note_groups').select('*').order('created_at'),
@@ -773,6 +789,7 @@ async function loadAll(){
     sb.from('plan_limits').select('*'),
   ]);
   if(fam.data){A.family=fam.data;}
+  else if(fam.error){console.error('families fetch failed — A.family will be unset this load, header will incorrectly show Sample mode:', fam.error);}
   A.members=mems.data||[];
   A.events=evts.data||[];
   A.noteGroups=ngrps.data||[];
