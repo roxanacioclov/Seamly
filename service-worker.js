@@ -73,6 +73,18 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
+  // 0. v22.2 fix: ignore anything that isn't a normal http(s) request —
+  //    browser extensions (chrome-extension://, moz-extension://), and
+  //    other non-network schemes (data:, blob:) can trigger fetch events
+  //    in this same page context. The Cache API only supports http(s), so
+  //    letting one of these reach branch 4's cache.put() below throws
+  //    "Failed to execute 'put' on 'Cache': Request scheme '...' is
+  //    unsupported" — seen in a real production console capture during
+  //    testing. Letting the browser handle these natively (by simply not
+  //    calling respondWith()) removes the gap entirely; this service
+  //    worker has no business intercepting non-http(s) requests anyway.
+  if (!url.protocol.startsWith('http')) return;
+
   // 1. Skip all non-GET requests (Supabase writes: POST, PATCH, DELETE).
   //    These must always go to the network — never intercept or queue them.
   if (event.request.method !== 'GET') return;
