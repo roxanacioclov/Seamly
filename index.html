@@ -1,4 +1,4 @@
-<!-- Seamly v21 | PROD | 04 Aug 2026 -->
+<!-- Seamly v22 (A–E, F, G) | PROD | 18 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,9 +14,16 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#5e8b62">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<!-- v22 (Pass G): apple-mobile-web-app-capable is deprecated per Chrome's
+     own DevTools warning; the standard replacement is added alongside it
+     (not instead of it — Safari/iOS still needs the apple-prefixed one). -->
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Seamly">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
+<!-- v22 fix: explicit favicon so the browser doesn't fall back to guessing
+     /favicon.ico (which doesn't exist) on every page load. -->
+<link rel="icon" type="image/png" href="/icons/icon-192.png">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -122,12 +129,13 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
 /* ── Notification bell & badge (v8) ──────────────────────── */
 /* v12: profile-btn replaces the old notif-btn (bell); profile-dot replaces
    notif-badge — a plain unread dot instead of a numeric count, since the
-   button now opens the consolidated My Profile menu, not just Notifications. */
+   button opens Settings (v22, Pass F — was the consolidated My Profile
+   menu before that), not just Notifications. */
 #profile-btn{position:relative;background:none;border:none;font-size:20px;cursor:pointer;padding:2px 6px;color:var(--muted);-webkit-tap-highlight-color:transparent}
 #profile-dot{position:absolute;top:1px;right:3px;background:var(--rose);border-radius:99px;width:9px;height:9px;display:none;box-sizing:border-box}
 /* ── Quick Add floating action button (v21) ─────────────────────── */
 /* Replaces the old .feedback-fab in this same bottom-right spot — Send
-   Feedback moved into the Profile Menu instead (see openProfileMenu()). */
+   Feedback is now a Settings section (v22, Pass F) instead. */
 .quick-add-fab{position:fixed;bottom:80px;right:16px;z-index:100;width:48px;height:48px;border-radius:50%;background:var(--sage);color:#fff;border:none;font-size:24px;font-weight:400;line-height:1;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;transition:transform .2s,box-shadow .2s;-webkit-tap-highlight-color:transparent}
 .quick-add-fab:active{transform:scale(.93);box-shadow:0 2px 8px rgba(0,0,0,.15)}
 @media (min-width:768px){
@@ -181,7 +189,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div class="auth-card">
     <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">Seamly</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v21 — 04 Aug 2026</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v22 (A–E, F, G) — 18 Aug 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -232,12 +240,14 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v21</span>
+      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·G</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sample-btn" onclick="A.family?toggleSampleMode():goTo('settings')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:var(--honey-light);color:var(--honey);border:1px solid var(--honey)44;cursor:pointer;display:none">📋 Sample</button>
       <span id="fam-badge" style="font-size:11px;font-weight:700;color:var(--muted)"></span>
-      <!-- v12: consolidated Notifications + Settings + Sign out into one My Profile entry point -->
+      <!-- v22 (Pass G): reintroduces the Profile Menu — testing feedback found
+           going straight to Settings with no obvious way to see other
+           sections wasn't intuitive. See openProfileMenu(). -->
       <button id="profile-btn" onclick="openProfileMenu()" title="My Profile" style="display:none">
         <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="vertical-align:middle">
           <circle cx="12" cy="8" r="3.6"/>
@@ -256,6 +266,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
     <div id="page-meals" class="page"></div>
     <div id="page-insights" class="page"></div>
     <div id="page-settings" class="page"></div>
+    <div id="page-admin" class="page"></div>
   </div>
   <nav class="bottom-nav">
     <div class="nav-wordmark">
@@ -272,7 +283,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v21</span>
+      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·G</span>
     </div>
     <button class="nav-btn" data-page="home" onclick="goTo('home')">
       <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0">
@@ -338,7 +349,7 @@ try { sb = supabase.createClient(SB_URL, SB_KEY); } catch(e) { console.error('Su
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const T={sage:'#5e8b62',sageMid:'#8ab88e',sageLight:'#d4e8d6',terra:'#b85c38',terraLight:'#f2ddd4',sky:'#3a7ca5',skyLight:'#d0e4f0',plum:'#7c5c8a',plumLight:'#e8d8f0',honey:'#c4892a',honeyLight:'#f5e4c4',rose:'#b85070',roseLight:'#f0d4de',ink:'#1e1b16',muted:'#7a7060',border:'#e0d8cc',bg:'#f5f2ed',surface:'#fff',parchment:'#ede8df'};
-const ET={task:{label:'Task',icon:'✅',color:T.honey,bg:T.honeyLight,desc:'To-dos assigned to family members'},social:{label:'Social Event',icon:'👥',color:T.sky,bg:T.skyLight,desc:'Gatherings, outings, celebrations'},health:{label:'Health Event',icon:'❤️',color:T.rose,bg:T.roseLight,desc:'Appointments, treatments, check-ups'},wellness:{label:'Wellness Log',icon:'🌿',color:T.sage,bg:T.sageLight,desc:'Daily health summary — sleep, mood, exercise'}};
+const ET={task:{label:'Task',icon:'✅',color:T.honey,bg:T.honeyLight,desc:'To-dos assigned to family members'},social:{label:'Event',icon:'👥',color:T.sky,bg:T.skyLight,desc:'Gatherings, outings, celebrations'},health:{label:'Health Event',icon:'❤️',color:T.rose,bg:T.roseLight,desc:'Appointments, treatments, check-ups'},wellness:{label:'Wellness Log',icon:'🌿',color:T.sage,bg:T.sageLight,desc:'Daily health summary — sleep, mood, exercise'}};
 const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DN=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const DNF=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -346,6 +357,25 @@ const MOODS=['😄 Great','😊 Good','😐 Okay','😔 Low','😢 Sad','😤 St
 const MCOLORS=[T.sage,T.terra,T.sky,T.plum,T.honey,T.rose];
 const CURRENCIES=[{code:'EUR',sym:'€'},{code:'USD',sym:'$'},{code:'GBP',sym:'£'},{code:'RON',sym:'lei'},{code:'CHF',sym:'CHF'},{code:'CAD',sym:'CA$'},{code:'AUD',sym:'A$'},{code:'JPY',sym:'¥'},{code:'BRL',sym:'R$'},{code:'INR',sym:'₹'},{code:'SEK',sym:'kr'},{code:'NOK',sym:'kr'},{code:'DKK',sym:'kr'},{code:'PLN',sym:'zł'},{code:'HUF',sym:'Ft'},{code:'AED',sym:'د.إ'},{code:'SGD',sym:'S$'},{code:'HKD',sym:'HK$'}];
 const NOTE_COLORS=['#d4e8d6','#f0d4de','#f5e4c4','#d0e4f0','#e8d8f0','#ede8df','#f2ddd4'];
+
+// ── SHARED ICON SVGs (v22) — small line-icon set matching the bottom-nav's
+// 1.8px-stroke visual style, reused across Meals/Inventory tabs, Insights
+// section headers, and Home's Shopping button, so the same shopping cart /
+// meal / meds / product icon looks identical everywhere it appears. Calendar/
+// Notebook/Inventory here reuse the exact same path shapes already drawn in
+// the static bottom-nav markup (just JS-string versions, since the nav icons
+// themselves are static HTML, not generated) — cart, meal, pill, and package
+// are the 4 genuinely new icons this version adds.
+const ICONS = {
+  cart: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0;vertical-align:middle"><path d="M3 4H5L7 15C7.15 15.8 7.85 16.4 8.65 16.4H18C18.8 16.4 19.5 15.8 19.65 15L21 6.5H6.3"/><circle cx="9" cy="20" r="1.4" fill="currentColor" stroke="none"/><circle cx="17" cy="20" r="1.4" fill="currentColor" stroke="none"/></svg>`,
+  meal: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0;vertical-align:middle"><circle cx="13" cy="12" r="8"/><path d="M4 3v6c0 1.1.9 2 2 2s2-.9 2-2V3"/><path d="M6 11v10"/></svg>`,
+  pill: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0;vertical-align:middle"><rect x="3" y="9" width="18" height="6" rx="3" transform="rotate(-45 12 12)"/><line x1="12" y1="7.5" x2="12" y2="16.5" transform="rotate(-45 12 12)"/></svg>`,
+  package: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0;vertical-align:middle"><rect x="4" y="8" width="16" height="12" rx="1.5"/><path d="M4 8L8 4H16L20 8"/><line x1="12" y1="8" x2="12" y2="20"/></svg>`,
+  calendar: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0;vertical-align:middle"><rect x="4" y="5" width="16" height="15" rx="3"/><line x1="4" y1="10" x2="20" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/><circle cx="12" cy="15" r="1.4" fill="currentColor" stroke="none"/></svg>`,
+  notebook: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0;vertical-align:middle"><rect x="6" y="3" width="14" height="18" rx="2"/><circle cx="4" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="14" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1" fill="currentColor" stroke="none"/><line x1="9" y1="8" x2="17" y2="8"/><line x1="9" y1="12" x2="17" y2="12"/><line x1="9" y1="16" x2="14" y2="16"/></svg>`,
+  inventory: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0;vertical-align:middle"><path d="M3 8L12 4L21 8L12 12L3 8Z"/><path d="M3 8V16L12 20L21 16V8"/><line x1="12" y1="12" x2="12" y2="20"/></svg>`,
+};
+window.ICONS = ICONS;
 
 // 52 Weekly Challenges
 const CHALLENGES=[
@@ -423,7 +453,7 @@ const SD_MEMBERS = [
 ];
 
 const SD_EVENTS = [
-  {id:'se1',type:'social',title:"Leo's Birthday Party",social_type:'Birthday',date:new Date(_SD_Y,_SD_M,_SD_D+5,15,0).toISOString(),end_date:new Date(_SD_Y,_SD_M,_SD_D+5,18,0).toISOString(),location:'Home',participants:['sm1','sm2','sm3','sm4'],participants_all_family:false,description:'Leo turns 9! Dinosaur theme 🦕',recurrence:'None',actions:[{text:'Order cake',done:false},{text:'Decorate house',done:true}],tags:['birthday'],links:[]},
+  {id:'se1',type:'social',title:"Leo's Birthday Party",social_type:'Social',date:new Date(_SD_Y,_SD_M,_SD_D+5,15,0).toISOString(),end_date:new Date(_SD_Y,_SD_M,_SD_D+5,18,0).toISOString(),location:'Home',participants:['sm1','sm2','sm3','sm4'],participants_all_family:false,description:'Leo turns 9! Dinosaur theme 🦕',recurrence:'None',actions:[{text:'Order cake',done:false},{text:'Decorate house',done:true}],tags:['birthday'],links:[]},
   {id:'se2',type:'health',appt_type:'Appointment',title:'Mia – Orthodontist',date:new Date(_SD_Y,_SD_M,_SD_D+3,10,0).toISOString(),end_date:new Date(_SD_Y,_SD_M,_SD_D+3,11,0).toISOString(),location:'Smile Clinic',doctor:'Dr. Popescu',specialty:'Dentist',participants:['sm3'],participants_all_family:false,description:'Monthly braces adjustment',recurrence:'Monthly',recurrence_end_type:'count',recurrence_end_count:6,actions:[{text:'Bring retainer',done:false}],tags:['dental'],links:[]},
   {id:'se3',type:'health',appt_type:'Appointment',title:'David – Cardiologist',date:new Date(_SD_Y,_SD_M,_SD_D+8,9,0).toISOString(),end_date:new Date(_SD_Y,_SD_M,_SD_D+8,10,0).toISOString(),location:'City Heart Center',doctor:'Dr. Ionescu',specialty:'Cardiology',participants:['sm2'],participants_all_family:false,description:'Annual heart check',recurrence:'Yearly',recurrence_end_type:'none',actions:[{text:'Bring last ECG results',done:false},{text:'Prepare medication list',done:true}],tags:[],links:[]},
   {id:'se4',type:'wellness',title:'Elena · 62kg 😊 – Wellness Log',date:new Date(_SD_Y,_SD_M,_SD_D-1).toISOString(),member_id:'sm1',weight:62,height:168,hydration:2.1,exercised:true,activity:'Yoga',activity_mins:45,mood:'😊 Good',energy:75,sleep:7.5},
@@ -880,6 +910,18 @@ async function initApp(user){
     try{await loadAll();}catch(e){console.error('Load error',e);}
   }
 
+  // v22 (Pass G): Admin check — a single row-exists query against the new
+  // `admins` table for the signed-in user. Gates both the Admin entry in
+  // the Settings section list and whether the Admin page is reachable at
+  // all. Guarded the same way as loadAll() above — only needs to run once
+  // per true session start, not on every silent reconnect re-fire.
+  if (!A._appInitialized) {
+    try {
+      const { data: adminRow } = await sb.from('admins').select('user_id').eq('user_id', user.id).maybeSingle();
+      A.isAdmin = !!adminRow;
+    } catch(e) { A.isAdmin = false; console.warn('Admin check failed', e); }
+  }
+
   // v20: Curated Content Library — hide any curated group/notes the family
   // hasn't opted into (Settings toggle). Replaces the old always-on
   // seedMedicalGroup() auto-seed from earlier versions — nothing curated
@@ -1050,11 +1092,17 @@ window.addEventListener('pagehide',_flushDraftsOnHide);
 
 // ── NAV ───────────────────────────────────────────────────────────────────────
 function goTo(page){
+  // v22 (Pass G): admin-only route guard — a non-admin can't reach the
+  // Admin page even by calling goTo('admin') directly (e.g. console,
+  // guessed link), since the UI entry point is already hidden but this is
+  // the actual enforcement point. Real data protection is the RLS
+  // policies on the admin-scoped tables; this is just the UI-level guard.
+  if (page === 'admin' && !A.isAdmin) { toast("You don't have access to that.", true); return; }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
   A.page=page;
-  ({home:renderHome,calendar:renderCal,notebook:renderNB,meds:renderMeds,inventory:renderInventory,meals:renderMeals,insights:renderInsights,settings:renderSettings}[page])?.();
+  ({home:renderHome,calendar:renderCal,notebook:renderNB,meds:renderMeds,inventory:renderInventory,meals:renderMeals,insights:renderInsights,settings:renderSettings,admin:renderAdmin}[page])?.();
 }
 
 // ── MODAL ─────────────────────────────────────────────────────────────────────
@@ -1459,7 +1507,7 @@ function renderCalResults(){
               <div style="font-size:11px;color:${T.muted}">${ET[e.type].icon} ${fmt(e.date)}${e.all_day?'':', '+fmtTime(e.date)}</div>
             </div>
             ${isSampleMode()?'':`<div style="display:flex;gap:5px">
-              <button onclick="openEvForm('${e.type}','${e.id}',null)" style="background:#f5f2ed;border:1px solid #e0d8cc;border-radius:7px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer;color:#7a7060">✏️</button>
+              <button onclick="${e.series_id?`showRecurrenceEditChoice('${e.id}')`:`openEvForm('${e.type}','${e.id}',null)`}" style="background:#f5f2ed;border:1px solid #e0d8cc;border-radius:7px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer;color:#7a7060">✏️</button>
               <button onclick="delEv('${e.id}')" style="background:#f0d4de;border:1px solid #b8507044;border-radius:7px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer;color:#b85070">🗑</button>
             </div>`}
           </div>`;
@@ -1517,7 +1565,7 @@ function showDayModal(dt,de){
           </div>
         </div>
         ${isSampleMode()?'':`<div style="display:flex;gap:5px">
-          <button onclick="_closeModalDOM();openEvForm('${e.type}','${e.id}',null)" style="background:#f5f2ed;border:1px solid #e0d8cc;border-radius:7px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer;color:#7a7060">✏️</button>
+          <button onclick="_closeModalDOM();${e.series_id?`showRecurrenceEditChoice('${e.id}')`:`openEvForm('${e.type}','${e.id}',null)`}" style="background:#f5f2ed;border:1px solid #e0d8cc;border-radius:7px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer;color:#7a7060">✏️</button>
           <button onclick="_closeModalDOM();delEv('${e.id}')" style="background:#f0d4de;border:1px solid #b8507044;border-radius:7px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer;color:#b85070">🗑</button>
         </div>`}
       </div>`;
@@ -1555,7 +1603,7 @@ window.showPicker=showPicker;
 
 // ET is defined in constants above with 👥 social icon
 
-const SOCIAL_TYPES = ['Birthday','Family time','Work gathering','Party','Entertainment','Education','Other'];
+const SOCIAL_TYPES = ['Social','Personal time','Family time','Work','Education','Sport','Other'];
 const MEDICAL_SPECIALTIES = [
   'General Practice','Vaccination','Laboratory / Blood test','Dentist','Dermatology',
   'Gastroenterology','Cardiology','Neurology','Orthopaedics','Gynaecology',
@@ -1952,6 +2000,42 @@ function _renderPlanUsageCard(){
 }
 
 // ── OPEN EVENT FORM ───────────────────────────────────────────────────────────
+// ── SHOW MORE (v22) — progressive disclosure for the event form ────────────
+// Wraps a block of field HTML behind a "Show more ▾ / Show less ▴" toggle.
+// CSS-only show/hide: every field stays present in the DOM at all times
+// (just visually hidden by the wrapper div's display:none), so
+// saveEvDraft() (fires every 5s while the form is open), draft-restore, and
+// saveEv() all keep reading every field by document.getElementById() exactly
+// as they already do today — nothing about autosave or saving needed to
+// change for this feature. Mirrors two patterns already used elsewhere in
+// this function (the Wellness "Exercised today" row and the Recurrence "End
+// recurrence" sub-fields), which already use this exact display-toggle
+// technique.
+function showMoreWrap(hiddenHtml, isOpenByDefault){
+  const open = !!isOpenByDefault;
+  return `
+    <button type="button" onclick="toggleShowMore(this)" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:${T.sage};font-size:13px;font-weight:700;cursor:pointer;padding:4px 0 10px;width:100%;text-align:left">
+      <span class="sm-arrow" style="display:inline-block;font-size:11px;transition:transform .15s;transform:rotate(${open?90:0}deg)">▸</span>
+      <span class="sm-label">${open?'Show less':'Show more'}</span>
+    </button>
+    <div class="ef-showmore" style="display:${open?'block':'none'}">${hiddenHtml}</div>`;
+}
+window.showMoreWrap = showMoreWrap;
+
+// Toggles the wrapper div that immediately follows the tapped button — see
+// showMoreWrap() above, where that div is always the button's next sibling.
+function toggleShowMore(btn){
+  const wrap = btn.nextElementSibling;
+  if(!wrap) return;
+  const isOpen = wrap.style.display !== 'none';
+  wrap.style.display = isOpen ? 'none' : 'block';
+  const arrow = btn.querySelector('.sm-arrow');
+  const label = btn.querySelector('.sm-label');
+  if(arrow) arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
+  if(label) label.textContent = isOpen ? 'Show more' : 'Show less';
+}
+window.toggleShowMore = toggleShowMore;
+
 function openEvForm(type, evId, dateTs, duplicateId) {
   // v18 Pass D: Subscription block-modal check. Only gates a genuinely NEW
   // event action (creating fresh, or duplicating an existing one — both
@@ -1984,6 +2068,26 @@ function openEvForm(type, evId, dateTs, duplicateId) {
   const typeSwitchSource = A._pendingTypeSwitchSource || null;
   const source = typeSwitchSource || healthOverride || dupEv || ev; // source for pre-filling fields
   const cfg = ET[type];
+
+  // v22.1 fix: it was previously unclear, once inside the edit form, whether
+  // you were editing the full recurring series or just one occurrence — and
+  // the Recurrence fields kept showing/accepting edits either way, even
+  // though changing them only actually does anything in full-series mode
+  // (single-occurrence saves silently write recurrence values back onto
+  // just that one row with no effect, risking that row's own recurrence
+  // columns drifting out of sync with its siblings). `A._editSeriesMode` is
+  // the existing flag set by showRecurrenceEditChoice() when "Edit all
+  // occurrences" is chosen; its absence (for an existing event that IS part
+  // of a series) means we're in single-occurrence mode.
+  const isEditingFullSeries = !!A._editSeriesMode;
+  const isSingleOccurrenceEdit = !!(ev && ev.series_id && !isEditingFullSeries);
+  let recurrenceModeLabel = '';
+  if (ev && ev.series_id) {
+    const seriesCount = A.events.filter(e => e.series_id === ev.series_id).length;
+    recurrenceModeLabel = isEditingFullSeries
+      ? `<div style="background:${T.skyLight};color:${T.sky};border-radius:9px;padding:8px 12px;font-size:12px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px">🔁 You're editing the full recurring series (${seriesCount} occurrence${seriesCount!==1?'s':''})</div>`
+      : `<div style="background:${T.honeyLight};color:${T.honey};border-radius:9px;padding:8px 12px;font-size:12px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px">📌 You're editing this occurrence only</div>`;
+  }
 
   // DATE/TIME DEFAULTS
   // Fix date offset: use local ISO, not UTC-shifted
@@ -2031,7 +2135,7 @@ function openEvForm(type, evId, dateTs, duplicateId) {
   // Helper: participant buttons
   const partButtons = () => `
     <div style="display:flex;gap:7px;flex-wrap:wrap" id="ef-parts">
-      <button type="button" data-mid="__family__" data-sel="${isFamilyAll}" onclick="togPart(this,'__family__')" style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;border:1.5px solid ${isFamilyAll?T.sage:T.border};background:${isFamilyAll?T.sageLight:'#fff'};cursor:pointer;font-size:12px;font-weight:600;color:${isFamilyAll?T.sage:T.muted}">👨‍👩‍👧‍👦 Entire Family</button>
+      <button type="button" data-mid="__family__" data-sel="${isFamilyAll}" onclick="togPart(this,'__family__')" style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;border:1.5px solid ${isFamilyAll?T.sage:T.border};background:${isFamilyAll?T.sageLight:'#fff'};cursor:pointer;font-size:12px;font-weight:600;color:${isFamilyAll?T.sage:T.muted}">👨‍👩‍👧‍👦 Anyone/All</button>
       ${A.members.map(m=>{const sel=partIds.includes(m.id);return`<button type="button" data-mid="${m.id}" data-sel="${sel}" onclick="togPart(this,'${m.id}')" style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;border:1.5px solid ${sel?m.color:T.border};background:${sel?m.color+'22':'#fff'};cursor:pointer;font-size:12px;font-weight:600;color:${sel?m.color:T.muted}">${av(m,18)} ${m.name}</button>`;}).join('')}
     </div>`;
 
@@ -2060,30 +2164,33 @@ function openEvForm(type, evId, dateTs, duplicateId) {
           ${buildTimeSelect('ef-etime', eTime)}</div>
       </div>`;
 
-    const recurrenceFields = (rec, endType, endCount, endDate2) => {
+    const recurrenceFields = (rec, endType, endCount, endDate2, disabled=false) => {
       const eType = endType || 'count';
       const showEnd = rec && rec !== 'None';
+      const dis = disabled ? 'disabled' : '';
+      const dimStyle = disabled ? 'opacity:0.55;' : '';
+      const lockNote = disabled ? `<div style="font-size:11px;color:${T.muted};margin-bottom:6px;font-style:italic">🔒 Recurrence applies to the whole series — choose "Edit all occurrences" to change it.</div>` : '';
       return `
-    <div class="form-row"><label class="lbl">Recurrence</label>
-      <select class="sel" id="ef-rec" onchange="updateRecurrenceEnd(this.value)">
+    ${lockNote}
+    <div class="form-row" style="${dimStyle}"><label class="lbl">Recurrence</label>
+      <select class="sel" id="ef-rec" ${dis} onchange="updateRecurrenceEnd(this.value)" style="${disabled?'cursor:not-allowed;':''}">
         ${['None','Daily','Weekly','Bi-weekly','Monthly','Yearly'].map(r=>`<option${(rec||'None')===r?' selected':''}>${r}</option>`).join('')}
       </select></div>
-    <div id="ef-rec-end" style="display:${showEnd?'block':'none'}">
+    <div id="ef-rec-end" style="display:${showEnd?'block':'none'};${dimStyle}">
       <div class="form-row"><label class="lbl">End recurrence <span style="color:#b85070">*</span></label>
-        <select class="sel" id="ef-recend-type" onchange="updateRecurrenceEndType(this.value)">
+        <select class="sel" id="ef-recend-type" ${dis} onchange="updateRecurrenceEndType(this.value)" style="${disabled?'cursor:not-allowed;':''}">
           <option value="count"${eType==='count'?' selected':''}>After number of times</option>
           <option value="date"${eType==='date'?' selected':''}>Until a specific date</option>
           <option value="none"${eType==='none'?' selected':''}>Repeat forever</option>
         </select></div>
       <div id="ef-recend-count" style="display:${eType!=='date'&&eType!=='none'?'block':'none'}" class="form-row">
         <label class="lbl">Number of occurrences <span style="color:#b85070">*</span></label>
-        <input class="inp" type="number" id="ef-recend-n" min="1" value="${endCount||''}" placeholder="e.g. 4">
+        <input class="inp" type="number" id="ef-recend-n" min="1" value="${endCount||''}" placeholder="e.g. 4" ${dis}>
       </div>
       <div id="ef-recend-date" style="display:${eType==='date'?'block':'none'}" class="form-row">
         <label class="lbl">Repeat until <span style="color:#b85070">*</span></label>
-        <input class="inp" type="date" id="ef-recend-d" value="${endDate2||''}">
+        <input class="inp" type="date" id="ef-recend-d" value="${endDate2||''}" ${dis}>
       </div>
-          </div>
     </div>`;};
 
   // Helper: link attachments
@@ -2134,33 +2241,47 @@ function openEvForm(type, evId, dateTs, duplicateId) {
 
   // ── SOCIAL ──
   } else if (type === 'social') {
-    fields = `
+    // v22.1 (testing feedback): Description moved into Main — always
+    // visible right after the dates, matching Illness's Symptoms field —
+    // per Roxana's testing feedback on the initial Show More split.
+    // Main = Participants, Title, Location, Date/Time, Description.
+    // Hidden = sub-type, Recurrence, Actions, Tags, Attachments.
+    const _smMain = `
       <div class="form-row"><label class="lbl">Participants</label>${partButtons()}</div>
-      <div class="form-row"><label class="lbl">Type</label>
-        <select class="sel" id="ef-social-type">
-          <option value="">Select…</option>
-          ${SOCIAL_TYPES.map(t=>`<option value="${t}"${source?.social_type===t?' selected':''}>${t}</option>`).join('')}
-        </select></div>
       <div class="form-row"><label class="lbl">Title</label>
         <div style="position:relative"><input class="inp" id="ef-title" value="${source?.title||''}" placeholder="Add a title…"></div></div>
       <div class="form-row"><label class="lbl">Location</label>
         <div style="position:relative"><input class="inp" id="ef-loc" value="${source?.location||''}" placeholder="Where?"></div></div>
       ${dateTimeFields(isAllDay, startDate, startTime, endDate, endTime)}
-      ${recurrenceFields(source?.recurrence, source?.recurrence_end_type, source?.recurrence_end_count, source?.recurrence_end_date)}
+      <div class="form-row"><label class="lbl">Description</label><textarea class="inp" id="ef-desc" rows="2" placeholder="Any notes…" style="resize:none">${source?.description||''}</textarea></div>`;
+    const _smHidden = `
+      <div class="form-row"><label class="lbl">Type</label>
+        <select class="sel" id="ef-social-type">
+          <option value="">Select…</option>
+          ${SOCIAL_TYPES.map(t=>`<option value="${t}"${source?.social_type===t?' selected':''}>${t}</option>`).join('')}
+        </select></div>
+      ${recurrenceFields(source?.recurrence, source?.recurrence_end_type, source?.recurrence_end_count, source?.recurrence_end_date, isSingleOccurrenceEdit)}
       <div class="form-row"><label class="lbl">Actions</label>
         <div id="ef-actions"></div>
         <button type="button" onclick="addChecklistRow('ef-actions')" style="font-size:12px;color:${T.sage};background:none;border:1px dashed ${T.sageMid};border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:600;margin-top:4px">+ Add action</button>
       </div>
       <div class="form-row"><label class="lbl">Tags</label>${tagButtons()}</div>
-      <div class="form-row"><label class="lbl">Description</label><textarea class="inp" id="ef-desc" rows="2" placeholder="Any notes…" style="resize:none">${source?.description||''}</textarea></div>
       ${attachmentField()}`;
+    // Auto-expand on edit if any hidden field already has real data, per spec.
+    const _smOpen = !!(source?.social_type || (source?.recurrence && source.recurrence!=='None') || (source?.actions&&source.actions.length) || (source?.tags&&source.tags.length) || (source?.links&&source.links.length));
+    fields = _smMain + showMoreWrap(_smHidden, _smOpen);
 
   // ── HEALTH ──
   } else if (type === 'health') {
     const hType = apptType;
 
     if (hType === 'Appointment') {
-      fields = `
+      // v22.1 (testing feedback): Description moved into Main — always
+      // visible right after the dates, matching Illness's Symptoms field.
+      // Main = sub-type switcher, Participants, Title, Doctor, Location,
+      // Date/Time, Description. Hidden = Specialty, Recurrence, Cost,
+      // Actions, Tags, Attachments.
+      const _smMain = `
         <div class="form-row"><label class="lbl">Health Event Type</label>
           <select class="sel" id="ef-apt" onchange="confirmHealthSubTypeSwitch(this.value,'${hType}','${evId||''}',${dateTs||'null'})">
             ${['Appointment','Treatment','Illness'].map(t=>`<option${hType===t?' selected':''}>${t}</option>`).join('')}
@@ -2169,15 +2290,17 @@ function openEvForm(type, evId, dateTs, duplicateId) {
         <div class="form-row"><label class="lbl">Title</label>
           <div style="position:relative"><input class="inp" id="ef-title" value="${source?.title||''}" placeholder="e.g. Annual check-up"></div></div>
         <div class="form-row"><label class="lbl">Doctor / Practitioner</label><input class="inp" id="ef-doctor" value="${source?.doctor||''}" placeholder="Dr. Smith"></div>
+        <div class="form-row"><label class="lbl">Location</label>
+          <div style="position:relative"><input class="inp" id="ef-loc" value="${source?.location||''}" placeholder="Clinic / Hospital name"></div></div>
+        ${dateTimeFields(isAllDay, startDate, startTime, endDate, endTime)}
+        <div class="form-row"><label class="lbl">Description</label><textarea class="inp" id="ef-desc" rows="2" style="resize:none">${source?.description||''}</textarea></div>`;
+      const _smHidden = `
         <div class="form-row"><label class="lbl">Specialty</label>
           <select class="sel" id="ef-specialty">
             <option value="">Select…</option>
             ${MEDICAL_SPECIALTIES.map(s=>`<option${source?.specialty===s?' selected':''}>${s}</option>`).join('')}
           </select></div>
-        <div class="form-row"><label class="lbl">Location</label>
-          <div style="position:relative"><input class="inp" id="ef-loc" value="${source?.location||''}" placeholder="Clinic / Hospital name"></div></div>
-        ${dateTimeFields(isAllDay, startDate, startTime, endDate, endTime)}
-        ${recurrenceFields(source?.recurrence, source?.recurrence_end_type, source?.recurrence_end_count, source?.recurrence_end_date)}
+        ${recurrenceFields(source?.recurrence, source?.recurrence_end_type, source?.recurrence_end_count, source?.recurrence_end_date, isSingleOccurrenceEdit)}
         <div class="grid2">
           <div class="form-row" style="margin:0"><label class="lbl">Cost</label><input class="inp" type="number" id="ef-cost" value="${source?.cost||''}" placeholder="0.00" step="0.01"></div>
           <div class="form-row" style="margin:0"><label class="lbl">Currency</label>
@@ -2190,11 +2313,18 @@ function openEvForm(type, evId, dateTs, duplicateId) {
           <button type="button" onclick="addChecklistRow('ef-actions')" style="font-size:12px;color:${T.sage};background:none;border:1px dashed ${T.sageMid};border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:600;margin-top:4px">+ Add action</button>
         </div>
         <div class="form-row"><label class="lbl">Tags</label>${tagButtons()}</div>
-        <div class="form-row"><label class="lbl">Description</label><textarea class="inp" id="ef-desc" rows="2" style="resize:none">${source?.description||''}</textarea></div>
         ${attachmentField()}`;
+      const _smOpen = !!(source?.specialty || (source?.recurrence && source.recurrence!=='None') || source?.cost || (source?.actions&&source.actions.length) || (source?.tags&&source.tags.length) || (source?.links&&source.links.length));
+      fields = _smMain + showMoreWrap(_smHidden, _smOpen);
 
     } else if (hType === 'Treatment') {
-      fields = `
+      // v22.1 (testing feedback): Considerations moved into Main — always
+      // visible right after the dates (Treatment's closest equivalent to a
+      // "Description" field), matching Illness's Symptoms field. Main =
+      // sub-type switcher, Participants, Title, Start/End Date,
+      // Considerations, Administration. Hidden = Recurrence,
+      // Recommended by, Tags, Attachments.
+      const _smMain = `
         <div class="form-row"><label class="lbl">Health Event Type</label>
           <select class="sel" id="ef-apt" onchange="confirmHealthSubTypeSwitch(this.value,'${hType}','${evId||''}',${dateTs||'null'})">
             ${['Appointment','Treatment','Illness'].map(t=>`<option${hType===t?' selected':''}>${t}</option>`).join('')}
@@ -2206,18 +2336,23 @@ function openEvForm(type, evId, dateTs, duplicateId) {
           <div class="form-row" style="margin:0"><label class="lbl">Start Date</label><input class="inp" type="date" id="ef-date" value="${startDate}" onchange="syncEndDate(this.value)"></div>
           <div class="form-row" style="margin:0"><label class="lbl">End Date</label><input class="inp" type="date" id="ef-enddate" value="${endDate}"></div>
         </div>
-        ${recurrenceFields(source?.recurrence, source?.recurrence_end_type, source?.recurrence_end_count, source?.recurrence_end_date)}
+        <div class="form-row"><label class="lbl">Considerations</label><textarea class="inp" id="ef-considerations" rows="2" placeholder="Reactions, restrictions (e.g. take with food)…" style="resize:none">${source?.considerations||''}</textarea></div>
         <div class="form-row"><label class="lbl">Administration</label>
           <div id="ef-admin"></div>
           <button type="button" onclick="addAdminRow('ef-admin')" style="font-size:12px;color:${T.sage};background:none;border:1px dashed ${T.sageMid};border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:600;margin-top:4px">+ Add dosage</button>
-        </div>
+        </div>`;
+      const _smHidden = `
+        ${recurrenceFields(source?.recurrence, source?.recurrence_end_type, source?.recurrence_end_count, source?.recurrence_end_date, isSingleOccurrenceEdit)}
         <div class="form-row"><label class="lbl">Recommended by</label><input class="inp" id="ef-recby" value="${source?.recommended_by||''}" placeholder="Dr. name"></div>
-        <div class="form-row"><label class="lbl">Considerations</label><textarea class="inp" id="ef-considerations" rows="2" placeholder="Reactions, restrictions (e.g. take with food)…" style="resize:none">${source?.considerations||''}</textarea></div>
         <div class="form-row"><label class="lbl">Tags</label>${tagButtons()}</div>
         ${attachmentField()}`;
+      const _smOpen = !!((source?.recurrence && source.recurrence!=='None') || source?.recommended_by || (source?.tags&&source.tags.length) || (source?.links&&source.links.length));
+      fields = _smMain + showMoreWrap(_smHidden, _smOpen);
 
     } else { // Illness
-      fields = `
+      // v22 (Show more): Main = sub-type switcher, Participants, Title,
+      // Start/End Date, Symptoms. Hidden = Cure/Treatment, Tags, Attachments.
+      const _smMain = `
         <div class="form-row"><label class="lbl">Health Event Type</label>
           <select class="sel" id="ef-apt" onchange="confirmHealthSubTypeSwitch(this.value,'${hType}','${evId||''}',${dateTs||'null'})">
             ${['Appointment','Treatment','Illness'].map(t=>`<option${hType===t?' selected':''}>${t}</option>`).join('')}
@@ -2229,17 +2364,24 @@ function openEvForm(type, evId, dateTs, duplicateId) {
           <div class="form-row" style="margin:0"><label class="lbl">Start Date</label><input class="inp" type="date" id="ef-date" value="${startDate}" onchange="syncEndDate(this.value)"></div>
           <div class="form-row" style="margin:0"><label class="lbl">End Date</label><input class="inp" type="date" id="ef-enddate" value="${endDate}"></div>
         </div>
-        <div class="form-row"><label class="lbl">Symptoms</label><textarea class="inp" id="ef-symptoms" rows="2" placeholder="Describe symptoms…" style="resize:none">${source?.symptoms||''}</textarea></div>
+        <div class="form-row"><label class="lbl">Symptoms</label><textarea class="inp" id="ef-symptoms" rows="2" placeholder="Describe symptoms…" style="resize:none">${source?.symptoms||''}</textarea></div>`;
+      const _smHidden = `
         <div class="form-row"><label class="lbl">Cure / Treatment</label><textarea class="inp" id="ef-cure" rows="2" placeholder="Treatment applied…" style="resize:none">${source?.cure||''}</textarea></div>
         <div class="form-row"><label class="lbl">Tags</label>${tagButtons()}</div>
         ${attachmentField()}`;
+      const _smOpen = !!(source?.cure || (source?.tags&&source.tags.length) || (source?.links&&source.links.length));
+      fields = _smMain + showMoreWrap(_smHidden, _smOpen);
     }
 
   // ── TASK ──
   } else if (type === 'task') {
-    fields = `
-      <div class="form-row"><label class="lbl">Assign To</label>
-        <select class="sel" id="ef-mem"><option value="">Anyone</option>${A.members.map(m=>`<option value="${m.id}"${source?.member_id===m.id?' selected':''}>${m.name}</option>`).join('')}</select></div>
+    // v22 (Anyone/All unification): Task now uses the same
+    // participants[]/participants_all_family model and partButtons() UI as
+    // Social/Health — one person, several people, or the whole family —
+    // instead of the old single-assignee dropdown. Label changed from
+    // "Assign To" to "Participants" to match exactly.
+    const _smMain = `
+      <div class="form-row"><label class="lbl">Participants</label>${partButtons()}</div>
       <div class="form-row"><label class="lbl">Title</label>
         <div style="position:relative"><input class="inp" id="ef-title" value="${source?.title||''}" placeholder="Add a title…"></div></div>
       <div class="form-row"><label class="lbl">Location</label>
@@ -2253,14 +2395,17 @@ function openEvForm(type, evId, dateTs, duplicateId) {
         <div class="form-row" style="margin:0" id="ef-stime-row"><label class="lbl">Time</label>
           ${buildTimeSelect('ef-stime', source?.date&&!source?.all_day?new Date(source.date).toTimeString().slice(0,5):defST)}</div>
       </div>
-      ${recurrenceFields(source?.recurrence, source?.recurrence_end_type, source?.recurrence_end_count, source?.recurrence_end_date)}
       <div class="form-row"><label class="lbl">Actions / Subtasks</label>
         <div id="ef-actions"></div>
         <button type="button" onclick="addChecklistRow('ef-actions')" style="font-size:12px;color:${T.sage};background:none;border:1px dashed ${T.sageMid};border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:600;margin-top:4px">+ Add item</button>
-      </div>
+      </div>`;
+    const _smHidden = `
+      ${recurrenceFields(source?.recurrence, source?.recurrence_end_type, source?.recurrence_end_count, source?.recurrence_end_date, isSingleOccurrenceEdit)}
       <div class="form-row"><label class="lbl">Tags</label>${tagButtons()}</div>
       <div class="form-row"><label class="lbl">Description</label><textarea class="inp" id="ef-desc" rows="2" placeholder="Any notes…" style="resize:none">${source?.description||''}</textarea></div>
       ${attachmentField()}`;
+    const _smOpen = !!((source?.recurrence && source.recurrence!=='None') || (source?.tags&&source.tags.length) || source?.description || (source?.links&&source.links.length));
+    fields = _smMain + showMoreWrap(_smHidden, _smOpen);
   }
 
   // v18 (Event Type Switcher): a dropdown to switch this event between
@@ -2273,7 +2418,7 @@ function openEvForm(type, evId, dateTs, duplicateId) {
       <div class="form-row"><label class="lbl">Event Type</label>
         <select class="sel" id="ef-type-switch" onchange="confirmTypeSwitch(this.value,'${type}','${evId||''}',${dateTs||'null'})">
           <option value="task"${type==='task'?' selected':''}>Task</option>
-          <option value="social"${type==='social'?' selected':''}>Social Event</option>
+          <option value="social"${type==='social'?' selected':''}>Event</option>
           <option value="health"${type==='health'?' selected':''}>Health Event</option>
         </select></div>`;
     fields = typeSwitcherHtml + fields;
@@ -2292,6 +2437,7 @@ function openEvForm(type, evId, dateTs, duplicateId) {
     : '';
   showModal(`${isDup?'Duplicate':(ev?'Edit':'New')} ${cfg.label}`, `
     <div style="display:flex;flex-direction:column">
+      ${recurrenceModeLabel}
       ${fields}
       ${privToggleHtml}
       <button class="btn btn-primary btn-full btn-lg" style="margin-top:8px" onclick="saveEv('${type}','${isDup?'':evId||''}',${dateTs||'null'})">
@@ -2796,33 +2942,18 @@ function switchEventType(newType, oldType, evId, dateTs){
   src.actions = snap.actions || [];
   src.links = snap.links || [];
 
-  // Assignee conversion (§3.2)
-  if (newType === 'task') {
-    if (oldType === 'task') {
-      src.member_id = f['ef-mem'] || null;
-    } else {
-      const parts = snap.participants || [];
-      const isFamily = parts.includes('__family__');
-      const memberIds = parts.filter(p=>p!=='__family__');
-      // Exactly one participant (and not "entire family") carries over;
-      // multiple participants or "entire family" -> Task left unassigned
-      // ("Anyone"), per confirmed interim behavior.
-      src.member_id = (!isFamily && memberIds.length===1) ? memberIds[0] : null;
-    }
-    src.participants = [];
-    src.participants_all_family = false;
-  } else {
-    if (oldType === 'task') {
-      const mid = f['ef-mem'] || '';
-      src.participants = mid ? [mid] : [];
-      src.participants_all_family = false;
-    } else {
-      const parts = snap.participants || [];
-      src.participants_all_family = parts.includes('__family__');
-      src.participants = parts.filter(p=>p!=='__family__');
-    }
-    src.member_id = null;
-  }
+  // Assignee conversion (§3.2) — v22 (Anyone/All unification): Task now
+  // uses the exact same participants[]/participants_all_family model as
+  // Social/Health, so participants carry straight across for EVERY type
+  // combination with no lossy conversion needed anymore. The old
+  // "only a single specific participant carries over, multi/family
+  // dropped" special-case for switching TO Task is gone — switching a
+  // multi-person or Anyone/All event to Task no longer silently loses who
+  // was assigned.
+  const _srcParts = snap.participants || [];
+  src.participants_all_family = _srcParts.includes('__family__');
+  src.participants = _srcParts.filter(p=>p!=='__family__');
+  src.member_id = null;
 
   // Recurrence (§3.5) — only carried over when editing the FULL series.
   // A single-occurrence type switch on a recurring event detaches that
@@ -2974,16 +3105,46 @@ window.getLinks = getLinks;
 
 function togPart(btn, id) {
   const sel = btn.dataset.sel === 'true';
-  btn.dataset.sel = !sel;
+  const willSelect = !sel;
+  btn.dataset.sel = willSelect;
   if (id === '__family__') {
-    btn.style.border = `1.5px solid ${!sel?T.sage:T.border}`;
-    btn.style.background = !sel ? T.sageLight : '#fff';
-    btn.style.color = !sel ? T.sage : T.muted;
+    btn.style.border = `1.5px solid ${willSelect?T.sage:T.border}`;
+    btn.style.background = willSelect ? T.sageLight : '#fff';
+    btn.style.color = willSelect ? T.sage : T.muted;
+    // v22.1 fix: "Anyone/All" is mutually exclusive with specific
+    // participants — turning it ON deselects every individual member,
+    // since "assigned to everyone" makes a more specific selection
+    // meaningless and previously allowed both to be selected at once.
+    if (willSelect) {
+      const container = btn.parentElement;
+      if (container) {
+        container.querySelectorAll('button[data-mid]').forEach(b => {
+          if (b !== btn && b.dataset.sel === 'true') {
+            b.dataset.sel = 'false';
+            b.style.border = `1.5px solid ${T.border}`;
+            b.style.background = '#fff';
+            b.style.color = T.muted;
+          }
+        });
+      }
+    }
   } else {
     const m = getMem(id);
-    btn.style.border = `1.5px solid ${!sel?m.color:T.border}`;
-    btn.style.background = !sel ? m.color+'22' : '#fff';
-    btn.style.color = !sel ? m.color : T.muted;
+    btn.style.border = `1.5px solid ${willSelect?m.color:T.border}`;
+    btn.style.background = willSelect ? m.color+'22' : '#fff';
+    btn.style.color = willSelect ? m.color : T.muted;
+    // v22.1 fix: selecting a specific participant while "Anyone/All" is
+    // active deselects Anyone/All — same reasoning, other direction.
+    if (willSelect) {
+      const container = btn.parentElement;
+      const familyBtn = container ? container.querySelector('button[data-mid="__family__"]') : null;
+      if (familyBtn && familyBtn.dataset.sel === 'true') {
+        familyBtn.dataset.sel = 'false';
+        familyBtn.style.border = `1.5px solid ${T.border}`;
+        familyBtn.style.background = '#fff';
+        familyBtn.style.color = T.muted;
+      }
+    }
   }
 }
 window.togPart = togPart;
@@ -3014,7 +3175,7 @@ window.addTag = addTag;
 // ── SUPABASE WRITE WRAPPER ────────────────────────────────────────────────────
 // Wraps any Supabase operation with timeout + one automatic retry
 // Fixes silent failures caused by stale HTTP/2 connections
-async function sbWrite(operation) {
+async function sbWrite(operation, opts = {}) {
   // v18 revert: back to 7000ms, per Roxana's testing feedback — the 25s
   // change (from the now-reverted Pass E) meant waiting a long time on every
   // slow save before even getting a retry, which felt worse in practice than
@@ -3022,6 +3183,12 @@ async function sbWrite(operation) {
   // were slow enough to hit this at all — that's a more useful fix than the
   // timeout number itself.
   const TIMEOUT_MS = 7000;
+  // v22.1: optional {silent:true} suppresses the "Connection issue —
+  // retrying…" / "Save failed" toasts, for background operations (like the
+  // 60s notification poll) that should never interrupt the user with a
+  // toast for something they didn't initiate. Diagnostic console logging
+  // (_logConnIssue) still fires either way.
+  const silent = !!opts.silent;
   const withTimeout = (fn) => Promise.race([
     fn(),
     new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS))
@@ -3036,9 +3203,18 @@ async function sbWrite(operation) {
       // before deciding on an actual fix. Console-only — nothing leaves the
       // browser. See _logConnIssue() just below.
       _logConnIssue(operation, e, 'first-attempt-failed');
-      toast('Connection issue — retrying…');
+      if (!silent) toast('Connection issue — retrying…');
       await new Promise(r => setTimeout(r, 1000));
-      // Force fresh Supabase client to break out of stale HTTP/2 connection pool
+      // v22.1 REVERT: the earlier "no longer create a fresh client" change
+      // was WRONG — confirmed by real staging testing where saves failed
+      // completely (both the first attempt AND the retry timing out
+      // back-to-back, repeatedly), something a genuinely fresh connection
+      // fixes but retrying the same stuck connection does not. Reverted to
+      // V21's original behavior: force a fresh Supabase client on retry to
+      // break out of a stale HTTP/2 connection pool. The "Multiple
+      // GoTrueClient instances" console warning this reintroduces is a
+      // known, accepted cosmetic trade-off — a working save matters far
+      // more. _logConnIssue() diagnostic logging stays active either way.
       try {
         sb = supabase.createClient(SB_URL, SB_KEY, {
           auth: { persistSession: true, autoRefreshToken: true },
@@ -3052,7 +3228,7 @@ async function sbWrite(operation) {
       }
       catch (e2) {
         _logConnIssue(operation, e2, 'retry-failed');
-        toast('Save failed. Please refresh and try again.', true);
+        if (!silent) toast('Save failed. Please refresh and try again.', true);
         return { error: { message: e2.message }, data: null };
       }
     }
@@ -3169,7 +3345,14 @@ async function saveEv(type, evId, dateTs) {
         data.date = dv ? localDT(dv, tv) : new Date().toISOString();
       }
       data.end_date = null;
-      data.member_id = document.getElementById('ef-mem')?.value || null;
+      // v22 (Anyone/All unification): Task now reads the same
+      // participants[]/participants_all_family pair Social/Health already
+      // read, via the same #ef-parts pill buttons. Task stops WRITING to
+      // member_id going forward — the column stays in the schema (Wellness
+      // still uses it), it's just never set by this branch anymore.
+      const partBtns = Array.from(document.querySelectorAll('#ef-parts button[data-sel="true"]'));
+      data.participants_all_family = partBtns.some(b=>b.dataset.mid==='__family__');
+      data.participants = partBtns.filter(b=>b.dataset.mid!=='__family__').map(b=>b.dataset.mid).filter(Boolean);
       // v18 (Event Type Switcher §3.4): Task gains Location + Attachments,
       // so these aren't lost when converting Social/Health -> Task.
       data.location = document.getElementById('ef-loc')?.value || null;
@@ -3459,6 +3642,133 @@ async function saveEv(type, evId, dateTs) {
             succeeded.forEach(r => { byId[r.data.id] = r.data; });
             A.events = A.events.map(e => byId[e.id] ? byId[e.id] : e);
             A._seriesUpdateMsg = `Series updated! ✅ (${succeeded.length + 1} occurrence${succeeded.length+1!==1?'s':''})`;
+          }
+        }
+
+        // ── v22: RECURRENCE COUNT FIX ──────────────────────────────────
+        // Editing the full series can change how many occurrences the
+        // series SHOULD have (a new count, a new end date, or a new end
+        // type) — but nothing above this point ever added or removed
+        // actual event rows to match; it only ever updated rows that
+        // already existed. This compares the just-saved recurrence
+        // settings against what's actually in the database and grows or
+        // shrinks the series to match, reusing the same date-stepping
+        // rules generateRecurrences() uses for brand-new series, so a
+        // grown series looks identical to one created that size from the
+        // start. Reads A.events fresh (after the sibling date-shift
+        // update above), so it always compares against the real,
+        // just-saved state. Only runs when recurrence is still active —
+        // a single-occurrence edit never reaches this branch at all, and
+        // clearing recurrence entirely on a full-series edit is left
+        // alone (out of scope for this fix).
+        if (data.recurrence && data.recurrence !== 'None') {
+          const currentSeriesEvents = A.events
+            .filter(e => e.series_id === editSeriesId)
+            .sort((a,b) => new Date(a.date) - new Date(b.date));
+          const currentCount = currentSeriesEvents.length;
+
+          const stepDate = d => {
+            const next = new Date(d);
+            if (data.recurrence === 'Monthly') next.setMonth(next.getMonth() + 1);
+            else if (data.recurrence === 'Yearly') next.setFullYear(next.getFullYear() + 1);
+            else if (data.recurrence === 'Daily') next.setDate(next.getDate() + 1);
+            else if (data.recurrence === 'Weekly') next.setDate(next.getDate() + 7);
+            else if (data.recurrence === 'Bi-weekly') next.setDate(next.getDate() + 14);
+            return next;
+          };
+
+          // Resolve how many occurrences the series SHOULD have, per the
+          // just-saved recurrence settings — mirrors generateRecurrences()'s
+          // own totalCount/endDateLimit resolution.
+          const endType = data.recurrence_end_type || 'none';
+          let targetCount = currentCount; // default: no change if unresolved
+          if (endType === 'count') {
+            targetCount = Math.max(1, data.recurrence_end_count || 1);
+          } else if (endType === 'date' && data.recurrence_end_date) {
+            const endDateLimit = new Date(data.recurrence_end_date + 'T23:59:59');
+            let count = 1;
+            let cursor = new Date(currentSeriesEvents[0]?.date || cleanedData.date);
+            while (count <= 200) {
+              const next = stepDate(cursor);
+              if (next > endDateLimit) break;
+              cursor = next;
+              count++;
+            }
+            targetCount = count;
+          } else if (endType === 'none') {
+            // "Repeat forever" — same practical cap generateRecurrences()
+            // uses for brand-new series. Only ever GROWS toward this cap
+            // if the series is currently smaller — never shrinks an
+            // existing longer series just because it's now "forever".
+            targetCount = Math.max(currentCount, 365);
+          }
+
+          if (targetCount > currentCount) {
+            // ── GROW: generate the missing occurrence(s), continuing from
+            // the LAST existing occurrence's date. Every new row gets the
+            // same shared fields just saved on this edit (same exclusion
+            // set already used for siblings above: everything except
+            // identity/date fields).
+            const EXCLUDE_FROM_NEW = new Set(['family_id','date','end_date','series_id','created_by_user_id','id']);
+            const templateFields = {};
+            Object.keys(cleanedData).forEach(k => { if (!EXCLUDE_FROM_NEW.has(k)) templateFields[k] = cleanedData[k]; });
+            const lastEv = currentSeriesEvents[currentSeriesEvents.length - 1];
+            const lastDate = new Date(lastEv.date);
+            const lastEndDate = lastEv.end_date ? new Date(lastEv.end_date) : null;
+            const duration = lastEndDate ? (lastEndDate - lastDate) : 0;
+            const newRows = [];
+            let cursor = lastDate;
+            for (let i = 0; i < targetCount - currentCount; i++) {
+              cursor = stepDate(cursor);
+              newRows.push({
+                family_id: A.family.id,
+                created_by_user_id: lastEv.created_by_user_id || null,
+                series_id: editSeriesId,
+                date: cursor.toISOString(),
+                end_date: duration ? new Date(cursor.getTime() + duration).toISOString() : null,
+                ...templateFields,
+              });
+            }
+            if (newRows.length) {
+              const insRes = await sbWrite(() => sb.from('events').insert(newRows).select());
+              if (insRes.error) {
+                toast('Series updated, but adding the new occurrence(s) failed — please try again.', true);
+                console.error('Series growth insert error', insRes.error);
+              } else if (insRes.data) {
+                A.events.push(...insRes.data);
+                A._seriesUpdateMsg = `Series updated! ✅ (${targetCount} occurrence${targetCount!==1?'s':''})`;
+              }
+            }
+          } else if (targetCount < currentCount) {
+            // ── SHRINK (v22.1, corrected per testing feedback): keep the
+            // EARLIEST `targetCount` occurrences, delete the rest. An
+            // earlier version of this logic tried to protect the actively-
+            // edited occurrence (evId) from ever being deleted — this
+            // produced a confusing, non-contiguous kept set whenever the
+            // edited occurrence wasn't among the ones a straightforward
+            // date-based trim would keep (e.g. editing the LAST occurrence
+            // of a 5x series and shrinking to 3x kept an arbitrary
+            // Mon/Tue/Fri mix instead of a clean "first 3" trim). That
+            // protection turns out to be unnecessary: the edited field
+            // VALUES already propagated to every surviving sibling via the
+            // sharedUpdate sync above, so which literal database row
+            // survives doesn't matter to the user — only "does the series
+            // end up with the right occurrences, correct dates, correct
+            // values" does. currentSeriesEvents is already sorted ascending
+            // by date (see its definition above), so this is now a
+            // straightforward slice.
+            const toDelete = currentSeriesEvents.slice(targetCount);
+            if (toDelete.length) {
+              const delIds = toDelete.map(e => e.id);
+              const delRes = await sbWrite(() => sb.from('events').delete().in('id', delIds));
+              if (delRes.error) {
+                toast('Series updated, but removing extra occurrence(s) failed — please try again.', true);
+                console.error('Series shrink delete error', delRes.error);
+              } else {
+                A.events = A.events.filter(e => !delIds.includes(e.id));
+                A._seriesUpdateMsg = `Series updated! ✅ (${targetCount} occurrence${targetCount!==1?'s':''})`;
+              }
+            }
           }
         }
       }
@@ -3854,7 +4164,7 @@ function viewEv(id) {
   if (allMembers || ev.participants?.length) {
     body += `<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:${T.muted};margin-bottom:5px">PARTICIPANTS</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        ${allMembers?`<div style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600">👨‍👩‍👧‍👦 Entire Family</div>`:''}
+        ${allMembers?`<div style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600">👨‍👩‍👧‍👦 Anyone/All</div>`:''}
         ${(ev.participants||[]).map(pid=>{const m=getMem(pid);return m?`<div style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600">${av(m,22)} ${m.name}</div>`:''}).join('')}
       </div></div>`;
   }
@@ -4055,12 +4365,19 @@ function renderNB(){
   // Expanded: tap selects the group.
   // Collapsed: tap expands the ribbon (stopPropagation so outer div doesn't double-fire).
   // v7: user-created groups also get a small ✏️ edit icon when ribbon is open.
+  // v22: curated groups get a small × "hide" icon in that same slot instead
+  // (Batch 1 spec item 3) — tapping it calls the existing, unmodified
+  // toggleCuratedContent(key, false) to hide the group from the Notebook.
+  // No "show again from here" control needed: a hidden group isn't visible
+  // in the ribbon to tap in the first place, so turning it back on stays a
+  // Settings action (Settings → Notebook settings), which makes sense since
+  // you're re-discovering it, not managing something already in front of you.
   // v9: `color` is kept in the signature (some callers still pass a group's
   // color field) but is intentionally NOT used for any visual styling —
   // note_groups.color was never meant to drive ribbon appearance and can be
   // too light to read against the ribbon background. Selected/unselected
   // states now always use fixed sage-green styling instead.
-  const rSection=(id,name,color,isUserGroup=false)=>{
+  const rSection=(id,name,color,isUserGroup=false,curatedKey=null)=>{
     const isActive=A.noteFGroup===id;
     const clickAction=ribbonOpen
       ? `A.noteFGroup='${id}';renderNB()`
@@ -4071,11 +4388,12 @@ function renderNB(){
         ${ribbonOpen?`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:9px;line-height:1.4">${name}</span>`:''}
       </button>
       ${ribbonOpen&&isUserGroup&&!isSampleMode()?`<button onclick="event.stopPropagation();openEditGroup('${id}')" title="Edit group" style="background:none;border:none;color:${T.muted};cursor:pointer;font-size:11px;padding:4px 8px 4px 2px;-webkit-tap-highlight-color:transparent">✏️</button>`:''}
+      ${ribbonOpen&&curatedKey&&!isSampleMode()?`<button onclick="event.stopPropagation();toggleCuratedContent('${curatedKey}',false)" title="Hide from Notebook — re-enable anytime in Settings → Notebook settings" style="background:none;border:none;color:${T.muted};cursor:pointer;font-size:14px;padding:4px 8px 4px 2px;-webkit-tap-highlight-color:transparent">×</button>`:''}
     </div>`;
   };
 
   // Section order: user groups first, then a divider, then All Notes + Uncategorized at bottom
-  const userGroupSections=groups.map(g=>rSection(g.id,g.name,g.color||T.sage,!g.is_curated)).join('');
+  const userGroupSections=groups.map(g=>rSection(g.id,g.name,g.color||T.sage,!g.is_curated,g.is_curated?g.curated_key:null)).join('');
   // Divider only rendered when user has at least one group (separates user groups from defaults)
   const dividerEl=groups.length>0
     ? `<div style="height:1px;background:${T.border};margin:${ribbonOpen?'3px 8px 3px 12px':'3px 0'};opacity:.5"></div>`
@@ -5715,6 +6033,37 @@ function _insightsMealPlanCompletion(){
   return total ? Math.round((filled/total)*100) : 0;
 }
 
+// v22 (Insights Clickability): list-reveal modal for "Events to follow up
+// on" — the one Insights card that's a mix of tasks and non-task events
+// with open actions, so no single existing page shows exactly this set.
+// Reuses the exact same _followUpCalendarItems() data already powering
+// both this card and Home's "Other Actions" section, so the count shown
+// on the card can never disagree with what's shown in this list. Each row
+// closes the sheet and opens the real event/task via the existing,
+// unmodified viewEv().
+function _showFollowUpListModal(){
+  const items = _followUpCalendarItems();
+  const today = todayD();
+  const rows = items.map(e=>{
+    const isTask = e.type === 'task';
+    const isOverdue = new Date(e.date) < today;
+    const openCount = (e.actions||[]).filter(a=>!a.done).length;
+    const icon = isTask ? '✅' : ET[e.type].icon;
+    const subtitle = isTask
+      ? `${isOverdue?'⚠️ Overdue · ':''}Due: ${fmt(e.date)} · ${openCount} open item${openCount!==1?'s':''}`
+      : `${fmt(e.date)} · ${openCount} open item${openCount!==1?'s':''}`;
+    return `<div onclick="closeModal();setTimeout(()=>viewEv('${e.id}'),50)" style="display:flex;align-items:center;gap:10px;padding:10px 11px;border-radius:10px;background:#fff;border-left:3px solid ${T.sky};margin-bottom:6px;cursor:pointer">
+      <span style="font-size:16px">${icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.series_id?'🔁 ':''}${e.title||(isTask?'Untitled Task':ET[e.type].label)}</div>
+        <div style="font-size:11px;color:${isTask&&isOverdue?T.rose:T.muted}">${subtitle}</div>
+      </div>
+    </div>`;
+  }).join('');
+  showModal('Events to follow up on', items.length ? rows : `<div style="text-align:center;color:${T.muted};padding:20px 0;font-size:13px">Nothing to follow up on right now 🎉</div>`);
+}
+window._showFollowUpListModal = _showFollowUpListModal;
+
 function renderInsights(){
   // Weekly Family Challenge — unchanged selection logic, just repositioned
   // above the module sections below instead of above the old Wellness
@@ -5743,9 +6092,20 @@ function renderInsights(){
   const mealCompletion=_insightsMealPlanCompletion();
 
   const sectionTitle=(icon,label)=>`<div style="font-family:'Playfair Display',serif;font-size:16px;color:${T.ink};margin:18px 0 10px;display:flex;align-items:center;gap:7px">${icon} ${label}</div>`;
-  const lineCard=html=>`<div class="card" style="padding:12px 14px;margin-bottom:8px;font-size:13px;color:${T.ink};line-height:1.5">${html}</div>`;
+  // v22 (Insights Clickability): lineCard/memberRow both take an optional
+  // onclick string. When provided, the whole card/row becomes tappable —
+  // cursor:pointer, a trailing "›" affordance matching the style already
+  // used on event/note cards elsewhere in the app (e.g. Home's sky-left-
+  // border cards) — and the onclick fires. When omitted (the default),
+  // both render exactly as they did before this pass: plain, non-interactive.
+  const lineCard=(html,onclick=null)=>`<div class="card" style="padding:12px 14px;margin-bottom:8px;font-size:13px;color:${T.ink};line-height:1.5;${onclick?'cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px':''}"${onclick?` onclick="${onclick}"`:''}><div style="flex:1;min-width:0">${html}</div>${onclick?`<span style="color:${T.muted};font-size:16px;flex-shrink:0">›</span>`:''}</div>`;
   const emptyLine=text=>`<div style="font-size:12px;color:${T.muted};padding:2px 0">${text}</div>`;
-  const memberRow=(name,valueHtml)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:3px 0"><span>${name}</span><span style="color:${T.muted};text-align:right">${valueHtml}</span></div>`;
+  const memberRow=(name,valueHtml,onclick=null)=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:3px 0;${onclick?'cursor:pointer':''}"${onclick?` onclick="${onclick}"`:''}><span>${name}</span><span style="display:flex;align-items:center;gap:5px;color:${T.muted};text-align:right"><span>${valueHtml}</span>${onclick?`<span style="font-size:13px">›</span>`:''}</span></div>`;
+  // Tier 3 (Busiest day / Busiest member): tap toggles a short inline
+  // explanation open/closed directly under the card — no modal, no
+  // navigation. A couple of lines flipping one wrapper div's display is
+  // all this needs, per spec — no separate named function per card.
+  const infoToggle=(domId,explainText)=>`<button type="button" onclick="event.stopPropagation();const el=document.getElementById('${domId}');if(el)el.style.display=el.style.display==='none'?'block':'none';" style="background:none;border:none;color:${T.muted};font-size:13px;cursor:pointer;padding:0 0 0 4px;vertical-align:middle" title="How is this calculated?">ⓘ</button><div id="${domId}" style="display:none;font-size:11px;color:${T.muted};margin-top:6px;line-height:1.5">${explainText}</div>`;
 
   document.getElementById('page-insights').innerHTML=`
     <div class="page-header">
@@ -5760,25 +6120,25 @@ function renderInsights(){
         <div style="display:flex;gap:6px;flex-wrap:wrap">${challenge.tips.map(t=>`<span style="background:rgba(255,255,255,.2);border-radius:99px;padding:3px 10px;font-size:11px;font-weight:600">💡 ${t}</span>`).join('')}</div>
       </div>
 
-      ${sectionTitle('📅','Calendar')}
-      ${lineCard(busiestDay?`<b>${busiestDay}</b> are usually your busiest day.`:emptyLine('Not enough events yet to spot a pattern.'))}
-      ${lineCard(busiestMember?`<b>${busiestMember.name}</b> has the most on their plate this month (${busiestMember.count} event${busiestMember.count===1?'':'s'}).`:emptyLine('No events assigned to a member in the last 30 days.'))}
-      ${lineCard(`<div style="font-weight:700;margin-bottom:6px">Last health event per member</div>${lastHealthPerMember.length?lastHealthPerMember.map(({member,event})=>memberRow(member.name, event?`${event.title||'Health event'}, ${fmt(event.date)}`:'No health events logged')).join(''):emptyLine('No family members yet.')}`)}
-      ${lineCard(`Events to follow up on: <b>${followUpCount}</b>`)}
+      ${sectionTitle(ICONS.calendar,'Calendar')}
+      ${lineCard(busiestDay?`<b>${busiestDay}</b> are usually your busiest day.${infoToggle('insight-busiest-day-info','Based on how many events fall on each weekday over the last 30 days.')}`:emptyLine('Not enough events yet to spot a pattern.'))}
+      ${lineCard(busiestMember?`<b>${busiestMember.name}</b> has the most on their plate this month (${busiestMember.count} event${busiestMember.count===1?'':'s'}).${infoToggle('insight-busiest-member-info','Based on how many events are assigned to each member over the last 30 days.')}`:emptyLine('No events assigned to a member in the last 30 days.'))}
+      ${lineCard(`<div style="font-weight:700;margin-bottom:6px">Last health event per member</div>${lastHealthPerMember.length?lastHealthPerMember.map(({member,event})=>memberRow(member.name, event?`${event.title||'Health event'}, ${fmt(event.date)}`:'No health events logged', event?`viewEv('${event.id}')`:null)).join(''):emptyLine('No family members yet.')}`)}
+      ${lineCard(`Events to follow up on: <b>${followUpCount}</b>`, followUpCount>0?`_showFollowUpListModal()`:null)}
 
-      ${sectionTitle('📓','Notebook')}
-      ${lineCard(`Notes with open checklist items: <b>${openChecklistCount}</b>`)}
+      ${sectionTitle(ICONS.notebook,'Notebook')}
+      ${lineCard(`Notes with open checklist items: <b>${openChecklistCount}</b>`, openChecklistCount>0?`goTo('notebook')`:null)}
 
-      ${sectionTitle('💊','Inventory')}
-      ${lineCard(`<div style="font-weight:700;margin-bottom:6px">Meds assigned per member</div>${medsPerMember.length?medsPerMember.map(({member,count})=>memberRow(member.name, count)).join(''):emptyLine('No family members yet.')}`)}
-      ${lineCard(`<div style="font-weight:700;margin-bottom:6px">Runs out first, per member</div>${medRunsOutFirst.length?medRunsOutFirst.map(({member,med,daysLeft})=>memberRow(member.name, med?`<span style="color:${daysLeft!==null&&daysLeft<=7?T.rose:T.muted}">${med.name} — ${daysLeft}d left</span>`:'No meds assigned')).join(''):emptyLine('No family members yet.')}`)}
-      ${lineCard(expiringProducts.length?`<div style="font-weight:700;margin-bottom:6px">Products expiring within ${INSIGHTS_EXPIRY_WINDOW_DAYS} days</div>${expiringProducts.map(p=>memberRow(p.name, `<span style="color:${T.rose}">${fmt(p.expiry)}</span>`)).join('')}`:emptyLine('Nothing expiring in the next '+INSIGHTS_EXPIRY_WINDOW_DAYS+' days.'))}
+      ${sectionTitle(ICONS.inventory,'Inventory')}
+      ${lineCard(`<div style="font-weight:700;margin-bottom:6px">Meds assigned per member</div>${medsPerMember.length?medsPerMember.map(({member,count})=>memberRow(member.name, count, count>0?`A.invTab='treatments';goTo('inventory')`:null)).join(''):emptyLine('No family members yet.')}`)}
+      ${lineCard(`<div style="font-weight:700;margin-bottom:6px">Runs out first, per member</div>${medRunsOutFirst.length?medRunsOutFirst.map(({member,med,daysLeft})=>memberRow(member.name, med?`<span style="color:${daysLeft!==null&&daysLeft<=7?T.rose:T.muted}">${med.name} — ${daysLeft}d left</span>`:'No meds assigned', med?`openEditDM('${med.id}')`:null)).join(''):emptyLine('No family members yet.')}`)}
+      ${lineCard(expiringProducts.length?`<div style="font-weight:700;margin-bottom:6px">Products expiring within ${INSIGHTS_EXPIRY_WINDOW_DAYS} days</div>${expiringProducts.map(p=>memberRow(p.name, `<span style="color:${T.rose}">${fmt(p.expiry)}</span>`, `openEditProduct('${p.id}')`)).join('')}`:emptyLine('Nothing expiring in the next '+INSIGHTS_EXPIRY_WINDOW_DAYS+' days.'))}
 
-      ${sectionTitle('🛒','Shopping')}
-      ${lineCard(`Items still to be bought: <b>${uncheckedShoppingCount}</b>`)}
+      ${sectionTitle(ICONS.cart,'Shopping')}
+      ${lineCard(`Items still to be bought: <b>${uncheckedShoppingCount}</b>`, uncheckedShoppingCount>0?`A.mealsTab='shopping';goTo('meals')`:null)}
 
-      ${sectionTitle('🍽️','Meals')}
-      ${lineCard(`This week's meal plan is <b>${mealCompletion}%</b> filled in.`)}
+      ${sectionTitle(ICONS.meal,'Meals')}
+      ${lineCard(`This week's meal plan is <b>${mealCompletion}%</b> filled in.`, `A.mealsTab='planner';goTo('meals')`)}
     </div>`;
 }
 
@@ -5924,7 +6284,7 @@ function renderHome(){
 
       <div style="display:flex;gap:8px;margin-bottom:14px">
         <button onclick="showPicker(new Date())" style="flex:1;padding:12px;border-radius:12px;background:${T.sage};color:#fff;border:none;font-weight:700;font-size:13px;cursor:pointer">+ Calendar Entry</button>
-        <button onclick="A.mealsTab='shopping';goTo('meals')" style="flex:1;padding:12px;border-radius:12px;background:${T.honeyLight};color:${T.honey};border:1px solid ${T.honey}44;font-weight:700;font-size:13px;cursor:pointer">🛒 Shopping</button>
+        <button onclick="A.mealsTab='shopping';goTo('meals')" style="flex:1;padding:12px;border-radius:12px;background:${T.honeyLight};color:${T.honey};border:1px solid ${T.honey}44;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px">${ICONS.cart} Shopping</button>
       </div>
 
       <div style="font-weight:800;font-size:14px;color:${T.ink};margin-bottom:8px">Today — ${fmt(today)}</div>
@@ -6001,7 +6361,16 @@ const MEAL_PLAN_ROWS=['Breakfast','Lunch','Snack','Dinner'];
 
 function renderMeals(){
   if(!A.mealsTab||A.mealsTab==='ideas') A.mealsTab='planner';
-  const TABS=[{id:'planner',label:'📅 Meal Planner'},{id:'shopping',label:'🛒 Shopping'}];
+  // v22: icon separated from label so the tab button can render an inline
+  // SVG (matching the bottom-nav's visual style) instead of an emoji —
+  // also fixes the pre-existing Meal Planner icon mismatch (was a 📅
+  // calendar emoji, unrelated to meals).
+  // v22 (Pass G): reverted from the Pass F dropdown selector back to plain
+  // horizontal tabs — per testing feedback, a selector makes sense for
+  // longer lists (Settings), but for exactly 2 always-visible options it
+  // added a tap for no benefit and was flagged as the same kind of
+  // friction Pass F was trying to fix elsewhere.
+  const TABS=[{id:'planner',icon:ICONS.meal,label:'Meal Planner'},{id:'shopping',icon:ICONS.cart,label:'Shopping'}];
   let tc='';
   if(A.mealsTab==='shopping'){
     tc=renderShoppingTab();
@@ -6012,7 +6381,7 @@ function renderMeals(){
     <div class="page-header">
       <div class="page-title">Meals</div>
     </div>
-    <div class="tabs">${TABS.map(t=>`<button class="tab ${A.mealsTab===t.id?'active':''}" onclick="A.mealsTab='${t.id}';renderMeals()">${t.label}</button>`).join('')}</div>
+    <div class="tabs">${TABS.map(t=>`<button class="tab ${A.mealsTab===t.id?'active':''}" onclick="A.mealsTab='${t.id}';renderMeals()" style="display:flex;align-items:center;gap:6px">${t.icon} ${t.label}</button>`).join('')}</div>
     ${A.mealsTab==='shopping'?_usageBanner('shopping','Shopping Lists'):''}
     <div style="padding:14px 16px">${tc}</div>`;
   // Planner grid is filled with saved values once the table exists in the DOM
@@ -6427,11 +6796,30 @@ async function reorderShoppingItems(listId,cont){
   const list=A.shoppingLists.find(l=>l.id===listId);
   if(!list)return;
   const items=list.items||[];
+  // v22 fix: previously this always pushed every HIDDEN item (filtered out
+  // by "Hide completed" or the per-list search box) to the very END of the
+  // array — silently relocating items the user never touched, and worse
+  // every time a drag happened under these conditions. Fixed merge
+  // strategy: hidden items keep their EXACT original index; only the
+  // indices that belonged to visible items get refilled, in order, with
+  // the drag-resulting visible order — so nothing outside the drag
+  // selection ever moves.
   const shownIdx=Array.from(cont.querySelectorAll('.shop-item-row')).map(row=>parseInt(row.dataset.idx));
   const shownSet=new Set(shownIdx);
-  const hiddenIdx=items.map((_,i)=>i).filter(i=>!shownSet.has(i));
-  const finalOrder=[...shownIdx,...hiddenIdx];
-  const newItems=finalOrder.map(i=>items[i]);
+  const newItems=new Array(items.length);
+  let visiblePtr=0;
+  for(let i=0;i<items.length;i++){
+    if(shownSet.has(i)){
+      // This original slot belonged to a visible item — fill it with the
+      // next item from the drag-resulting visible order.
+      newItems[i]=items[shownIdx[visiblePtr]];
+      visiblePtr++;
+    }else{
+      // This original slot belonged to a hidden item — leave it exactly
+      // where it was.
+      newItems[i]=items[i];
+    }
+  }
   list.items=newItems;
   // v10 (UX hardening): sbWrite() + error toast. No loading state — drag-to-
   // reorder should feel instant. Always re-render regardless of outcome.
@@ -6530,6 +6918,14 @@ async function toggleShoppingItem(listId,idx,checked){
     return;
   }
   list.items=items;
+  // v22: notify the family when an item is CHECKED (not unchecked) — same
+  // asymmetry already used for the urgent-flag toggle just below in this
+  // file. Reuses the existing notif_shopping preference; no new Settings
+  // toggle needed, and respects that preference automatically if a family
+  // has already turned Shopping notifications off.
+  if(checked){
+    writeNotif('shopping','updated',`${getActorName()} checked off a shopping item`,items[idx].text||'');
+  }
   if(checked) showShopUndoToast(listId,idx);
   // v14: keep the Shopping tab page behind this modal in sync too.
   renderMeals();
@@ -6833,7 +7229,10 @@ window.restoreMealPlanDraftLS=restoreMealPlanDraftLS;
 // ── INVENTORY PAGE ─────────────────────────────────────────────────────────────
 function renderInventory(){
   if(!A.invTab) A.invTab='treatments';
-  const TABS=[{id:'treatments',label:'💊 Frequent meds'},{id:'products',label:'📦 Products'}];
+  // v22: icon separated from label, two distinct new icons (pill/package)
+  // give each sub-tab its own visual identity instead of both implicitly
+  // sharing the module's crate icon.
+  const TABS=[{id:'treatments',icon:ICONS.pill,label:'Frequent meds'},{id:'products',icon:ICONS.package,label:'Products'}];
   let tc='';
   if(A.invTab==='treatments'){
     // Placeholder container — filled directly by renderMeds('inv-meds-container')
@@ -6873,7 +7272,7 @@ function renderInventory(){
     <div class="page-header">
       <div class="page-title">Inventory</div>
     </div>
-    <div class="tabs">${TABS.map(t=>`<button class="tab ${A.invTab===t.id?'active':''}" onclick="A.invTab='${t.id}';renderInventory()">${t.label}</button>`).join('')}</div>
+    <div class="tabs">${TABS.map(t=>`<button class="tab ${A.invTab===t.id?'active':''}" onclick="A.invTab='${t.id}';renderInventory()" style="display:flex;align-items:center;gap:6px">${t.icon} ${t.label}</button>`).join('')}</div>
     <div style="padding:14px 16px">${tc}</div>`;
 
   // If treatments tab, render meds directly into the now-visible Inventory
@@ -7048,40 +7447,13 @@ window.saveEditProduct=saveEditProduct;
 // ── SETTINGS ──────────────────────────────────────────────────────────────────
 function renderSettings(){
   const fam=getFamily(),members=getMembers();
-  const TABS=[{id:'family',label:'👨‍👩‍👧‍👦 Family'},{id:'calendar',label:'🗓 Calendar'},{id:'content',label:'📖 Curated Content'},{id:'notifs',label:'🔔 Notifications'}];
+  // v22 (Pass G): now built from the shared _settingsSectionsList() helper
+  // — 'family' is a normal entry in it (see that function's comment for
+  // why this changed from Pass F's original "no visible entry" approach).
+  const SETTINGS_SECTIONS = _settingsSectionsList();
   let tc='';
 
-  if(A.settingsTab==='family'){
-    tc=`
-      ${_renderPlanUsageCard()}
-      <div class="card" style="padding:14px;margin-bottom:12px">
-        <div class="lbl" style="margin-bottom:8px">Family Name</div>
-        <div style="display:flex;gap:8px">
-          <input class="inp" id="s-fn" value="${fam?.name||''}" style="flex:1;font-size:15px;font-weight:700" placeholder="Family name">
-          <button class="btn btn-primary btn-sm" onclick="saveFamName()">Save</button>
-        </div>
-      </div>
-      ${_usageBanner('members','Family Members')}
-      <div class="card" style="padding:14px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <div class="lbl">Family Members</div>
-          <button class="btn btn-primary btn-sm" onclick="openAddMem()">+ Add Member</button>
-        </div>
-        ${members.map(m=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid ${T.border}">
-          ${av(m,40)}
-          <div style="flex:1">
-            <div style="font-weight:700;font-size:14px">${m.name}</div>
-            <div style="font-size:12px;color:${T.muted}">${m.role||''}${m.age?` · Age ${m.age}`:''}${m.gender?` · ${m.gender}`:''}</div>
-            ${m.email?`<div style="font-size:11px;color:${T.sky}">${m.email}</div>`:''}
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
-            ${m.is_owner?`<span class="chip" style="background:${T.sageLight};color:${T.sage}">Owner</span>`:''}
-            <button onclick="openEditMem('${m.id}')" style="background:${T.parchment};border:1px solid ${T.border};border-radius:7px;padding:3px 9px;font-size:11px;font-weight:700;cursor:pointer;color:${T.muted}">✏️ Edit</button>
-            ${m.email&&!m.is_owner?`<button onclick="sendInvite('${m.email}','${m.id}')" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px 9px">🔗 Invite</button>`:''}
-          </div>
-        </div>`).join('')}
-      </div>`;
-  } else if(A.settingsTab==='calendar'){
+  if(A.settingsTab==='calendar'){
     tc=`<div class="card" style="padding:14px">
       <div class="lbl" style="margin-bottom:10px">Custom Tags</div>
       <p style="font-size:12px;color:${T.muted};margin-bottom:12px">These tags appear when creating calendar entries, letting you quickly categorise and search events.</p>
@@ -7112,52 +7484,380 @@ function renderSettings(){
           </div>
         </label>`).join('')}
     </div>`;
+  } else if(A.settingsTab==='notifs'){
+    // Same trigger point the old toggleNotifPanel() used ("opening" the
+    // panel) — now it's navigating into this section instead.
+    markAllNotifsRead();
+    tc = `
+      ${_notifActivityListHtml()}
+      <button type="button" onclick="_openNotifPrefsModal()" style="margin-top:14px;width:100%;padding:11px;border-radius:10px;background:${T.parchment};border:1px solid ${T.border};color:${T.ink};font-weight:700;font-size:13px;cursor:pointer">⚙️ Manage notification settings</button>`;
+  } else if(A.settingsTab==='feedback'){
+    tc = _feedbackFormHtml();
   } else {
-    const prefs = getNotifPrefs();
-    const prefRow = (key, icon, label) => `
-      <label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid ${T.border};cursor:pointer">
-        <input type="checkbox" ${prefs[key]!==false?'checked':''} onchange="updateNotifPref('${key}',this.checked)">
-        <span style="font-size:16px;flex-shrink:0">${icon}</span>
-        <span style="font-size:14px;font-weight:600">${label}</span>
-      </label>`;
+    // Default landing view ("family" / Profile home) — unchanged content.
     tc=`
+      ${_renderPlanUsageCard()}
       <div class="card" style="padding:14px;margin-bottom:12px">
-        <div class="lbl" style="margin-bottom:10px">Family Activity — what to track</div>
-        <p style="font-size:12px;color:${T.muted};margin-bottom:12px">Shown in the 🔔 panel whenever another family member makes a change.</p>
-        ${prefRow('notif_event','🗓','Calendar events added or changed')}
-        ${prefRow('notif_note','📓','Notes added or changed')}
-        ${prefRow('notif_shopping','🛒','Shopping list items added')}
-        ${prefRow('notif_meal','🍽','Meal planner updated')}
-        ${prefRow('notif_inventory_meds','💊','Medications added or changed')}
-        ${prefRow('notif_inventory_products','📦','Products added or changed')}
+        <div class="lbl" style="margin-bottom:8px">Family Name</div>
+        <div style="display:flex;gap:8px">
+          <input class="inp" id="s-fn" value="${fam?.name||''}" style="flex:1;font-size:15px;font-weight:700" placeholder="Family name">
+          <button class="btn btn-primary btn-sm" onclick="saveFamName()">Save</button>
+        </div>
       </div>
-      <div class="card" style="padding:14px;margin-bottom:12px">
-        <div class="lbl" style="margin-bottom:10px">Smart Alerts — computed from your data</div>
-        <p style="font-size:12px;color:${T.muted};margin-bottom:12px">Shown each time you open the notification panel.</p>
-        ${prefRow('alert_low_stock','💊','Low medication stock (≤ 7 days left)')}
-        ${prefRow('alert_expiring','⏰','Products expiring within 30 days')}
-        ${prefRow('alert_overdue','⚠️','Overdue tasks with open items')}
-        ${prefRow('alert_event_start','🔔','Events starting within the next hour')}
-      </div>
+      ${_usageBanner('members','Family Members')}
       <div class="card" style="padding:14px">
-        <div class="lbl" style="margin-bottom:10px">Push notifications — coming soon</div>
-        <p style="font-size:12px;color:${T.muted};margin-bottom:12px;line-height:1.6">Get device-level alerts for upcoming events, low stock, and family activity. Your preferences above will activate automatically when push notifications launch.</p>
-        <div style="background:${T.honeyLight};border-radius:9px;padding:10px 12px;font-size:12px;color:${T.honey};font-weight:600">📱 Available in the Seamly PWA — install the app on your home screen to be first to get them.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="lbl">Family Members</div>
+          <button class="btn btn-primary btn-sm" onclick="openAddMem()">+ Add Member</button>
+        </div>
+        ${members.map(m=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid ${T.border}">
+          ${av(m,40)}
+          <div style="flex:1">
+            <div style="font-weight:700;font-size:14px">${m.name}</div>
+            <div style="font-size:12px;color:${T.muted}">${m.role||''}${m.age?` · Age ${m.age}`:''}${m.gender?` · ${m.gender}`:''}</div>
+            ${m.email?`<div style="font-size:11px;color:${T.sky}">${m.email}</div>`:''}
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
+            ${m.is_owner?`<span class="chip" style="background:${T.sageLight};color:${T.sage}">Owner</span>`:''}
+            <button onclick="openEditMem('${m.id}')" style="background:${T.parchment};border:1px solid ${T.border};border-radius:7px;padding:3px 9px;font-size:11px;font-weight:700;cursor:pointer;color:${T.muted}">✏️ Edit</button>
+            ${m.email&&!m.is_owner?`<button onclick="sendInvite('${m.email}','${m.id}')" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px 9px">🔗 Invite</button>`:''}
+          </div>
+        </div>`).join('')}
       </div>`;
   }
 
   const cu=A.user;
+  // v22 (Pass G): now a plain lookup — 'family' is a normal entry in
+  // SETTINGS_SECTIONS, so no special-case stand-in object is needed here
+  // anymore (Pass F originally needed one; see _settingsSectionsList()).
+  const _settingsCurrent = SETTINGS_SECTIONS.find(s=>s.id===A.settingsTab) || SETTINGS_SECTIONS[0];
+
   document.getElementById('page-settings').innerHTML=`
     <div class="page-header">
       <div class="page-title">Settings</div>
     </div>
     ${cu?`<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:${T.sageLight};border-bottom:1px solid ${T.border}">
-      <div style="width:36px;height:36px;border-radius:50%;background:${T.sage};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px;flex-shrink:0">${(cu.user_metadata?.name||cu.email||'U')[0].toUpperCase()}</div>
-      <div><div style="font-weight:700;font-size:13px;color:${T.ink}">${cu.user_metadata?.name||'My Account'}</div><div style="font-size:11px;color:${T.muted}">${cu.email||''}</div></div>
+      <div onclick="A.settingsTab='family';renderSettings()" style="cursor:pointer;display:flex;align-items:center;gap:10px;flex:1;min-width:0" title="Back to Family &amp; Profile">
+        <div style="width:36px;height:36px;border-radius:50%;background:${T.sage};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px;flex-shrink:0">${(cu.user_metadata?.name||cu.email||'U')[0].toUpperCase()}</div>
+        <div style="min-width:0"><div style="font-weight:700;font-size:13px;color:${T.ink};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cu.user_metadata?.name||'My Account'}</div><div style="font-size:11px;color:${T.muted};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cu.email||''}</div></div>
+      </div>
+      <button type="button" onclick="doSignOut()" style="background:#fff;border:1px solid ${T.border};border-radius:8px;padding:6px 11px;font-size:11px;font-weight:700;color:${T.muted};cursor:pointer;flex-shrink:0;white-space:nowrap">🚪 Sign out</button>
     </div>`:''}
-    <div class="tabs">${TABS.map(t=>`<button class="tab ${A.settingsTab===t.id?'active':''}" onclick="A.settingsTab='${t.id}';renderSettings()">${t.label}</button>`).join('')}</div>
+    ${sectionSelectorTrigger(_settingsCurrent, '_openSettingsSectionPicker', _hasUnreadNotifs())}
     <div style="padding:14px 16px">${tc}</div>`;
 }
+
+// v22 (Pass F/G): shared section list used by renderSettings()'s in-page
+// selector, its own picker, AND the top-bar Profile Menu (reintroduced in
+// Pass G) — one canonical place to add/remove a Settings destination.
+// 'family' is a normal list entry (not a special-cased default anymore —
+// Pass F originally excluded it from the list; Pass G testing feedback
+// found that confusing, since there was then no obvious way back to it).
+// Admin is included only when A.isAdmin is true (Pass G's admins-table
+// check, set once at load).
+function _settingsSectionsList(){
+  const hasUnread = _hasUnreadNotifs();
+  const sections = [
+    {id:'family', icon:'👨‍👩‍👧‍👦', label:'Family'},
+    {id:'notifs', icon:'🔔', label:'Notifications', showDot:hasUnread},
+    {id:'calendar', icon:'🗓', label:'Calendar settings'},
+    {id:'content', icon:'📖', label:'Notebook settings'},
+    {id:'feedback', icon:'💬', label:'Feedback'},
+  ];
+  if (A.isAdmin) sections.push({id:'admin', icon:'🛠', label:'Admin'});
+  return sections;
+}
+window._settingsSectionsList = _settingsSectionsList;
+
+// v22 (Pass F): opens the "jump to section" picker from WITHIN Settings —
+// excludes the currently-viewed section from the list, per the shared
+// _showSectionPicker() convention.
+function _openSettingsSectionPicker(){
+  _showSectionPicker('Settings', _settingsSectionsList(), A.settingsTab, 'switchSettingsSection');
+}
+window._openSettingsSectionPicker = _openSettingsSectionPicker;
+
+// v22 (Pass G): reintroduces a dedicated top-bar entry point — tapping 👤
+// now opens the same picker Settings' own in-page trigger uses. Per
+// testing feedback, Pass F's "tap profile icon → land directly on
+// whatever Settings section you last had open, with no obvious way to see
+// the OTHER sections" wasn't intuitive. This restores a clear, familiar
+// "tap profile icon → pick where to go" flow. '__none__' is passed as the
+// currentId since there's no "current" section to exclude when opening
+// from outside Settings — every section shows.
+function openProfileMenu(){
+  _showSectionPicker('My Profile', _settingsSectionsList(), '__none__', 'switchSettingsSection');
+}
+window.openProfileMenu = openProfileMenu;
+
+// Routes 'admin' straight to the Admin page; every other id switches
+// A.settingsTab and goes to Settings. Uses goTo('settings') (not a direct
+// renderSettings() call) so this works correctly whether the person is
+// already on Settings or navigating there from anywhere else in the app
+// (e.g. from the top-bar Profile Menu).
+function switchSettingsSection(id){
+  if (id === 'admin') { goTo('admin'); return; }
+  A.settingsTab = id;
+  goTo('settings');
+}
+window.switchSettingsSection = switchSettingsSection;
+
+// ── ADMIN (v22, Pass G) ──────────────────────────────────────────────────────
+// Admin-only usage/adoption dashboard. Gated by A.isAdmin (set once at load,
+// see initApp()) both at the UI level (entry point hidden, goTo('admin')
+// guarded) and at the data level (new admin-scoped RLS policies — see the
+// accompanying schema file). 3 plain tabs, matching the "small fixed number
+// of options" pattern Roxana asked to keep as simple horizontal tabs rather
+// than a dropdown selector (same reasoning as the Inventory/Meals revert).
+function renderAdmin(){
+  if (!A.isAdmin) { goTo('home'); return; }
+  if (!A.adminTab) A.adminTab = 'overview';
+  const TABS = [
+    {id:'overview', label:'Overview'},
+    {id:'families', label:'Families & Users'},
+    {id:'feedback', label:'Feedback'},
+  ];
+  document.getElementById('page-admin').innerHTML = `
+    <div class="page-header"><div class="page-title">🛠 Admin</div></div>
+    <div class="tabs">${TABS.map(t=>`<button class="tab ${A.adminTab===t.id?'active':''}" onclick="A.adminTab='${t.id}';renderAdmin()">${t.label}</button>`).join('')}</div>
+    <div id="admin-content" style="padding:14px 16px"><div style="text-align:center;padding:30px;color:${T.muted}">Loading…</div></div>`;
+  if (A.adminTab === 'overview') _renderAdminOverview();
+  else if (A.adminTab === 'families') _renderAdminFamilies();
+  else if (A.adminTab === 'feedback') _renderAdminFeedback();
+}
+window.renderAdmin = renderAdmin;
+
+// Tab 1 — Overview. Simple counting queries computed client-side from full
+// table scans, matching the spec's own stated "simple counting, same spirit
+// as _familyEventCount()-style helpers" scope — no background jobs, no new
+// tables. Table names below (daily_meds, meal_plans, shopping_lists, etc.)
+// were confirmed against actual sb.from(...) calls already in this file,
+// not guessed.
+async function _renderAdminOverview(){
+  const root = document.getElementById('admin-content');
+  try {
+    const [famRes, memRes, subRes, fbRes, evtRes, noteRes, shopRes, medRes, mealRes] = await Promise.all([
+      sb.from('families').select('id,created_at'),
+      sb.from('family_members').select('id,family_id,user_id'),
+      sb.from('family_subscription').select('family_id,plan_name'),
+      sb.from('feedback').select('type,created_at'),
+      sb.from('events').select('family_id'),
+      sb.from('notes').select('family_id'),
+      sb.from('shopping_lists').select('family_id'),
+      sb.from('daily_meds').select('family_id'),
+      sb.from('meal_plans').select('family_id'),
+    ]);
+    const families = famRes.data || [];
+    const members = memRes.data || [];
+    const subs = subRes.data || [];
+    const feedback = fbRes.data || [];
+    const events = evtRes.data || [];
+    const notes = noteRes.data || [];
+    const shopLists = shopRes.data || [];
+    const meds = medRes.data || [];
+    const meals = mealRes.data || [];
+
+    const totalFamilies = families.length;
+    const linkedUsers = members.filter(m=>m.user_id).length;
+    const now = new Date();
+    const weekAgo = new Date(now - 7*86400000);
+    const monthAgo = new Date(now - 30*86400000);
+    const newThisWeek = families.filter(f=>new Date(f.created_at) >= weekAgo).length;
+    const newThisMonth = families.filter(f=>new Date(f.created_at) >= monthAgo).length;
+
+    const planCounts = {};
+    subs.forEach(s => { const p = s.plan_name || 'free'; planCounts[p] = (planCounts[p]||0)+1; });
+
+    const famIdsWith = (rows) => new Set(rows.map(r=>r.family_id));
+    const pct = (set) => totalFamilies ? Math.round(set.size / totalFamilies * 100) : 0;
+
+    const countByType = (rows) => { const c = {}; rows.forEach(r=>{ c[r.type] = (c[r.type]||0)+1; }); return c; };
+    const fb7dCounts = countByType(feedback.filter(f=>new Date(f.created_at) >= weekAgo));
+    const fb30dCounts = countByType(feedback.filter(f=>new Date(f.created_at) >= monthAgo));
+
+    const metricCard = (label, value) => `
+      <div style="background:${T.parchment};border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:22px;font-weight:800;color:${T.sage}">${value}</div>
+        <div style="font-size:11px;color:${T.muted};margin-top:2px">${label}</div>
+      </div>`;
+
+    root.innerHTML = `
+      <div class="card" style="padding:14px;margin-bottom:12px">
+        <div class="lbl" style="margin-bottom:10px">Adoption &amp; Growth</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          ${metricCard('Total Families', totalFamilies)}
+          ${metricCard('Linked Users', linkedUsers)}
+          ${metricCard('New This Week', newThisWeek)}
+          ${metricCard('New This Month', newThisMonth)}
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:${T.muted};font-weight:700;margin-bottom:6px">Plan breakdown</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${Object.entries(planCounts).map(([plan,count])=>`<span class="chip" style="background:${T.sageLight};color:${T.sage}">${plan}: ${count}</span>`).join('') || `<span style="font-size:12px;color:${T.muted}">No subscription rows yet.</span>`}
+        </div>
+      </div>
+      <div class="card" style="padding:14px;margin-bottom:12px">
+        <div class="lbl" style="margin-bottom:10px">Engagement</div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+          <div style="display:flex;justify-content:space-between"><span>Families with ≥1 event</span><b>${pct(famIdsWith(events))}%</b></div>
+          <div style="display:flex;justify-content:space-between"><span>Families with ≥1 note</span><b>${pct(famIdsWith(notes))}%</b></div>
+          <div style="display:flex;justify-content:space-between"><span>Families with ≥1 shopping list</span><b>${pct(famIdsWith(shopLists))}%</b></div>
+          <div style="display:flex;justify-content:space-between"><span>Families with ≥1 medication tracked</span><b>${pct(famIdsWith(meds))}%</b></div>
+          <div style="display:flex;justify-content:space-between"><span>Families with a meal plan started</span><b>${pct(famIdsWith(meals))}%</b></div>
+        </div>
+      </div>
+      <div class="card" style="padding:14px;margin-bottom:12px">
+        <div class="lbl" style="margin-bottom:10px">Feedback signal</div>
+        <div style="font-size:12px;color:${T.muted};margin-bottom:8px">Last 7 days / Last 30 days, by type</div>
+        ${FB_TYPES.map(t=>`
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid ${T.border};font-size:13px">
+            <span>${t.icon} ${t.label}</span>
+            <span><b>${fb7dCounts[t.value]||0}</b> / ${fb30dCounts[t.value]||0}</span>
+          </div>`).join('')}
+      </div>
+      <div class="card" style="padding:14px">
+        <div class="lbl" style="margin-bottom:6px">Reliability metrics</div>
+        <div style="font-size:12px;color:${T.muted}">Coming soon — tied to the ongoing connection-flakiness investigation.</div>
+      </div>`;
+  } catch(e) {
+    console.error('Admin overview load error', e);
+    root.innerHTML = `<div style="text-align:center;padding:30px;color:${T.muted}">Couldn't load admin metrics — check console for details.</div>`;
+  }
+}
+window._renderAdminOverview = _renderAdminOverview;
+
+// Tab 2 — Families & Users
+async function _renderAdminFamilies(){
+  const root = document.getElementById('admin-content');
+  try {
+    const [famRes, memRes, subRes] = await Promise.all([
+      sb.from('families').select('id,name,created_at'),
+      sb.from('family_members').select('id,family_id,name,email,is_owner,user_id'),
+      sb.from('family_subscription').select('family_id,plan_name'),
+    ]);
+    A._adminFamilies = famRes.data || [];
+    A._adminMembers = memRes.data || [];
+    A._adminSubs = subRes.data || [];
+    _renderAdminFamiliesList();
+  } catch(e) {
+    console.error('Admin families load error', e);
+    root.innerHTML = `<div style="text-align:center;padding:30px;color:${T.muted}">Couldn't load families — check console for details.</div>`;
+  }
+}
+window._renderAdminFamilies = _renderAdminFamilies;
+
+function _renderAdminFamiliesList(){
+  const root = document.getElementById('admin-content');
+  if (!root) return;
+  const families = A._adminFamilies || [];
+  const members = A._adminMembers || [];
+  const subs = A._adminSubs || [];
+  const search = (A._adminFamSearch || '').toLowerCase();
+  const rows = families
+    .map(f => {
+      const famMembers = members.filter(m => m.family_id === f.id);
+      const owner = famMembers.find(m => m.is_owner);
+      const sub = subs.find(s => s.family_id === f.id);
+      return { family: f, members: famMembers, owner, plan: sub?.plan_name || 'free' };
+    })
+    .filter(r => !search || r.family.name?.toLowerCase().includes(search) || r.owner?.email?.toLowerCase().includes(search))
+    .sort((a,b) => new Date(b.family.created_at) - new Date(a.family.created_at));
+
+  root.innerHTML = `
+    <input class="inp" placeholder="Search by family name or owner email…" value="${A._adminFamSearch||''}" oninput="A._adminFamSearch=this.value;_renderAdminFamiliesList()" style="margin-bottom:12px">
+    ${rows.length ? rows.map(r => `
+      <div onclick="_openAdminFamilyDetail('${r.family.id}')" class="card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div style="min-width:0">
+          <div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.family.name || 'Unnamed family'}</div>
+          <div style="font-size:12px;color:${T.muted};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.owner?.email || 'No owner email'} · ${r.members.length} member${r.members.length!==1?'s':''} · ${fmt(r.family.created_at)}</div>
+        </div>
+        <span class="chip" style="background:${T.sageLight};color:${T.sage};flex-shrink:0">${r.plan}</span>
+      </div>`).join('') : `<div style="text-align:center;padding:30px;color:${T.muted}">No families match your search.</div>`}`;
+}
+window._renderAdminFamiliesList = _renderAdminFamiliesList;
+
+function _openAdminFamilyDetail(familyId){
+  const family = (A._adminFamilies||[]).find(f=>f.id===familyId);
+  const members = (A._adminMembers||[]).filter(m=>m.family_id===familyId);
+  const sub = (A._adminSubs||[]).find(s=>s.family_id===familyId);
+  if (!family) return;
+  showModal(family.name || 'Family detail', `
+    <div style="font-size:12px;color:${T.muted};margin-bottom:14px">Created ${fmt(family.created_at)}</div>
+    <div class="lbl" style="margin-bottom:8px">Members</div>
+    ${members.map(m=>`
+      <div style="padding:8px 0;border-bottom:1px solid ${T.border};font-size:13px">
+        <div style="font-weight:700">${m.name}${m.is_owner?` <span style="color:${T.sage};font-size:11px;font-weight:700">(Owner)</span>`:''}</div>
+        <div style="color:${T.muted};font-size:11px">${m.email||'—'}</div>
+      </div>`).join('') || `<div style="font-size:12px;color:${T.muted}">No members found.</div>`}
+    <div class="lbl" style="margin:16px 0 8px">Plan</div>
+    <div style="display:flex;gap:8px">
+      <select class="sel" id="admin-plan-select" style="flex:1">
+        ${['free','early_adopter','premium'].map(p=>`<option value="${p}"${(sub?.plan_name||'free')===p?' selected':''}>${p}</option>`).join('')}
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="_saveAdminFamilyPlan('${familyId}')">Save</button>
+    </div>`);
+}
+window._openAdminFamilyDetail = _openAdminFamilyDetail;
+
+async function _saveAdminFamilyPlan(familyId){
+  const plan = document.getElementById('admin-plan-select')?.value;
+  if (!plan) return;
+  try {
+    const { error } = await sbWrite(() => sb.from('family_subscription').update({ plan_name: plan }).eq('family_id', familyId));
+    if (error) { toast('Error updating plan: ' + error.message, true); return; }
+    toast('Plan updated ✅');
+    closeModal();
+    const sub = (A._adminSubs||[]).find(s=>s.family_id===familyId);
+    if (sub) sub.plan_name = plan; else (A._adminSubs=A._adminSubs||[]).push({family_id:familyId, plan_name:plan});
+    _renderAdminFamiliesList();
+  } catch(e) {
+    toast('Something went wrong — please try again.', true);
+    console.error(e);
+  }
+}
+window._saveAdminFamilyPlan = _saveAdminFamilyPlan;
+
+// Tab 3 — Feedback (read-only, per spec — no reply/resolve workflow this pass)
+async function _renderAdminFeedback(){
+  const root = document.getElementById('admin-content');
+  try {
+    const { data, error } = await sb.from('feedback').select('*').order('created_at', {ascending:false});
+    if (error) throw error;
+    A._adminFeedback = data || [];
+    _renderAdminFeedbackList();
+  } catch(e) {
+    console.error('Admin feedback load error', e);
+    root.innerHTML = `<div style="text-align:center;padding:30px;color:${T.muted}">Couldn't load feedback — check console for details.</div>`;
+  }
+}
+window._renderAdminFeedback = _renderAdminFeedback;
+
+function _renderAdminFeedbackList(){
+  const root = document.getElementById('admin-content');
+  if (!root) return;
+  const all = A._adminFeedback || [];
+  const typeFilter = A._adminFbTypeFilter || '';
+  const search = (A._adminFbSearch || '').toLowerCase();
+  const filtered = all
+    .filter(f => !typeFilter || f.type === typeFilter)
+    .filter(f => !search || f.message?.toLowerCase().includes(search));
+
+  root.innerHTML = `
+    <select class="sel" style="margin-bottom:8px;width:100%" onchange="A._adminFbTypeFilter=this.value;_renderAdminFeedbackList()">
+      <option value="">All types</option>
+      ${FB_TYPES.map(t=>`<option value="${t.value}"${typeFilter===t.value?' selected':''}>${t.label}</option>`).join('')}
+    </select>
+    <input class="inp" placeholder="Search message text…" value="${A._adminFbSearch||''}" oninput="A._adminFbSearch=this.value;_renderAdminFeedbackList()" style="margin-bottom:12px">
+    ${filtered.length ? filtered.map(f => `
+      <div class="card" style="padding:12px 14px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px">
+          <span class="chip" style="background:${T.sageLight};color:${T.sage}">${FB_TYPES.find(t=>t.value===f.type)?.icon||''} ${FB_TYPES.find(t=>t.value===f.type)?.label||f.type}</span>
+          <span style="font-size:11px;color:${T.muted};flex-shrink:0">${fmt(f.created_at)}</span>
+        </div>
+        <div style="font-size:13px;margin-bottom:6px">${f.message}</div>
+        <div style="font-size:11px;color:${T.muted}">${f.family_name||'Unknown family'} · ${f.user_email||'—'}${f.page?' · '+f.page:''}</div>
+      </div>`).join('') : `<div style="text-align:center;padding:30px;color:${T.muted}">No feedback matches your filters.</div>`}`;
+}
+window._renderAdminFeedbackList = _renderAdminFeedbackList;
 
 async function saveFamName(){
   const name=document.getElementById('s-fn')?.value?.trim();
@@ -7653,16 +8353,32 @@ async function loadNotifications() {
   if (!A.family || !A.user || isSampleMode()) return;
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 7);
-  const { data, error } = await sb.from('notifications')
-    .select('*')
-    .eq('family_id', A.family.id)
-    .neq('actor_user_id', A.user.id)
-    .gte('created_at', cutoff.toISOString())
-    .order('created_at', { ascending: false })
-    .limit(50);
-  if (error) { console.warn('Notifications load error:', error.message); return; }
-  _notifications = data || [];
-  refreshNotifBadge();
+  // v22.1 fix: this background poll (setInterval, every 60s) previously
+  // called sb.from(...) directly — no timeout, no retry, and no try/catch
+  // around the await itself. If the connection was in a bad state, this
+  // would throw an uncaught promise rejection every single poll cycle,
+  // forever, even while the person wasn't doing anything else in the app —
+  // matching exactly the repeating "Uncaught (in promise) Error" console
+  // spam reported during testing. Now routed through the same sbWrite()
+  // timeout/retry wrapper every other database call already uses, with
+  // {silent:true} so a background poll never pops a "Connection issue…"
+  // toast for something the user didn't initiate — plus a try/catch as a
+  // last-resort safety net so this can never surface an unhandled
+  // rejection either way.
+  try {
+    const { data, error } = await sbWrite(() => sb.from('notifications')
+      .select('*')
+      .eq('family_id', A.family.id)
+      .neq('actor_user_id', A.user.id)
+      .gte('created_at', cutoff.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(50), { silent: true });
+    if (error) { console.warn('Notifications load error:', error.message); return; }
+    _notifications = data || [];
+    refreshNotifBadge();
+  } catch (e) {
+    console.warn('Notifications load failed:', e.message);
+  }
 }
 
 // Computes real-time alerts from existing app data. No DB query needed.
@@ -7770,6 +8486,21 @@ function notifIcon(category, action) {
 }
 
 // Updates the red badge on the bell icon.
+// v22 (Pass F): shared unread-notifications check — was previously
+// duplicated between refreshNotifBadge() and openProfileMenu(). Now the
+// one canonical version; openProfileMenu() is retired this pass, and
+// refreshNotifBadge() below is refactored to call this instead of
+// repeating the same calculation inline.
+function _hasUnreadNotifs() {
+  const prefs = getNotifPrefs();
+  const lastRead = parseInt(localStorage.getItem('ks_notif_last_read_' + (A.user?.id || '')) || '0');
+  return _notifications.some(n => {
+    const prefKey = n.category === 'member' ? 'notif_member_join' : 'notif_' + n.category;
+    if (prefs[prefKey] === false) return false;
+    return new Date(n.created_at).getTime() > lastRead;
+  });
+}
+
 function refreshNotifBadge() {
   // v12: target renamed from #notif-badge (numeric badge on old bell) to
   // #profile-dot (plain dot on the new My Profile button). The unread-
@@ -7777,14 +8508,7 @@ function refreshNotifBadge() {
   // result changed (show/hide a dot instead of setting a number).
   const dot = document.getElementById('profile-dot');
   if (!dot) return;
-  const prefs = getNotifPrefs();
-  const lastRead = parseInt(localStorage.getItem('ks_notif_last_read_' + (A.user?.id || '')) || '0');
-  const unread = _notifications.filter(n => {
-    const prefKey = n.category === 'member' ? 'notif_member_join' : 'notif_' + n.category;
-    if (prefs[prefKey] === false) return false;
-    return new Date(n.created_at).getTime() > lastRead;
-  }).length;
-  dot.style.display = unread > 0 ? 'block' : 'none';
+  dot.style.display = _hasUnreadNotifs() ? 'block' : 'none';
 }
 
 // Stamps "last read" timestamp so the badge clears on next refresh
@@ -7795,57 +8519,51 @@ function markAllNotifsRead() {
   refreshNotifBadge();
 }
 
-// v12: My Profile bottom sheet — consolidates what used to be three separate
-// top-bar controls (🔔 Notifications, ⚙️ Settings, Sign out) behind one 👤
-// entry point. Reuses the existing showModal() bottom-sheet system and the
-// same account-info header markup already shown at the top of Settings.
-// Rows close the sheet first, then call the existing, unmodified functions
-// that already do these jobs — nothing about Notifications, Settings, or
-// Sign-out behaviour itself changes.
-function openProfileMenu() {
-  const cu = A.user;
-  const initial = (cu?.user_metadata?.name || cu?.email || 'U')[0].toUpperCase();
-  const name = cu?.user_metadata?.name || 'My Account';
-  const email = cu?.email || '';
-  // v15: mirror refreshNotifBadge()'s unread calculation so the Notifications
-  // row inside this menu shows the same red dot as the outer profile button.
-  // Previously only #profile-dot (the button itself) reflected unread state —
-  // opening the menu showed no indicator on the Notifications row itself.
-  const prefs = getNotifPrefs();
-  const lastRead = parseInt(localStorage.getItem('ks_notif_last_read_' + (A.user?.id || '')) || '0');
-  const hasUnread = _notifications.some(n => {
-    const prefKey = n.category === 'member' ? 'notif_member_join' : 'notif_' + n.category;
-    if (prefs[prefKey] === false) return false;
-    return new Date(n.created_at).getTime() > lastRead;
-  });
-  // Helper: one tappable row (icon + label + chevron); showDot adds a small
-  // red unread indicator on the icon, same visual language as #profile-dot.
-  const row = (icon, label, onclick, isLast, showDot) => `
-    <button type="button" onclick="${onclick}" style="display:flex;align-items:center;gap:12px;width:100%;padding:13px 4px;background:none;border:none;${isLast?'':`border-bottom:1px solid ${T.border};`}cursor:pointer;text-align:left;font-family:inherit;-webkit-tap-highlight-color:transparent">
-      <span style="font-size:19px;width:24px;text-align:center;flex-shrink:0;position:relative">${icon}${showDot?`<span style="position:absolute;top:-1px;right:1px;background:var(--rose);border-radius:99px;width:8px;height:8px;box-sizing:border-box"></span>`:''}</span>
-      <span style="flex:1;font-size:14px;font-weight:600;color:${T.ink}">${label}</span>
-      <span style="color:${T.muted};font-size:15px">›</span>
+// ── SHARED DROPDOWN SECTION SELECTOR (v22, Pass F) ──────────────────────────
+// Replaces the horizontal .tabs/.tab row wherever a page has multiple
+// sub-sections (Settings, Inventory, Meals). Renders as a single trigger
+// button (current section's icon + label + optional unread dot + ▾
+// chevron); tapping it opens the OTHER sections as a showModal() bottom-
+// sheet — reusing the app's existing modal system for free outside-tap-to-
+// close behavior, rather than inventing a new floating-menu style.
+// Icons are raw SVG strings in some callers (ICONS.*), which can't safely
+// be serialized through an onclick attribute — so this trigger takes the
+// name of a small page-specific "open" function (already in scope, no
+// serialization needed) rather than the section list itself.
+function sectionSelectorTrigger(current, openFnName, showDot) {
+  return `
+    <button type="button" onclick="${openFnName}()" style="display:flex;align-items:center;gap:8px;width:100%;padding:12px 16px;background:none;border:none;border-bottom:1px solid ${T.border};cursor:pointer;text-align:left;-webkit-tap-highlight-color:transparent">
+      <span style="display:flex;align-items:center;flex-shrink:0">${current.icon}</span>
+      <span style="flex:1;font-size:14px;font-weight:700;color:${T.ink};display:flex;align-items:center;gap:6px">${current.label}${showDot?`<span style="background:${T.rose};border-radius:99px;width:7px;height:7px;display:inline-block;flex-shrink:0"></span>`:''}</span>
+      <span style="color:${T.muted};font-size:12px;flex-shrink:0">▾</span>
     </button>`;
-  showModal('My Profile', `
-    <div style="display:flex;align-items:center;gap:12px;padding:2px 4px 18px">
-      <div style="width:44px;height:44px;border-radius:50%;background:${T.sage};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:17px;flex-shrink:0">${initial}</div>
-      <div style="min-width:0">
-        <div style="font-weight:700;font-size:15px;color:${T.ink};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
-        <div style="font-size:12px;color:${T.muted};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${email}</div>
-      </div>
-    </div>
-    <div style="display:flex;flex-direction:column">
-      ${row('🔔','Notifications',"closeModal();toggleNotifPanel();",false,hasUnread)}
-      ${row('📊','Insights',"closeModal();goTo('insights');")}
-      ${row('⚙️','Settings',"closeModal();goTo('settings');")}
-      ${row('💬','Send Feedback',"closeModal();openFeedback();")}
-      ${row('🚪','Sign out',"closeModal();doSignOut();",true)}
-    </div>`);
 }
-window.openProfileMenu = openProfileMenu;
+window.sectionSelectorTrigger = sectionSelectorTrigger;
 
-// Renders the notification bottom sheet into #notif-root
-function renderNotifPanel() {
+// Shared bottom-sheet listing the OTHER sections (excludes currentId).
+// Tapping a row closes the sheet and calls the given onSelect function
+// name with that section's id — same underlying `A.xTab = id; renderX()`
+// pattern every page already used with the old tabs, only the trigger UI
+// changed.
+function _showSectionPicker(title, sections, currentId, onSelectFnName) {
+  const others = sections.filter(s => s.id !== currentId);
+  const rows = others.map(s => `
+    <button type="button" onclick="closeModal();${onSelectFnName}('${s.id}')" style="display:flex;align-items:center;gap:12px;width:100%;padding:13px 4px;background:none;border:none;border-bottom:1px solid ${T.border};cursor:pointer;text-align:left;-webkit-tap-highlight-color:transparent">
+      <span style="flex-shrink:0;display:flex;align-items:center">${s.icon}</span>
+      <span style="flex:1;font-size:14px;font-weight:600;color:${T.ink};display:flex;align-items:center;gap:6px">${s.label}${s.showDot?`<span style="background:${T.rose};border-radius:99px;width:7px;height:7px;display:inline-block;flex-shrink:0"></span>`:''}</span>
+    </button>`).join('');
+  showModal(title, `<div style="display:flex;flex-direction:column">${rows}</div>`);
+}
+window._showSectionPicker = _showSectionPicker;
+
+// v22 (Pass F): shared activity+alerts list markup, now rendered INLINE
+// inside Settings → Notifications instead of the retired toggleNotifPanel()
+// bottom-sheet. Same data sources (_notifications, computeAlerts()) and the
+// same visual rows as before; the only content change is dropping the
+// "push notifications coming soon" banner from the bottom of the list,
+// since that content now lives in the notification-preferences modal
+// instead (see _openNotifPrefsModal() below).
+function _notifActivityListHtml(){
   const alerts = computeAlerts();
   const prefs = getNotifPrefs();
   const filtered = _notifications.filter(n => {
@@ -7861,65 +8579,76 @@ function renderNotifPanel() {
     if (hrs < 24) return `${hrs}h ago`;
     return `${Math.floor(hrs / 24)}d ago`;
   };
-  const hasContent = alerts.length > 0 || filtered.length > 0;
-  const root = document.getElementById('notif-root');
-  if (!root) return;
-  root.innerHTML = `
-    <div class="modal-bg" onclick="if(event.target.classList.contains('modal-bg'))toggleNotifPanel()">
-      <div class="modal-sheet">
-        <div class="modal-head">
-          <div class="modal-title">🔔 Notifications</div>
-          <button class="modal-close" onclick="toggleNotifPanel()">×</button>
+  return `
+    <div style="font-size:10px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Family Activity</div>
+    ${filtered.length ? filtered.map(n => `
+      <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:11px;background:${T.parchment};margin-bottom:8px">
+        <span style="font-size:18px;flex-shrink:0;margin-top:1px">${notifIcon(n.category, n.action)}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:13px;color:${T.ink}">${n.title || ''}</div>
+          ${n.body ? `<div style="font-size:12px;color:${T.muted};margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.body}</div>` : ''}
+          <div style="font-size:10px;color:${T.muted};margin-top:4px;font-weight:600">${fmtRel(n.created_at)}</div>
         </div>
-        <div class="modal-body">
-          <div style="font-size:10px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Family Activity</div>
-          ${filtered.length ? filtered.map(n => `
-            <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:11px;background:${T.parchment};margin-bottom:8px">
-              <span style="font-size:18px;flex-shrink:0;margin-top:1px">${notifIcon(n.category, n.action)}</span>
-              <div style="flex:1;min-width:0">
-                <div style="font-weight:700;font-size:13px;color:${T.ink}">${n.title || ''}</div>
-                ${n.body ? `<div style="font-size:12px;color:${T.muted};margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.body}</div>` : ''}
-                <div style="font-size:10px;color:${T.muted};margin-top:4px;font-weight:600">${fmtRel(n.created_at)}</div>
-              </div>
-            </div>`).join('') : `
-            <div style="text-align:center;padding:20px 0;color:${T.muted}">
-              <div style="font-size:32px;margin-bottom:8px">🤝</div>
-              <div style="font-size:13px;font-weight:600;margin-bottom:4px">No activity yet</div>
-              <div style="font-size:12px">Changes made by other family members will appear here.</div>
-            </div>`}
-          ${alerts.length ? `
-            <div style="height:1px;background:${T.border};margin:14px 0 12px"></div>
-            <div style="font-size:10px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Alerts</div>
-            ${alerts.map(a => `
-              <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:11px;background:${a.color}18;border-left:3px solid ${a.color};margin-bottom:8px">
-                <span style="font-size:18px;flex-shrink:0;margin-top:1px">${a.icon}</span>
-                <div>
-                  <div style="font-weight:700;font-size:13px;color:${T.ink}">${a.title}</div>
-                  <div style="font-size:12px;color:${T.muted};margin-top:2px">${a.body}</div>
-                </div>
-              </div>`).join('')}
-          ` : ''}
-          <div style="background:${T.honeyLight};border-radius:10px;padding:12px 14px;margin-top:${hasContent ? '16' : '8'}px">
-            <div style="font-size:12px;color:${T.honey};font-weight:700;margin-bottom:4px">📱 Push notifications — coming soon</div>
-            <div style="font-size:11px;color:${T.muted};line-height:1.5">Get device alerts for events, reminders, and family activity. Manage your preferences in <button onclick="toggleNotifPanel();goTo('settings');A.settingsTab='notifs';renderSettings()" style="background:none;border:none;color:${T.sage};font-weight:700;cursor:pointer;font-size:11px;padding:0;text-decoration:underline">Settings → Notifications</button>.</div>
+      </div>`).join('') : `
+      <div style="text-align:center;padding:20px 0;color:${T.muted}">
+        <div style="font-size:32px;margin-bottom:8px">🤝</div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">No activity yet</div>
+        <div style="font-size:12px">Changes made by other family members will appear here.</div>
+      </div>`}
+    ${alerts.length ? `
+      <div style="height:1px;background:${T.border};margin:14px 0 12px"></div>
+      <div style="font-size:10px;font-weight:700;color:${T.muted};text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Alerts</div>
+      ${alerts.map(a => `
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:11px;background:${a.color}18;border-left:3px solid ${a.color};margin-bottom:8px">
+          <span style="font-size:18px;flex-shrink:0;margin-top:1px">${a.icon}</span>
+          <div>
+            <div style="font-weight:700;font-size:13px;color:${T.ink}">${a.title}</div>
+            <div style="font-size:12px;color:${T.muted};margin-top:2px">${a.body}</div>
           </div>
-        </div>
-      </div>
-    </div>`;
+        </div>`).join('')}
+    ` : ''}`;
 }
+window._notifActivityListHtml = _notifActivityListHtml;
 
-// Opens or closes the notification panel.
-async function toggleNotifPanel() {
-  _notifPanelOpen = !_notifPanelOpen;
-  if (_notifPanelOpen) {
-    await loadNotifications();
-    renderNotifPanel();
-    markAllNotifsRead();
-  } else {
-    document.getElementById('notif-root').innerHTML = '';
-  }
+// v22 (Pass F): notification PREFERENCES modal — reuses the exact three
+// cards (Family Activity, Smart Alerts, Push-coming-soon) that used to be
+// the "Notifications" Settings TAB content verbatim, just moved into
+// showModal() instead of a tab pane. Opened via "Manage notification
+// settings" below the activity list in Settings → Notifications.
+function _openNotifPrefsModal(){
+  const prefs = getNotifPrefs();
+  const prefRow = (key, icon, label) => `
+    <label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid ${T.border};cursor:pointer">
+      <input type="checkbox" ${prefs[key]!==false?'checked':''} onchange="updateNotifPref('${key}',this.checked)">
+      <span style="font-size:16px;flex-shrink:0">${icon}</span>
+      <span style="font-size:14px;font-weight:600">${label}</span>
+    </label>`;
+  showModal('Notification settings', `
+    <div class="card" style="padding:14px;margin-bottom:12px">
+      <div class="lbl" style="margin-bottom:10px">Family Activity — what to track</div>
+      <p style="font-size:12px;color:${T.muted};margin-bottom:12px">Shown in your Notifications section whenever another family member makes a change.</p>
+      ${prefRow('notif_event','🗓','Calendar events added or changed')}
+      ${prefRow('notif_note','📓','Notes added or changed')}
+      ${prefRow('notif_shopping','🛒','Shopping list items added')}
+      ${prefRow('notif_meal','🍽','Meal planner updated')}
+      ${prefRow('notif_inventory_meds','💊','Medications added or changed')}
+      ${prefRow('notif_inventory_products','📦','Products added or changed')}
+    </div>
+    <div class="card" style="padding:14px;margin-bottom:12px">
+      <div class="lbl" style="margin-bottom:10px">Smart Alerts — computed from your data</div>
+      <p style="font-size:12px;color:${T.muted};margin-bottom:12px">Shown at the top of your Notifications section.</p>
+      ${prefRow('alert_low_stock','💊','Low medication stock (≤ 7 days left)')}
+      ${prefRow('alert_expiring','⏰','Products expiring within 30 days')}
+      ${prefRow('alert_overdue','⚠️','Overdue tasks with open items')}
+      ${prefRow('alert_event_start','🔔','Events starting within the next hour')}
+    </div>
+    <div class="card" style="padding:14px">
+      <div class="lbl" style="margin-bottom:10px">Push notifications — coming soon</div>
+      <p style="font-size:12px;color:${T.muted};margin-bottom:12px;line-height:1.6">Get device-level alerts for upcoming events, low stock, and family activity. Your preferences above will activate automatically when push notifications launch.</p>
+      <div style="background:${T.honeyLight};border-radius:9px;padding:10px 12px;font-size:12px;color:${T.honey};font-weight:600">📱 Not available yet — we'll let you know as soon as push notifications launch.</div>
+    </div>`);
 }
-window.toggleNotifPanel = toggleNotifPanel;
+window._openNotifPrefsModal = _openNotifPrefsModal;
 
 // Saves a single notification preference key into families.notif_preferences (JSONB).
 async function updateNotifPref(key, val) {
@@ -7933,7 +8662,7 @@ async function updateNotifPref(key, val) {
     .update({ notif_preferences: prefs })
     .eq('id', A.family.id)
     .select().single());
-  if (error) { toast('Error saving preference.', true); console.error(error); renderSettings(); return; }
+  if (error) { toast('Error saving preference.', true); console.error(error); _openNotifPrefsModal(); return; }
   A.family = data;
 }
 window.updateNotifPref = updateNotifPref;
@@ -7994,11 +8723,14 @@ window.toggleCuratedContent=toggleCuratedContent;
 // ── FEEDBACK ──────────────────────────────────────────────────────────────────
 // Floating 💬 button → modal form → saves to `feedback` table in Supabase.
 
+// v22: 'other' type removed per Roxana's decision — 'general feedback' already
+// covers that ground. Historic feedback rows saved with type='other' are left
+// untouched in Supabase and still visible in Table Editor / the future Admin
+// feedback viewer — this only removes the option going forward.
 const FB_TYPES = [
   { value:'general', icon:'💬', label:'General feedback', desc:'Share your thoughts on the app' },
   { value:'bug',     icon:'🐛', label:'Report a bug',     desc:"Something isn't working right" },
   { value:'feature', icon:'✨', label:'Feature request',  desc:"Something you'd love to see added" },
-  { value:'other',   icon:'📝', label:'Other',            desc:'' },
 ];
 
 // ── QUICK ADD (v21) ──────────────────────────────────────────────────────────
@@ -8089,7 +8821,7 @@ function openQuickTask(){
     <div class="form-row"><label class="lbl">Title *</label><input class="inp" id="qt-title" placeholder="Task title" autofocus></div>
     <div class="grid2">
       <div class="form-row" style="margin:0"><label class="lbl">Date</label><input class="inp" type="date" id="qt-date" value="${iDate}"></div>
-      <div class="form-row" style="margin:0"><label class="lbl">Time</label><input class="inp" type="time" id="qt-time" value="${defTime}"></div>
+      <div class="form-row" style="margin:0" id="qt-time-row"><label class="lbl">Time</label>${buildTimeSelect('qt-time', defTime)}</div>
     </div>
     <button class="btn btn-primary btn-full" onclick="saveQuickTask()">Add Task</button>`);
   setTimeout(()=>{ const el=document.getElementById('qt-title'); if(el){el.focus();} },80);
@@ -8101,14 +8833,14 @@ async function saveQuickTask(){
   const title=document.getElementById('qt-title')?.value?.trim();
   if(!title){toast('Please add a title.',true);return;}
   const dateStr=document.getElementById('qt-date')?.value;
-  const timeStr=document.getElementById('qt-time')?.value||'12:00';
+  const timeStr=getTimeVal('qt-time')||'12:00';
   const date = dateStr ? localDT(dateStr,timeStr) : new Date().toISOString();
   // A completely normal task event — same columns as the full Calendar
   // form's Task save (saveEv()), just with every optional field left at
   // its blank/default value, per spec §4.
   const data={
     family_id:A.family.id, type:'task', title, date,
-    end_date:null, all_day:false, member_id:null, location:null,
+    end_date:null, all_day:false, participants:[], participants_all_family:false, location:null,
     links:[], actions:[], tags:[], description:null,
     recurrence:'None', recurrence_end_type:null, recurrence_end_count:null, recurrence_end_date:null,
     is_private:false, created_by_user_id:A.user?.id||null,
@@ -8225,8 +8957,16 @@ async function saveQuickShopItem(){
 }
 window.saveQuickShopItem = saveQuickShopItem;
 
-function openFeedback() {
-  showModal('Send Feedback 💬', `
+// v22 (Pass F): Feedback moved from a modal (openFeedback()) into an
+// inline Settings section. This returns just the form markup — no modal
+// title/wrapper, since Settings already has its own page header.
+// selFbType()/saveFeedback() below are otherwise unchanged; only the
+// "area" dropdown's "Settings" option is renamed to "Profile & Settings",
+// reflecting that Settings is now also the Profile home, and the Save
+// button gets a stable id (was previously found via a modal-scoped
+// selector that would silently no-op once this moved out of a modal).
+function _feedbackFormHtml() {
+  return `
     <div style="font-size:13px;color:${T.muted};margin-bottom:14px;line-height:1.6">
       Help us improve Seamly — tell us what's working, what isn't, or what you'd love to see next. We read every message.
     </div>
@@ -8256,18 +8996,18 @@ function openFeedback() {
       <label class="lbl">Which area of the app? (optional)</label>
       <select class="sel" id="fb-page">
         <option value="">Select…</option>
-        ${['Home','Calendar','Notebook','Inventory','Meals','Settings','General / Other']
+        ${['Home','Calendar','Notebook','Inventory','Meals','Profile & Settings','General / Other']
           .map(p=>`<option value="${p}">${p}</option>`).join('')}
       </select>
     </div>
-    <button class="btn btn-primary btn-full btn-lg" style="margin-top:4px" onclick="saveFeedback()">
+    <button id="fb-save-btn" class="btn btn-primary btn-full btn-lg" style="margin-top:4px" onclick="saveFeedback()">
       Send Feedback 💚
     </button>
     <div style="font-size:11px;color:${T.muted};text-align:center;margin-top:10px;line-height:1.5">
       Your feedback goes directly to the Seamly team.
-    </div>`);
+    </div>`;
 }
-window.openFeedback = openFeedback;
+window._feedbackFormHtml = _feedbackFormHtml;
 
 function selFbType(btn, type) {
   document.querySelectorAll('#fb-types button').forEach(b => {
@@ -8297,7 +9037,11 @@ async function saveFeedback() {
   // v10 (UX hardening): sbWrite() already present — adding Pattern B on top
   // (button-disable, saving toast, try/catch/finally). Button text is
   // "Sending…" rather than "Saving…" to match the feedback context.
-  const _saveBtn=document.querySelector('.modal-body button.btn-primary');
+  // v22 (Pass F): selector changed from a modal-scoped query to a stable
+  // id — this form now lives inline in Settings, not always inside a
+  // modal, and the old '.modal-body button.btn-primary' selector would
+  // have silently found nothing there.
+  const _saveBtn=document.getElementById('fb-save-btn');
   if(_saveBtn){_saveBtn.disabled=true;_saveBtn.dataset.origText=_saveBtn.textContent;_saveBtn.textContent='Sending…';_saveBtn.style.opacity='0.7';}
   showSavingToast();
   let _saveOk=false;
@@ -8311,6 +9055,10 @@ async function saveFeedback() {
     _saveOk=true;
     closeModal();
     toast('Feedback sent! Thank you 💚');
+    // v22 (Pass F): re-render so the form clears for next time, now that
+    // it's a persistent inline section rather than a modal that gets
+    // dismissed (which used to discard the filled-in fields automatically).
+    if (A.settingsTab === 'feedback') renderSettings();
   }catch(e){
     toast('Something went wrong — please try again.',true);console.error(e);
   }finally{
