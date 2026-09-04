@@ -1,4 +1,4 @@
-<!-- Seamly v22 (A–E, F, G + hotfix 2) | STAGING | 18 Aug 2026 -->
+<!-- Seamly v23 (Pass A+B+C+D+E) | STAGING | 03 Sep 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -189,7 +189,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div class="auth-card">
     <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">Seamly</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v22 (A–E, F, G + hotfix 2) — 18 Aug 2026</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v23 (Pass A+B+C+D+E) — 03 Sep 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -240,7 +240,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·G3</span>
+      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v23·E</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sample-btn" onclick="A.family?toggleSampleMode():goTo('settings')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:var(--honey-light);color:var(--honey);border:1px solid var(--honey)44;cursor:pointer;display:none">📋 Sample</button>
@@ -283,7 +283,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v22·G3</span>
+      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v23·E</span>
     </div>
     <button class="nav-btn" data-page="home" onclick="goTo('home')">
       <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0">
@@ -732,6 +732,27 @@ async function doPasswordReset(){
 }
 window.doPasswordReset=doPasswordReset;
 
+// v23 Pass D: entry point for the Sign Out button — warns first if there's
+// anything created/edited offline that hasn't synced to the database yet,
+// since signing out clears the local session this device uses to identify
+// which family that pending data belongs to. Confirms straight through to
+// doSignOut() when there's nothing pending, exactly like before.
+function confirmSignOutIfPending(){
+  const n = _pendingCount();
+  if (!n) { doSignOut(); return; }
+  showModal('Sign out?', `
+    <div style="text-align:center;padding:10px 0">
+      <div style="font-size:40px;margin-bottom:12px">📴</div>
+      <div style="font-weight:700;font-size:16px;margin-bottom:8px">You have ${n} item${n!==1?'s':''} not yet synced</div>
+      <div style="font-size:13px;color:${T.muted};margin-bottom:16px">Signing out now means Seamly can no longer tell these are yours once you sign back in. Stay signed in and reconnect to sync them first, or sign out anyway if you're sure.</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-secondary btn-full" onclick="closeModal()">Stay signed in</button>
+        <button class="btn btn-danger btn-full" onclick="doSignOut()">Sign out anyway</button>
+      </div>
+    </div>`);
+}
+window.confirmSignOutIfPending = confirmSignOutIfPending;
+
 async function doSignOut(){
   // Bypass Supabase network entirely — clear session from localStorage directly
   // This is safe: Supabase reads auth state from localStorage on page load
@@ -806,6 +827,10 @@ async function loadAll(){
   A.subscription = famSub.data || null;
   A.planLimits = {};
   (planLim.data||[]).forEach(p => { A.planLimits[p.plan_name] = p; });
+  // v23 Pass D: every successful full load is a fresh "known good" snapshot —
+  // save it so there's real data to fall back to if the connection drops
+  // later, including a full page reload while offline. See loadSnapshotFromLocalStorage().
+  saveSnapshotToLocalStorage();
 }
 
 
@@ -923,6 +948,46 @@ async function initApp(user){
   // re-fetch everything from scratch on these silent reconnects — only on
   // the genuine first load. A._appInitialized is the same flag already used
   // just below for this exact distinction.
+  // v23 Pass D: on a genuine cold start while offline, none of the network
+  // calls below (loadAll, admin check, invite acceptance, unlinked-member
+  // linking) can run — so skip straight to restoring whatever was last
+  // successfully loaded, from localStorage. If nothing has ever been loaded
+  // on this device, there's nothing to show — display a dedicated "no data
+  // yet" screen and stop here rather than letting the rest of initApp() run
+  // against empty/undefined data.
+  if (!A._appInitialized && isOffline()) {
+    const hadSnapshot = loadSnapshotFromLocalStorage();
+    if (!hadSnapshot) {
+      document.getElementById('root').style.display = 'none';
+      document.getElementById('auth-screen').style.display = 'none';
+      document.getElementById('loading-screen').style.display = 'flex';
+      document.getElementById('loading-screen').innerHTML = `<div style="text-align:center;padding:40px;font-family:sans-serif">
+        <div style="font-size:40px;margin-bottom:16px">📵</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px">You're offline</div>
+        <div style="font-size:13px;color:#7a7060;margin-bottom:16px">Seamly needs to load your family's data at least once with a connection before it can work offline.</div>
+        <button onclick="location.reload()" style="padding:10px 20px;background:#5e8b62;color:#fff;border:none;border-radius:10px;font-size:14px;cursor:pointer">Retry</button>
+      </div>`;
+      return;
+    }
+    A._appInitialized = true;
+    document.getElementById('root').style.display = 'flex';
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('fam-badge').textContent = A.family?.name || '';
+    const sBtn = document.getElementById('sample-btn');
+    if (sBtn) sBtn.style.display = A.family ? 'none' : 'block';
+    const profileBtn = document.getElementById('profile-btn');
+    if (profileBtn) profileBtn.style.display = A.family ? 'block' : 'none';
+    goTo(A.page || 'home');
+    // Draft-recovery banners (unfinished Event/Notebook/Meal Planner forms)
+    // are purely local-storage-based, so they still make sense to offer even
+    // on a cold start with no connection — same guard/delay as the online path.
+    if(!A._draftChecksDone){
+      A._draftChecksDone=true;
+      setTimeout(()=>_runDraftChecksSequentially([checkAndOfferEvDraft,checkAndOfferNoteDraft,checkAndOfferMealDraft]),1500);
+    }
+    return;
+  }
+
   if (!A._appInitialized) {
     try{await loadAll();}catch(e){console.error('Load error',e);}
   }
@@ -985,7 +1050,10 @@ async function initApp(user){
 
   // ALWAYS check for unlinked family_members rows matching this user's email
   // This covers: invited users who already had an account, users added after signup
-  try {
+  // v23 Pass D: skipped entirely while offline — this is a real network call
+  // (not routed through sbWrite), so it would otherwise hang/throw on every
+  // silent reconnect re-fire that happens to land while still offline.
+  if (!isOffline()) try {
     const {data:unlinked, error:ule} = await sb.from('family_members')
       .select('id,family_id')
       .ilike('email', user.email)
@@ -1034,7 +1102,11 @@ async function initApp(user){
   if (profileBtn) profileBtn.style.display = A.family ? 'block' : 'none';
 
   // v8: load initial notifications and start a polling interval (60s)
-  if (A.family && !isSampleMode()) {
+  // v23 Pass D: don't kick this off while offline — loadNotifications() hits
+  // the network directly. It'll start correctly once online, since
+  // _updateOnlineStatus() re-runs initApp()'s notification setup indirectly
+  // via the same reconnect handling that triggers syncPendingItems() below.
+  if (A.family && !isSampleMode() && !isOffline()) {
     loadNotifications();
     clearInterval(A._notifInterval);
     A._notifInterval = setInterval(loadNotifications, 60000);
@@ -1065,6 +1137,46 @@ async function initApp(user){
   } else {
     goTo(A.page);
   }
+
+  // v23 (Shareable links): resolve a pending ?note=/?event= deep link now
+  // that notes/events have loaded, overriding wherever the block above
+  // just navigated to. Mirrors the invite-consumption pattern earlier in
+  // this function — read once, always clear from localStorage right away
+  // (success or failure) so it can never re-fire on a later reload or a
+  // silent initApp() re-run. Family-scoped, so only runs once a family
+  // context actually exists.
+  const _pendingShareRaw = localStorage.getItem('ks_pending_share');
+  if (_pendingShareRaw && A.family && !isSampleMode()) {
+    localStorage.removeItem('ks_pending_share');
+    try {
+      const _share = JSON.parse(_pendingShareRaw);
+      if (_share.type === 'event') {
+        const _ev = A.events.find(e => e.id === _share.id);
+        // Privacy re-check: a link valid when shared can point to an item
+        // marked private since — never let this path bypass the same
+        // is_private filter getEvents() applies everywhere else. Treated
+        // identically to "not found".
+        if (_ev && (!_ev.is_private || _ev.created_by_user_id === A.user?.id)) {
+          goTo('calendar');
+          setTimeout(() => viewEv(_ev.id), 100);
+        } else {
+          toast("That item isn't available.", true);
+        }
+      } else if (_share.type === 'note') {
+        const _note = A.notes.find(n => n.id === _share.id);
+        if (_note && (!_note.is_private || _note.created_by_user_id === A.user?.id)) {
+          goTo('notebook');
+          // openNote() already branches internally to the read-only
+          // curated view when the note is curated — no special-casing
+          // needed here.
+          setTimeout(() => openNote(_note.id), 100);
+        } else {
+          toast("That item isn't available.", true);
+        }
+      }
+    } catch(e) { console.error('Share link consume error', e); }
+  }
+
   if(A.showOB)renderOB();
   // v13: check for an unfinished event form draft saved before a page reload
   // Delay 1.5s so the home page renders first before showing the banner
@@ -1203,16 +1315,28 @@ window.addEventListener('popstate', () => {
 // used for both the icon badge's tint background and this slide's dot.
 function getOB(){
   const isNew = A.obFlow === 'new';
+  // v23 Pass E: onboarding review, per your instruction to do this right
+  // before go-live. Three fixes from re-checking the tour against the
+  // actual app: (1) curated reference content — added in V20, opt-in via
+  // Settings — was never mentioned anywhere in the tour; (2) the Meal
+  // Planner (the default tab on the "Meals" nav page) had no slide of its
+  // own — the old "Shopping Lists" slide only covered the second tab; (3)
+  // the old "Meds & Supplies" slide only described the Inventory page's
+  // meds tab, not its Products/Supplies tab. Slide titles now match the
+  // bottom-nav labels exactly ("Inventory", "Meals"), and slide order now
+  // follows the nav's left-to-right order too, so the tour reads as a
+  // walkthrough of the actual nav bar rather than a differently-ordered,
+  // differently-labelled summary of it.
   return [
-    {icon:'👋',title:'Welcome to Seamly',body:"Your family's all-in-one hub — calendar, notes, meds tracking, shopping lists, and insights. Let's take a quick tour!",accent:T.sage},
+    {icon:'👋',title:'Welcome to Seamly',body:"Your family's all-in-one hub — calendar, notes, inventory, meal planning, and insights. Let's take a quick tour!",accent:T.sage},
     isNew
       ? {icon:'⚙️',title:'Settings',body:'Start here to create your family — add members, set your preferences, and get everyone set up.',accent:T.sage}
       : {icon:'⚙️',title:'Settings',body:'Review your family and the members already in it, and make it your own.',accent:T.sage},
     {icon:'🗓',title:'Calendar',body:'Add social events, health appointments, wellness logs, and tasks. Filter by type or member. Everything shared in one view.',accent:T.sky},
-    {icon:'📓',title:'Notebook',body:'Digital notes organised into groups. School schedules, health notes, travel plans — shared with your family.',accent:T.plum},
-    {icon:'🛒',title:'Shopping Lists',body:'Keep a running list for every store or occasion. Check items off together, from anywhere, in real time.',accent:T.sage},
-    {icon:'💊',title:'Meds & Supplies',body:'Track daily and occasional medications. The app calculates run-out dates and helps you coordinate your next order.',accent:T.rose},
-    {icon:'📊',title:'Insights',body:"A simple weekly digest across your calendar, notes, meds, shopping, and meals — plus a personalised family challenge.",accent:T.honey},
+    {icon:'📓',title:'Notebook',body:'Digital notes organised into groups. School schedules, health notes, travel plans — shared with your family. You can also turn on curated reference content (like natural-remedy guides) anytime in Settings.',accent:T.plum},
+    {icon:'💊',title:'Inventory',body:'Track daily and occasional medications — the app calculates run-out dates and helps you coordinate your next order — plus any household products or supplies, with their own stock levels and expiry dates.',accent:T.rose},
+    {icon:'🍽',title:'Meals',body:'Plan your weekly menu, then keep a running shopping list for every store or occasion. Check items off together, from anywhere, in real time.',accent:T.sage},
+    {icon:'📊',title:'Insights',body:"A simple weekly digest across your calendar, notes, inventory, and meals — plus a personalised family challenge.",accent:T.honey},
     isNew
       ? {icon:'🚀',title:"You're all set!",body:'Head to Settings to create your family and add your first members.',accent:T.sage,final:true,cta:'settings'}
       : {icon:'🚀',title:"You're all set!",body:"You're ready to go — head to Home to see what's happening.",accent:T.sage,final:true,cta:'home'},
@@ -1288,7 +1412,15 @@ function renderCal(){
   const rawFirst=new Date(vY,vM,1).getDay();
   const firstDay=(rawFirst+6)%7;
   const dIM=new Date(vY,vM+1,0).getDate();
-  const cells=Array.from({length:Math.ceil((firstDay+dIM)/7)*7},(_,i)=>{const d=i-firstDay+1;return d>=1&&d<=dIM?d:null;});
+  // v23 (Faded adjacent-month days): cells now always cover full weeks —
+  // day numbers before 1 or after dIM roll over into the previous/next
+  // month automatically (JS Date normalizes out-of-range day numbers), so
+  // every cell has a real date instead of some being blank placeholders.
+  // inMonth flags which cells belong to the month actually being viewed.
+  const cells=Array.from({length:Math.ceil((firstDay+dIM)/7)*7},(_,i)=>{
+    const dayNum=i-firstDay+1;
+    return {date:new Date(vY,vM,dayNum), inMonth:dayNum>=1&&dayNum<=dIM};
+  });
 
   const filtered=getEvents().filter(e=>{
     if(A.calFType!=='all'&&e.type!==A.calFType)return false;
@@ -1297,7 +1429,10 @@ function renderCal(){
     return true;
   }).sort((a,b)=>new Date(a.date)-new Date(b.date));
 
-  const evOnDay=d=>filtered.filter(e=>isSameDay(e.date,new Date(vY,vM,d)));
+  // v23: takes a real Date now (was a day-of-month number assumed to be
+  // within the currently-viewed month), so it also works correctly for
+  // the faded adjacent-month cells above.
+  const evOnDay=dt=>filtered.filter(e=>isSameDay(e.date,dt));
   // Note: toISOLocal used in form to avoid UTC date shift
 
   let grid='';
@@ -1306,10 +1441,11 @@ function renderCal(){
       ${DN.map(d=>`<div style="text-align:center;font-size:10px;font-weight:700;color:${T.muted};padding:3px 0;text-transform:uppercase">${d}</div>`).join('')}
     </div>
     <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">
-      ${cells.map(d=>{
-        if(!d)return'<div style="min-height:80px"></div>';
-        const isT=isSameDay(new Date(vY,vM,d),todayD());
-        const de=evOnDay(d);
+      ${cells.map(cell=>{
+        const dt=cell.date, inMonth=cell.inMonth;
+        const cy=dt.getFullYear(), cm=dt.getMonth(), cd=dt.getDate();
+        const isT=isSameDay(dt,todayD());
+        const de=evOnDay(dt);
         const shortT=e=>{const t=e.title||ET[e.type].label;const s=t.replace(/\s*[-–]\s*Wellness Log$/i,'').replace(/^Wellness Log$/i,'Log');return s.length>8?s.substring(0,7)+'\u2026':s;};
         const pillC=e=>{
           // Family-wide, unassigned, or multiple members = neutral grey
@@ -1320,10 +1456,15 @@ function renderCal(){
           const mem=A.members.find(m=>m.id===mid);
           return mem?mem.color:'#9e9488';
         };
-        const dayOfWeek=(new Date(vY,vM,d).getDay()+6)%7; // 0=Mon..6=Sun
+        const dayOfWeek=(dt.getDay()+6)%7; // 0=Mon..6=Sun
         const isWeekend=dayOfWeek>=5;
-        const dayBg=isT?T.sageLight:isWeekend?T.parchment+'bb':'#fff';
-        const dt=new Date(vY,vM,d);
+        // v23: only the cell's frame (bg/border/day-number) is muted for an
+        // out-of-month day; event pill colors below are untouched by
+        // inMonth, so upcoming events stay fully visible across the
+        // month boundary as requested.
+        const dayBg=!inMonth?T.parchment+'55':isT?T.sageLight:isWeekend?T.parchment+'bb':'#fff';
+        const cellBorder=!inMonth?T.border+'99':isT?T.sageMid:T.border;
+        const numColor=!inMonth?T.muted:isT?'#fff':T.ink;
         // Continuation events — started before today, ends today or later
         const spanCont=filtered.filter(e=>{
           if(!e.end_date)return false;
@@ -1338,13 +1479,17 @@ function renderCal(){
         const dayEvents=de.filter(e=>!spanCont.find(s=>s.id===e.id));
         // Multi-day starts (start today, end later)
         const isMultiStart=e=>e.end_date&&!isSameDay(e.date,e.end_date)&&isSameDay(e.date,dt);
-        return`<div onclick="calClick(${d})" style="min-height:80px;padding:3px 2px 4px;border-radius:9px;background:${dayBg};border:1px solid ${isT?T.sageMid:T.border};cursor:pointer;overflow:hidden">
-          <div style="width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:${isT?T.sage:'transparent'};color:${isT?'#fff':T.ink};font-size:11px;font-weight:${isT?800:600};margin:0 auto 3px">${d}</div>
+        // v23 (Unify day-click): the cell's own onclick, and every event
+        // pill's onclick below, all call the same calDayClick — tapping a
+        // pill now opens the Daily Summary instead of jumping straight to
+        // that event's own detail view.
+        return`<div onclick="calDayClick(${cy},${cm},${cd})" style="min-height:80px;padding:3px 2px 4px;border-radius:9px;background:${dayBg};border:1px solid ${cellBorder};cursor:pointer;overflow:hidden">
+          <div style="width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:${isT?T.sage:'transparent'};color:${numColor};font-size:11px;font-weight:${isT?800:inMonth?600:500};margin:0 auto 3px">${cd}</div>
           <div style="display:flex;flex-direction:column;gap:2px">
             ${spanCont.slice(0,2).map(e=>{
               const pc=pillC(e);
               const isLast=isLastDay(e);
-              return`<div onclick="event.stopPropagation();viewEv('${e.id}')" style="background:${pc};margin:0 -3px 0 -3px;padding:1px 3px;font-size:9px;font-weight:700;color:#fff;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:${isLast?'0 3px 3px 0':'0'};cursor:pointer;display:block">${isLast?(e.series_id?'🔁 ':'')+shortT(e):' '}</div>`;
+              return`<div onclick="event.stopPropagation();calDayClick(${cy},${cm},${cd})" style="background:${pc};margin:0 -3px 0 -3px;padding:1px 3px;font-size:9px;font-weight:700;color:#fff;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:${isLast?'0 3px 3px 0':'0'};cursor:pointer;display:block">${isLast?(e.series_id?'🔁 ':'')+shortT(e):' '}</div>`;
             }).join('')}
             ${dayEvents.slice(0,Math.max(0,3-spanCont.length)).map(e=>{
               const pc=pillC(e);
@@ -1352,7 +1497,7 @@ function renderCal(){
               // Multi-day start: solid colour pill extending right; single-day: left-border pill
               // 🔁 takes the place of the type icon for recurring events — there's only
               // room for one symbol at this size, and "this repeats" is the more useful cue.
-              return`<div onclick="event.stopPropagation();viewEv('${e.id}')" style="background:${ms?pc:pc+'22'};border-left:2px solid ${pc};border-radius:${ms?'4px 0 0 4px':'0 3px 3px 0'};margin:${ms?'0 -2px 0 0':'0'};padding:1px 2px;font-size:9px;font-weight:700;color:${ms?'#fff':pc};line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer" title="${e.title||ET[e.type].label}">${e.series_id?'🔁':ET[e.type].icon} ${shortT(e)}</div>`;
+              return`<div onclick="event.stopPropagation();calDayClick(${cy},${cm},${cd})" style="background:${ms?pc:pc+'22'};border-left:2px solid ${pc};border-radius:${ms?'4px 0 0 4px':'0 3px 3px 0'};margin:${ms?'0 -2px 0 0':'0'};padding:1px 2px;font-size:9px;font-weight:700;color:${ms?'#fff':pc};line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer" title="${e.title||ET[e.type].label}">${e.series_id?'🔁':ET[e.type].icon} ${shortT(e)}</div>`;
             }).join('')}
             ${dayEvents.length+spanCont.length>3?`<div style="font-size:8px;color:${T.muted};font-weight:700;text-align:center;padding-top:1px">+${dayEvents.length+spanCont.length-3} more</div>`:''}
           </div>
@@ -1378,7 +1523,10 @@ function renderCal(){
           ${de.length?de.map(e=>{
             const mc=wMc(e);
             const timeLabel=e.all_day||e.type==='wellness'?'All day':fmtT(e.date)+(e.end_date&&!e.all_day?' → '+fmtT(e.end_date):'');
-            return`<div onclick="viewEv('${e.id}')" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:9px;background:${mc}15;border-left:3px solid ${mc};margin-bottom:5px;cursor:pointer">
+            // v23 (Unify day-click): opens the Daily Summary for this day
+            // instead of jumping straight to this event's detail view —
+            // matches the same change made to the Calendar month grid.
+            return`<div onclick="calDayClick(${d.getFullYear()},${d.getMonth()},${d.getDate()})" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:9px;background:${mc}15;border-left:3px solid ${mc};margin-bottom:5px;cursor:pointer">
               <span style="font-size:14px;flex-shrink:0">${ET[e.type].icon}</span>
               <div style="flex:1;min-width:0">
                 <div style="font-size:12px;font-weight:700;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.series_id?'🔁 ':''}${e.title||ET[e.type].label}</div>
@@ -1533,9 +1681,15 @@ function renderCalResults(){
 }
 window.renderCalResults=renderCalResults;
 
-function calClick(d){
-  const vY=A.calDate.getFullYear(),vM=A.calDate.getMonth();
-  const dt=new Date(vY,vM,d);
+// v23: renamed from calClick(d) and now takes a full date (year, month,
+// day) instead of a day-of-month number assumed to be within the
+// currently-viewed month. Required for the faded adjacent-month cells (a
+// "31" cell shown on a September grid must resolve to August 31, not
+// September 31 rolling into October), and is now also the single shared
+// handler used when tapping an individual event pill anywhere on the
+// Calendar grid — see the "Unify day-click" comments at each call site.
+function calDayClick(y,m,d){
+  const dt=new Date(y,m,d);
   const applyFilters = e => {
     if(A.calFType!=='all' && e.type!==A.calFType) return false;
     if(A.calFMember!=='all' && !(e.participants||[]).includes(A.calFMember) && e.member_id!==A.calFMember) return false;
@@ -1556,7 +1710,7 @@ function calClick(d){
   else if(A.calFType==='all'&&A.calFMember==='all')showPicker(dt);
   else showDayModal(dt,[]); // filtered — show empty day modal not picker
 }
-window.calClick=calClick;
+window.calDayClick=calDayClick;
 
 function showDayModal(dt,de){
   const memColor=e=>{
@@ -3206,6 +3360,19 @@ async function sbWrite(operation, opts = {}) {
   // toast for something they didn't initiate. Diagnostic console logging
   // (_logConnIssue) still fires either way.
   const silent = !!opts.silent;
+  // v23 Pass D: blanket offline guard — covers every one of this app's write
+  // (and read) calls that already goes through sbWrite() in one place,
+  // instead of adding this check to each call site individually. Fails
+  // immediately rather than waiting out the 7s timeout below, which would
+  // otherwise make every offline attempt feel like a frozen app for 7
+  // seconds before finally showing an error. Offline-CREATE (new events,
+  // new notes) and local edits/deletes of a not-yet-synced item never reach
+  // this function at all — those are handled earlier, before sbWrite() is
+  // called, in saveEv()/saveNote()/confirmDelEv()/confirmDelNote().
+  if (isOffline()) {
+    if (!silent) _offlineBlockToast();
+    return { error: { message: 'offline' }, data: null };
+  }
   const withTimeout = (fn) => Promise.race([
     fn(),
     new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS))
@@ -3302,6 +3469,170 @@ function localDT(dateStr, timeStr) {
   return `${dateStr}T${pad(h)}:${pad(mi)}:00${sign}${pad(Math.floor(Math.abs(off)/60))}:${pad(Math.abs(off)%60)}`;
 }
 window.localDT = localDT;
+
+// ══════════════════════════════════════════════════════════════════════════
+// v23 Pass D — OFFLINE MODE (Approach B: read-only + create-only)
+// ══════════════════════════════════════════════════════════════════════════
+// See claude/seamly_v23_offline_mode_SPEC.md for the confirmed design. In
+// short: while offline, the app keeps showing whatever data it last loaded
+// successfully (a localStorage "snapshot", refreshed on every good load),
+// stamped with when that data was last retrieved. You can still create new
+// notes and new events/tasks of any type — they're saved to this device
+// only, with a local placeholder id (always starting "local_"), and pushed
+// to the real database automatically the moment the connection comes back.
+// Editing or deleting a NOT-YET-SYNCED item works fully offline too (it
+// never left this device, so there's nothing to reconcile). Everything else
+// — editing/deleting/completing/ignoring an item that's already in the
+// database, and all of Meds/Inventory/Shopping/Meal Planner — is read-only
+// offline; the centralized guard in sbWrite() (below) blocks those attempts
+// with a clear message instead of hanging or silently failing.
+//
+// Known, deliberate trade-offs (kept small on purpose — flagged to Roxana):
+// - Only Edit and Delete get the "still works, it's local-only" treatment
+//   for a pending item. Complete/Ignore/checklist-tick on a pending item
+//   falls back to the same "needs a connection" message as everything else
+//   — those are rarer to want on something you just created seconds ago,
+//   and special-casing them everywhere they're triggered from would have
+//   meant touching many more functions for not much real benefit.
+// - The Save/Delete buttons for Meds/Inventory/Shopping/Meal Planner are
+//   NOT visually greyed out while offline — attempting to use them still
+//   shows the same clear offline toast via the sbWrite() guard below, so
+//   nothing breaks silently, it's just not pre-emptively hidden there.
+
+// True whenever the browser reports no network connection. The single
+// source of truth every other offline check in this file reads from.
+function isOffline(){ return !navigator.onLine; }
+window.isOffline = isOffline;
+
+// Any id starting with "local_" was generated on THIS device while offline
+// and has never been saved to the real database — by construction, nothing
+// else can produce an id in this shape (real Supabase ids are UUIDs without
+// this prefix). Used everywhere to decide "can this be edited/deleted
+// locally without a connection, or does it need one".
+function isPendingSync(id){ return typeof id === 'string' && id.startsWith('local_'); }
+window.isPendingSync = isPendingSync;
+
+// One shared, friendly message for every "you can't do that offline" case.
+function _offlineBlockToast(msg){
+  toast(msg || "You're offline — this needs a connection. Your other data is still here to look at.", true);
+}
+
+// Snapshot of everything loadAll() fetched, written to localStorage after
+// every successful load so the app has something real to show if the
+// connection drops later (including a full page reload while offline).
+function saveSnapshotToLocalStorage(){
+  try{
+    const _savedAt = new Date().toISOString();
+    const snap = {
+      savedAt: _savedAt,
+      family: A.family, members: A.members, events: A.events, notes: A.notes,
+      noteGroups: A.noteGroups, dailyMeds: A.dailyMeds, invProducts: A.invProducts,
+      shoppingLists: A.shoppingLists, mealPlan: A.mealPlan,
+      subscription: A.subscription, planLimits: A.planLimits,
+    };
+    localStorage.setItem('ks_offline_snapshot', JSON.stringify(snap));
+    A._offlineSnapshotSavedAt = _savedAt;
+  }catch(e){ console.warn('Offline snapshot save failed', e); }
+}
+window.saveSnapshotToLocalStorage = saveSnapshotToLocalStorage;
+
+// Restores A.* from the last snapshot (used on a cold app start while
+// offline, since a real loadAll() can't run without a connection). Also
+// merges back in any not-yet-synced items created/edited on this device
+// since that snapshot was taken, so nothing offline-created is ever lost
+// on a reload. Returns true if a snapshot existed to restore.
+function loadSnapshotFromLocalStorage(){
+  try{
+    const raw = localStorage.getItem('ks_offline_snapshot');
+    if(!raw) return false;
+    const snap = JSON.parse(raw);
+    A.family = snap.family || null;
+    A.members = snap.members || [];
+    A.events = snap.events || [];
+    A.notes = snap.notes || [];
+    A.noteGroups = snap.noteGroups || [];
+    A.dailyMeds = snap.dailyMeds || [];
+    A.invProducts = snap.invProducts || [];
+    A.shoppingLists = snap.shoppingLists || [];
+    A.mealPlan = snap.mealPlan || null;
+    A.subscription = snap.subscription || null;
+    A.planLimits = snap.planLimits || {};
+    A._offlineSnapshotSavedAt = snap.savedAt || null;
+    try{
+      const pendingEvents = JSON.parse(localStorage.getItem('ks_pending_events') || '[]');
+      pendingEvents.forEach(pe => { if(!A.events.some(e=>e.id===pe.id)) A.events.push(pe); });
+    }catch(_){}
+    try{
+      const pendingNotes = JSON.parse(localStorage.getItem('ks_pending_notes') || '[]');
+      pendingNotes.forEach(pn => { if(!A.notes.some(n=>n.id===pn.id)) A.notes.push(pn); });
+    }catch(_){}
+    return true;
+  }catch(e){ console.warn('Offline snapshot load failed', e); return false; }
+}
+window.loadSnapshotFromLocalStorage = loadSnapshotFromLocalStorage;
+
+// Persist the current set of not-yet-synced events/notes so they survive a
+// reload while still offline (loadSnapshotFromLocalStorage merges these back
+// in on the next cold start). Called every time a pending item is created,
+// edited, deleted locally, or successfully synced.
+function _savePendingEvents(){
+  try{ localStorage.setItem('ks_pending_events', JSON.stringify(A.events.filter(e=>e._pendingSync))); }catch(_){}
+}
+function _savePendingNotes(){
+  try{ localStorage.setItem('ks_pending_notes', JSON.stringify(A.notes.filter(n=>n._pendingSync))); }catch(_){}
+}
+
+// How many not-yet-synced items currently exist (events + notes) — used by
+// the offline banner, Home, and the sign-out warning.
+function _pendingCount(){
+  return A.events.filter(e=>e._pendingSync).length + A.notes.filter(n=>n._pendingSync).length;
+}
+window._pendingCount = _pendingCount;
+
+// "Data last loaded 12 minutes ago" — reuses formatLastEdited()'s existing
+// relative-time phrasing (defined much earlier in this file) with a prefix
+// that fits a whole-app data snapshot rather than a single note/event edit.
+// Used by the offline banner and Home's offline notice.
+function _offlineDataAgeText(){
+  if(!A._offlineSnapshotSavedAt) return '';
+  return formatLastEdited(A._offlineSnapshotSavedAt).replace(/^Last edited/, 'Data last loaded');
+}
+window._offlineDataAgeText = _offlineDataAgeText;
+
+// Pushes every not-yet-synced event/note to the real database, one at a
+// time (never batched) so a single failure can't block the rest and so each
+// local placeholder is tied unambiguously to the real row it becomes. Runs
+// automatically when the connection comes back (see _updateOnlineStatus
+// below) — there's no manual "sync now" button, per the confirmed spec.
+async function syncPendingItems(){
+  if(isOffline()) return;
+  const pendingEvents = A.events.filter(e=>e._pendingSync);
+  const pendingNotes = A.notes.filter(n=>n._pendingSync);
+  const total = pendingEvents.length + pendingNotes.length;
+  if(!total) return;
+  toast(`Syncing ${total} offline item${total!==1?'s':''}…`);
+  let failCount = 0;
+  for(const localEv of pendingEvents){
+    const {id, _pendingSync, created_at, ...payload} = localEv;
+    const {data, error} = await sbWrite(() => sb.from('events').insert(payload).select().single());
+    if(error || !data){ failCount++; console.error('Pending event sync failed', error); continue; }
+    A.events = A.events.map(e => e.id===localEv.id ? data : e);
+  }
+  for(const localNt of pendingNotes){
+    const {id, _pendingSync, created_at, ...payload} = localNt;
+    const {data, error} = await sbWrite(() => sb.from('notes').insert(payload).select().single());
+    if(error || !data){ failCount++; console.error('Pending note sync failed', error); continue; }
+    A.notes = A.notes.map(n => n.id===localNt.id ? data : n);
+  }
+  _savePendingEvents(); _savePendingNotes();
+  saveSnapshotToLocalStorage();
+  if(typeof renderHome==='function') renderHome();
+  if(typeof renderCal==='function') renderCal();
+  if(typeof renderNB==='function') renderNB();
+  if(failCount===0) toast(`Synced! ✅ (${total} item${total!==1?'s':''})`);
+  else toast(`Synced ${total-failCount} of ${total} — ${failCount} will retry next time you're online.`, true);
+}
+window.syncPendingItems = syncPendingItems;
 
 async function saveEv(type, evId, dateTs) {
   if (!A.family) { toast('Set up your family first.', true); return; }
@@ -3589,6 +3920,30 @@ async function saveEv(type, evId, dateTs) {
 
     let savedFirst = null;
     if (evId) {
+      // v23 Pass D: editing an item that only exists on this device so far
+      // (created offline, never synced) — apply the edit locally, no
+      // network needed since there's nothing on the server to reconcile
+      // yet. Series-editing (Change IV) on a not-yet-synced item isn't
+      // supported — falls back to a plain single-occurrence local edit,
+      // which covers the case correctly even if less thoroughly.
+      if (isPendingSync(evId)) {
+        const _existingPending = A.events.find(e => e.id === evId) || {};
+        const merged = {..._existingPending, ...cleanedData, id: evId, _pendingSync: true};
+        A.events = A.events.map(e => e.id===evId ? merged : e);
+        _savePendingEvents();
+        savedFirst = merged;
+        _saveOk = true;
+        clearEvDraft();
+        _closeModalDOM();
+        toast("Saved locally — will sync when you're back online. 📴");
+        renderCal();
+        renderHome();
+        return;
+      }
+      if (isOffline()) {
+        _offlineBlockToast("You're offline — editing an already-saved entry needs a connection.");
+        return;
+      }
       const {family_id:_, ...updateData} = cleanedData;
       const res = await sbWrite(() => sb.from('events').update(updateData).eq('id', evId).select().single());
       if (res.error) {
@@ -3789,6 +4144,27 @@ async function saveEv(type, evId, dateTs) {
           }
         }
       }
+    } else if (isOffline()) {
+      // v23 Pass D: offline create — stamp local placeholder ids instead of
+      // inserting to the database, mirroring generateRecurrences()'s
+      // existing series_id stamping so a recurring series created offline
+      // behaves identically to one created online once it syncs.
+      const localRows = cleanedRecurrences.map(row => ({
+        ...row,
+        id: 'local_' + crypto.randomUUID(),
+        created_at: new Date().toISOString(),
+        _pendingSync: true,
+      }));
+      A.events.push(...localRows);
+      _savePendingEvents();
+      savedFirst = localRows[0];
+      _saveOk = true;
+      clearEvDraft();
+      _closeModalDOM();
+      toast(`Saved locally — will sync when you're back online.${localRows.length>1?' ('+localRows.length+' occurrences)':''} 📴`);
+      renderCal();
+      renderHome();
+      return;
     } else {
       const res = await sbWrite(() => sb.from('events').insert(cleanedRecurrences).select());
       if (res.error) {
@@ -4057,6 +4433,20 @@ function duplicateEv(id) {
 }
 window.duplicateEv = duplicateEv;
 
+// v23 (Shareable links): builds a link carrying just the item's own id —
+// no new table, no token, no expiry. Access control is entirely the same
+// family-scoping + is_private check the app already applies everywhere
+// else (getEvents()/getNotes(), and the explicit re-check in initApp()'s
+// share-consumption block) — this link grants no new access, it's purely
+// a "skip the search" shortcut for someone who already has full access
+// to the item once they're signed in.
+function shareItem(type, id) {
+  const link = `${window.location.origin}${window.location.pathname}?${type}=${id}`;
+  navigator.clipboard?.writeText(link).then(() => toast('Link copied! 📋'))
+    .catch(() => toast('Copy failed — try on a different browser', true));
+}
+window.shareItem = shareItem;
+
 // ── RECURRENCE EDIT CHOICE ────────────────────────────────────────────────────
 // Shows a modal asking the user whether to edit only this occurrence
 // or all occurrences in the series.
@@ -4096,8 +4486,20 @@ async function deleteEntireSeries(seriesId) {
   showSavingToast();
   let _delOk=false;
   try{
+    // v23 Pass D: a series created offline and not yet synced — delete it
+    // locally, no network call (none of its rows exist in the database yet).
+    if (isPendingSync(toDelete[0]?.id)) {
+      A.events = A.events.filter(e=>e.series_id!==seriesId);
+      _savePendingEvents();
+      _delOk=true;
+      closeModal();
+      toast(`Series deleted — ${toDelete.length} occurrence${toDelete.length!==1?'s':''} removed.`);
+      renderCal();
+      renderHome();
+      return;
+    }
     const {error} = await sbWrite(() => sb.from('events').delete().eq('series_id', seriesId));
-    if (error) { toast('Error deleting series.', true); console.error(error); return; }
+    if (error) { if (error.message !== 'offline') toast('Error deleting series.', true); console.error(error); return; }
     A.events = A.events.filter(e=>e.series_id!==seriesId);
     _delOk=true;
     closeModal();
@@ -4223,6 +4625,16 @@ function viewEv(id) {
   if(isSampleMode()){
     body += `<div style="background:${T.honeyLight};border-radius:9px;padding:10px;text-align:center;font-size:12px;color:${T.honey};font-weight:600;margin-top:8px">📋 Sample mode — read only</div>`;
   } else {
+    // v23 Pass D: a not-yet-synced item (created offline, still on this
+    // device only) gets a plain info banner — Edit/Delete both still work
+    // fully locally for it, no lockout needed. An already-synced item being
+    // viewed while offline gets Complete/Ignore/Edit/Delete disabled instead
+    // — those all need a connection to reach the database.
+    const _pendingLocal = !!ev._pendingSync;
+    const _offlineLockedItem = isOffline() && !_pendingLocal;
+    if (_pendingLocal) {
+      body += `<div style="display:inline-flex;align-items:center;gap:6px;background:${T.honeyLight};color:${T.honey};border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;margin-bottom:10px">📴 Saved on this device — will sync automatically once you're online</div>`;
+    }
     // Series badge — shown when this event is part of a recurring series
     if(ev.series_id){
       const seriesCount=A.events.filter(e=>e.series_id===ev.series_id).length;
@@ -4232,18 +4644,35 @@ function viewEv(id) {
     // Tasks WITH actions complete automatically when all actions are ticked.
     if (ev.type === 'task' && (!ev.actions || ev.actions.length === 0)) {
       const isComplete = !!ev.completed_at;
-      body += `<button class="btn btn-full" style="margin-bottom:10px;background:${isComplete?T.parchment:T.sageLight};color:${isComplete?T.muted:T.sage};border:1.5px solid ${isComplete?T.border:T.sageMid};font-size:13px;font-weight:700" onclick="markEvComplete('${ev.id}')">
-        ${isComplete ? '↩ Mark as incomplete' : '✅ Mark as complete'}
+      body += `<button class="btn btn-full" ${_offlineLockedItem?'disabled':''} style="margin-bottom:10px;background:${isComplete?T.parchment:T.sageLight};color:${isComplete?T.muted:T.sage};border:1.5px solid ${isComplete?T.border:T.sageMid};font-size:13px;font-weight:700${_offlineLockedItem?';opacity:0.5;cursor:not-allowed':''}" onclick="markEvComplete('${ev.id}')">
+        ${isComplete ? '↩ Mark as incomplete' : '✅ Mark as complete'}${_offlineLockedItem?' (needs connection)':''}
       </button>`;
+    }
+    // v23 (Ignore option): offered for the same items that can appear in
+    // Home's Other Actions — Tasks, and any event type with checklist
+    // action items — next to the Complete button above. Hidden once the
+    // item is completed (nothing left to ignore at that point).
+    if ((ev.type === 'task' || (ev.actions && ev.actions.length > 0)) && !ev.completed_at) {
+      const isIgnored = !!ev.ignored_at;
+      body += `<button class="btn btn-full" ${_offlineLockedItem?'disabled':''} style="margin-bottom:10px;background:${isIgnored?T.sageLight:'#f5f2ed'};color:${isIgnored?T.sage:'#7a7060'};border:1.5px solid ${isIgnored?T.sageMid:'#e0d8cc'};font-size:13px;font-weight:700${_offlineLockedItem?';opacity:0.5;cursor:not-allowed':''}" onclick="ignoreEv('${ev.id}')">
+        ${isIgnored ? '↩ Un-ignore' : '🙈 Ignore — stop showing on Home'}${_offlineLockedItem?' (needs connection)':''}
+      </button>`;
+    }
+    // v23 (Shareable links): private items never get a Share option —
+    // hidden entirely rather than shown-but-blocked, matching how private
+    // items are handled elsewhere (e.g. no lock-bypass affordance exists).
+    // Share works fully offline (it just copies a link — no network call).
+    if (!ev.is_private) {
+      body += `<button class="btn btn-full" style="margin-bottom:10px;background:${T.skyLight};color:${T.sky};border:1.5px solid ${T.sky}55;font-size:13px;font-weight:700" onclick="shareItem('event','${ev.id}')">🔗 Share</button>`;
     }
     // Edit button: if series event, show choice; otherwise open form directly
     const editCall = ev.series_id
       ? `showRecurrenceEditChoice('${ev.id}')`
       : `_closeModalDOM();openEvForm('${ev.type}','${ev.id}',null)`;
     body += `<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
-      <button class="btn btn-primary" style="flex:1" onclick="${editCall}">✏️ Edit</button>
+      <button class="btn btn-primary" ${_offlineLockedItem?'disabled':''} style="flex:1${_offlineLockedItem?';opacity:0.5;cursor:not-allowed':''}" onclick="${editCall}">✏️ Edit${_offlineLockedItem?' 🔒':''}</button>
       <button class="btn btn-secondary" style="flex:1" onclick="duplicateEv('${ev.id}')">⧉ Duplicate</button>
-      <button class="btn btn-danger" style="flex:1" onclick="delEv('${ev.id}')">🗑 Delete</button>
+      <button class="btn btn-danger" ${_offlineLockedItem?'disabled':''} style="flex:1${_offlineLockedItem?';opacity:0.5;cursor:not-allowed':''}" onclick="delEv('${ev.id}')">🗑 Delete${_offlineLockedItem?' 🔒':''}</button>
     </div>`;
   }
 
@@ -4292,8 +4721,19 @@ async function confirmDelEv(id) {
   // making a single reliable button selector impractical.
   showSavingToast();
   try{
+    // v23 Pass D: deleting an item that only exists on this device so far —
+    // just drop it locally, no network call (it was never in the database).
+    if (isPendingSync(id)) {
+      A.events = A.events.filter(e=>e.id!==id);
+      _savePendingEvents();
+      closeModal(); toast('Entry deleted.');
+      renderCal();
+      renderHome();
+      if(A.calSearch || A.calFType!=='all' || A.calFMember!=='all') setTimeout(renderCalResults, 50);
+      return;
+    }
     const {error} = await sbWrite(() => sb.from('events').delete().eq('id', id));
-    if (error) { toast('Error deleting.', true); console.error(error); return; }
+    if (error) { if (error.message !== 'offline') toast('Error deleting.', true); console.error(error); return; }
     A.events = A.events.filter(e=>e.id!==id);
     // v8: notify other family members
     writeNotif('event','deleted',`${getActorName()} deleted an event`,_evToDel?.title||'');
@@ -4355,7 +4795,7 @@ function renderNB(){
     // v7: strip HTML tags so rich-text markup doesn't show in the card preview
     const previewText=stripHTML(n.content||'');
     return`<div class="note-card" style="background:${n.color}" onclick="openNote('${n.id}')">
-      ${(n.pinned||n.is_private)?`<div style="display:flex;align-items:center;gap:5px;font-size:10px;margin-bottom:3px">${n.pinned?'<span>📌</span>':''}${n.is_private?'<span>🔒</span>':''}</div>`:''}
+      ${(n.pinned||n.is_private||n._pendingSync)?`<div style="display:flex;align-items:center;gap:5px;font-size:10px;margin-bottom:3px">${n._pendingSync?'<span>📴</span>':''}${n.pinned?'<span>📌</span>':''}${n.is_private?'<span>🔒</span>':''}</div>`:''}
       <div style="font-weight:800;font-size:13px;color:${T.ink};margin-bottom:5px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.title||'Untitled'}</div>
       ${previewText?`<div style="font-size:12px;color:${T.muted};line-height:1.5;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:6px">${previewText}</div>`:''}
       ${total>0?`<div style="font-size:11px;color:${T.muted};margin-bottom:5px">✅ ${done}/${total}</div>`:''}
@@ -4652,7 +5092,17 @@ function openNote(noteId){
   // The stored `content` field is HTML (innerHTML). For new notes it starts empty.
   const safeContent = note?.content ? note.content.replace(/`/g,'&#96;') : '';
 
+  // v23 Pass D: a not-yet-synced note (created offline, still on this device
+  // only) can still be freely edited/deleted with no connection — nothing to
+  // reconcile. An already-synced note being opened while offline gets
+  // Save/Delete disabled instead, since those need a connection to reach the
+  // database. A brand-new note (noteId falsy) is unaffected either way — new
+  // notes always save fine (offline creates locally, online saves normally).
+  const _pendingLocalNote = !!(noteId && isPendingSync(noteId));
+  const _offlineLockedNote = isOffline() && !!noteId && !_pendingLocalNote;
+
   showModal(noteId?'Edit Note':'New Note',`
+    ${_pendingLocalNote?`<div style="display:inline-flex;align-items:center;gap:6px;background:${T.honeyLight};color:${T.honey};border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;margin-bottom:10px">📴 Saved on this device — will sync automatically once you're online</div>`:''}
     <input id="ne-t" class="inp" value="${note?.title||''}" placeholder="Title…" style="font-size:16px;font-weight:700;margin-bottom:8px" autofocus>
     <!-- Rich-text formatting toolbar -->
     <div class="note-fmt-bar" id="ne-fmt-bar">
@@ -4701,9 +5151,10 @@ function openNote(noteId){
          (updated_at is NULL until the record's next post-v19 save). Kept in
          sync live as auto-save fires, by _doNoteAutoSave(). -->
     <div id="note-last-edited" style="font-size:11px;color:${T.muted};margin-bottom:10px">${formatLastEdited(note?.updated_at, note?.updated_by_name)}</div>
+    ${noteId&&!note?.is_private&&!_pendingLocalNote?`<button class="btn btn-full" style="margin-bottom:10px;background:${T.skyLight};color:${T.sky};border:1.5px solid ${T.sky}55;font-size:13px;font-weight:700" onclick="shareItem('note','${noteId}')">🔗 Share</button>`:''}
     <div style="display:flex;gap:10px">
-      <button class="btn btn-primary" style="flex:1" onclick="saveNote('${noteId||''}')">Save</button>
-      ${noteId?`<button class="btn btn-danger" onclick="delNote('${noteId}')">🗑</button>`:''}
+      <button class="btn btn-primary" ${_offlineLockedNote?'disabled':''} style="flex:1${_offlineLockedNote?';opacity:0.5;cursor:not-allowed':''}" onclick="saveNote('${noteId||''}')">Save${_offlineLockedNote?' 🔒':''}</button>
+      ${noteId?`<button class="btn btn-danger" ${_offlineLockedNote?'disabled':''} style="${_offlineLockedNote?'opacity:0.5;cursor:not-allowed':''}" onclick="delNote('${noteId}')">🗑</button>`:''}
     </div>`);
   // Populate checklist with drag-enabled rows after modal renders
   setTimeout(()=>{
@@ -4787,6 +5238,11 @@ function _renderCuratedNoteView(note){
     <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:16px;cursor:pointer">
       <input type="checkbox" ${note.pinned?'checked':''} onchange="toggleCuratedNotePin('${note.id}',this.checked)"> 📌 Pin this note
     </label>
+    <!-- v23 (Shareable links): curated notes are never private by nature,
+         so this is unconditional — the link opens straight back into this
+         same read-only curated view via openNote()'s existing is_curated
+         branch, not the editor. -->
+    <button class="btn btn-full" style="margin-bottom:10px;background:${T.skyLight};color:${T.sky};border:1.5px solid ${T.sky}55;font-size:13px;font-weight:700" onclick="shareItem('note','${note.id}')">🔗 Share</button>
     <button class="btn btn-secondary btn-full" onclick="closeModal()">Close</button>`);
 }
 window._renderCuratedNoteView=_renderCuratedNoteView;
@@ -4948,6 +5404,35 @@ async function saveNote(noteId){
     // v19: stamp "last edited" metadata on every manual save (create AND edit).
     data.updated_at = new Date().toISOString();
     data.updated_by_name = getActorName();
+    // v23 Pass D: editing a note that only exists on this device so far
+    // (created offline, never synced) — apply locally, no network needed.
+    if (effectiveId && isPendingSync(effectiveId)) {
+      const _existingPending = A.notes.find(n => n.id === effectiveId) || {};
+      const merged = {..._existingPending, ...data, id: effectiveId, _pendingSync: true};
+      A.notes = A.notes.map(n => n.id===effectiveId ? merged : n);
+      _savePendingNotes();
+      _saveOk = true;
+      A._noteDirty = false;
+      clearNoteDraftLS();
+      closeModal(); toast("Saved locally — will sync when you're back online. 📴"); renderNB();
+      return;
+    }
+    if (isOffline()) {
+      // v23 Pass D: offline create (brand-new note, or editing an
+      // already-synced note — the latter needs a connection to reconcile).
+      if (!effectiveId) {
+        const localNote = {...data, id: 'local_' + crypto.randomUUID(), created_at: new Date().toISOString(), _pendingSync: true};
+        A.notes.push(localNote);
+        _savePendingNotes();
+        _saveOk = true;
+        A._noteDirty = false;
+        clearNoteDraftLS();
+        closeModal(); toast("Saved locally — will sync when you're back online. 📴"); renderNB();
+        return;
+      }
+      _offlineBlockToast("You're offline — editing an already-saved note needs a connection.");
+      return;
+    }
     // v7: sbWrite() for idle-safety
     let res;
     if(effectiveId)res=await sbWrite(()=>sb.from('notes').update(data).eq('id',effectiveId).select().single());
@@ -5006,8 +5491,17 @@ async function confirmDelNote(id){
   showSavingToast();
   let _delOk=false;
   try{
+    // v23 Pass D: a note created offline and not yet synced — delete it
+    // locally, no network call (it was never in the database).
+    if (isPendingSync(id)) {
+      A.notes=A.notes.filter(n=>n.id!==id);
+      _savePendingNotes();
+      _delOk=true;
+      closeModal();toast('Note deleted.');renderNB();renderHome();
+      return;
+    }
     const{error}=await sbWrite(()=>sb.from('notes').delete().eq('id',id));
-    if(error){toast('Error deleting note.',true);console.error(error);return;}
+    if(error){if(error.message!=='offline')toast('Error deleting note.',true);console.error(error);return;}
     A.notes=A.notes.filter(n=>n.id!==id);
     _delOk=true;
     closeModal();toast('Note deleted.');renderNB();renderHome();
@@ -5040,6 +5534,14 @@ window.scheduleNoteAutoSave=scheduleNoteAutoSave;
 
 async function _doNoteAutoSave(){
   if(!A.family||!A.user) return;
+  // v23 Pass D: never attempt a network auto-save while offline — the
+  // existing localStorage draft (saveNoteDraftLS(), already called on every
+  // keystroke by scheduleNoteAutoSave() just above) is what protects your
+  // typing until you tap Save manually, which handles the offline
+  // create/pending-edit cases correctly. Keeping this one guard here (rather
+  // than duplicating the pending-queue logic into a second save path) is a
+  // deliberate simplification — see the Pass D header comment near sbWrite().
+  if(isOffline()) return;
   // v14: a manual Save is currently in flight — bail out so this auto-save
   // can't land after it and overwrite the just-saved data with stale content
   if(A._noteSavingManually) return;
@@ -5995,9 +6497,12 @@ function _followUpCalendarItems(excludeIds){
   const today=todayD();
   const weekAhead=addDays(today,7); weekAhead.setHours(23,59,59,999);
   const ex=excludeIds||new Set();
+  // v23 (Ignore option): items with ignored_at set are excluded here, the
+  // same way completed items already are — Ignore is a separate "stop
+  // nagging me" state from Complete, but has the same effect on this list.
   return [
-    ...getEvents().filter(e=>e.type==='task'&&!e.completed_at&&new Date(e.date)<=weekAhead&&!ex.has(e.id)),
-    ...getEvents().filter(e=>e.type!=='task'&&e.actions?.length>0&&e.actions.some(a=>!a.done)&&new Date(e.date)<=weekAhead&&!ex.has(e.id)),
+    ...getEvents().filter(e=>e.type==='task'&&!e.completed_at&&!e.ignored_at&&new Date(e.date)<=weekAhead&&!ex.has(e.id)),
+    ...getEvents().filter(e=>e.type!=='task'&&e.actions?.length>0&&e.actions.some(a=>!a.done)&&!e.ignored_at&&new Date(e.date)<=weekAhead&&!ex.has(e.id)),
   ].sort((a,b)=>new Date(a.date)-new Date(b.date));
 }
 
@@ -6184,6 +6689,7 @@ function renderHome(){
   const todayEvs=getEvents().filter(e=>{
     if(e.type==='wellness') return false;
     if(e.type==='task' && e.completed_at) return false; // v7: hide completed tasks
+    if(e.ignored_at) return false; // v23 (Ignore option): stop nagging on Home, any section
     const evStart=new Date(e.date);
     const evStartDay=new Date(evStart); evStartDay.setHours(0,0,0,0);
 
@@ -6233,6 +6739,7 @@ function renderHome(){
   const upcomingEvs=getEvents().filter(e=>{
     if(e.type==='wellness') return false;
     if(e.type==='task' && e.completed_at) return false; // v7: hide completed tasks
+    if(e.ignored_at) return false; // v23 (Ignore option): stop nagging on Home, any section
     const evStart=new Date(e.date); evStart.setHours(0,0,0,0);
     return evStart>=weekStart && evStart<=weekEnd;
   }).sort((a,b)=>new Date(a.date)-new Date(b.date));
@@ -6284,10 +6791,14 @@ function renderHome(){
     if(mLbl) subtitle+=' · '+mLbl;
     if(e.location) subtitle+=' · '+e.location;
     // v7: all Today/Coming Up cards use a consistent sky-blue border (matches legend)
+    // v23 (Locker icon consistency): private items now get the same 🔒
+    // prefix here as everywhere else in the app (event detail modal,
+    // Notebook note list) — previously this card showed no private
+    // indicator at all, on Home or anywhere else on this page.
     return `<div onclick="viewEv('${e.id}')" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:10px;background:#fff;border-left:3px solid ${T.sky};margin-bottom:6px;cursor:pointer">
       <span style="font-size:16px">${ET[e.type].icon}</span>
       <div style="flex:1;min-width:0">
-        <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.series_id?'🔁 ':''}${e.title||ET[e.type].label}</div>
+        <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e._pendingSync?'📴 ':''}${e.is_private?'🔒 ':''}${e.series_id?'🔁 ':''}${e.title||ET[e.type].label}</div>
         <div style="font-size:11px;color:${T.muted}">${subtitle}</div>
       </div>
     </div>`;
@@ -6298,6 +6809,14 @@ function renderHome(){
       <div class="page-title" style="font-size:20px">Good ${new Date().getHours()<12?'morning':'afternoon'} 👋</div>
     </div>
     <div style="padding:12px 16px">
+
+      ${isOffline()||_pendingCount()>0?`
+      <div style="display:flex;align-items:center;gap:8px;background:${isOffline()?'#f2ddd4':T.sageLight};color:${isOffline()?'#b85c38':T.sage};border-radius:10px;padding:9px 12px;font-size:12px;font-weight:700;margin-bottom:12px">
+        <span>${isOffline()?'📵':'🔄'}</span>
+        <span style="flex:1">${isOffline()
+          ?(_offlineDataAgeText()||"You're offline — showing your last loaded data")+(_pendingCount()>0?` · ${_pendingCount()} not yet synced`:'')
+          :`${_pendingCount()} item${_pendingCount()!==1?'s':''} waiting to sync — will retry automatically`}</span>
+      </div>`:''}
 
       <div style="display:flex;gap:8px;margin-bottom:14px">
         <button onclick="showPicker(new Date())" style="flex:1;padding:12px;border-radius:12px;background:${T.sage};color:#fff;border:none;font-weight:700;font-size:13px;cursor:pointer">+ Calendar Entry</button>
@@ -6335,7 +6854,7 @@ function renderHome(){
         return `<div onclick="viewEv('${e.id}')" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:10px;background:#fff;border-left:3px solid ${T.sky};margin-bottom:6px;cursor:pointer">
           <span style="font-size:16px">${icon}</span>
           <div style="flex:1;min-width:0">
-            <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.series_id?'🔁 ':''}${e.title||(isTask?'Untitled Task':ET[e.type].label)}</div>
+            <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e._pendingSync?'📴 ':''}${e.is_private?'🔒 ':''}${e.series_id?'🔁 ':''}${e.title||(isTask?'Untitled Task':ET[e.type].label)}</div>
             <div style="font-size:11px;color:${isTask&&isOverdue?T.rose:T.muted}">${subtitle}</div>
           </div>
         </div>`;
@@ -7558,7 +8077,7 @@ function renderSettings(){
         <div style="width:36px;height:36px;border-radius:50%;background:${T.sage};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px;flex-shrink:0">${(cu.user_metadata?.name||cu.email||'U')[0].toUpperCase()}</div>
         <div style="min-width:0"><div style="font-weight:700;font-size:13px;color:${T.ink};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cu.user_metadata?.name||'My Account'}</div><div style="font-size:11px;color:${T.muted};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cu.email||''}</div></div>
       </div>
-      <button type="button" onclick="doSignOut()" style="background:#fff;border:1px solid ${T.border};border-radius:8px;padding:6px 11px;font-size:11px;font-weight:700;color:${T.muted};cursor:pointer;flex-shrink:0;white-space:nowrap">🚪 Sign out</button>
+      <button type="button" onclick="confirmSignOutIfPending()" style="background:#fff;border:1px solid ${T.border};border-radius:8px;padding:6px 11px;font-size:11px;font-weight:700;color:${T.muted};cursor:pointer;flex-shrink:0;white-space:nowrap">🚪 Sign out</button>
     </div>`:''}
     ${sectionSelectorTrigger(_settingsCurrent, '_openSettingsSectionPicker', _hasUnreadNotifs())}
     <div style="padding:14px 16px">${tc}</div>`;
@@ -8203,11 +8722,25 @@ async function toggleEvAction(evId, actionIdx, done) {
   const actions = (ev.actions || []).map((a, i) => i === actionIdx ? {...a, done} : a);
   const allDone = actions.length > 0 && actions.every(a => a.done);
   const completedAt = allDone ? new Date().toISOString() : null;
-  const { error } = await sb.from('events')
-    .update({ actions, completed_at: completedAt })
-    .eq('id', evId);
-  if (error) { toast('Error saving.', true); return; }
-  A.events = A.events.map(e => e.id === evId ? {...e, actions, completed_at: completedAt} : e);
+  // v23 Pass D: a not-yet-synced item doesn't exist in the database yet, so
+  // update it locally instead of sending a network call that would silently
+  // match nothing. Otherwise, this now routes through sbWrite() (was a raw
+  // sb.from() call before) so it picks up the same offline guard as
+  // everything else — checklist-ticking on an already-saved item still
+  // needs a connection, same as Complete/Ignore.
+  if (isPendingSync(evId)) {
+    A.events = A.events.map(e => e.id === evId ? {...e, actions, completed_at: completedAt} : e);
+    _savePendingEvents();
+  } else {
+    const { error } = await sbWrite(() => sb.from('events')
+      .update({ actions, completed_at: completedAt })
+      .eq('id', evId));
+    // sbWrite() already showed its own toast for an offline/connection
+    // failure — only show this one for a genuine (non-connection) error, so
+    // the user never sees two toasts stacked for the same tap.
+    if (error) { if (error.message !== 'offline') toast('Error saving.', true); return; }
+    A.events = A.events.map(e => e.id === evId ? {...e, actions, completed_at: completedAt} : e);
+  }
   // Update label strikethrough in-place — no full modal re-render needed
   const lbl = document.getElementById(`ev-action-lbl-${actionIdx}`);
   if (lbl) {
@@ -8252,6 +8785,35 @@ async function markEvComplete(evId) {
   setTimeout(() => viewEv(evId), 50);
 }
 window.markEvComplete = markEvComplete;
+
+// v23 (Ignore option): dismisses a Task/action item from Home's Other
+// Actions list (and Insights' "events to follow up on" list) without
+// marking it complete and without deleting it — the item keeps showing
+// on the Calendar on its original date, so there's still a record it
+// existed and was deliberately left undone. This is a toggle, exactly
+// like markEvComplete() above, so a misclick can be undone the same way.
+// For a recurring item this only ever touches the one occurrence row
+// being viewed — each occurrence has always been its own database row
+// (see the V22 recurrence-count fix), so next month's occurrence of a
+// monthly reminder is untouched by ignoring this month's.
+async function ignoreEv(evId) {
+  if (isSampleMode()) return;
+  const ev = A.events.find(e => e.id === evId);
+  if (!ev) return;
+  const ignoredAt = ev.ignored_at ? null : new Date().toISOString();
+  const { error } = await sbWrite(() => sb.from('events')
+    .update({ ignored_at: ignoredAt })
+    .eq('id', evId));
+  if (error) { toast('Error saving.', true); return; }
+  A.events = A.events.map(e => e.id === evId ? {...e, ignored_at: ignoredAt} : e);
+  toast(ignoredAt ? 'Ignored — hidden from Home, still on your Calendar.' : 'Un-ignored.');
+  // Keep Home's Today / Coming Up / Other Actions sections in sync
+  renderHome();
+  // Re-render viewEv to refresh the button label
+  _closeModalDOM();
+  setTimeout(() => viewEv(evId), 50);
+}
+window.ignoreEv = ignoreEv;
 
 // Toggles a single checklist item on a note and saves the full note instantly.
 // Automatically sets or clears completed_at based on whether all items are done.
@@ -9212,6 +9774,26 @@ async function boot(){
     }
   } catch(e) { console.error('Invite token capture error', e); }
 
+  // v23 (Shareable links): capture ?note=id or ?event=id the same way as
+  // ?invite= just above, and for the same reason — it must survive a
+  // signup confirmation-email redirect or Google OAuth redirect, both of
+  // which reload the page fresh. Consumed once notes/events have loaded,
+  // near the end of initApp() below.
+  try {
+    const _shareParams = new URLSearchParams(window.location.search);
+    const _shareNoteId = _shareParams.get('note');
+    const _shareEventId = _shareParams.get('event');
+    if (_shareNoteId || _shareEventId) {
+      localStorage.setItem('ks_pending_share', JSON.stringify(
+        _shareNoteId ? {type:'note', id:_shareNoteId} : {type:'event', id:_shareEventId}
+      ));
+      _shareParams.delete('note'); _shareParams.delete('event');
+      const _newSearch2 = _shareParams.toString();
+      const _newUrl2 = window.location.pathname + (_newSearch2 ? '?'+_newSearch2 : '') + window.location.hash;
+      window.history.replaceState({}, '', _newUrl2);
+    }
+  } catch(e) { console.error('Share link capture error', e); }
+
   // ── PWA: service worker registration (v8) ────────────────────────────────
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/service-worker.js')
@@ -9219,15 +9801,46 @@ async function boot(){
       .catch(err => console.warn('SW registration failed:', err));
   }
 
-  // ── PWA: offline banner management (v8) ─────────────────────────────────
-  function _updateOnlineStatus() {
+  // ── PWA: offline banner management (v8; rewritten in v23 Pass D) ────────
+  // v23 Pass D: the banner text is now dynamic (shows how old the data on
+  // screen is while offline) instead of one fixed sentence, and reconnecting
+  // now does real work — syncs anything created/edited on this device while
+  // offline, then quietly refreshes everything else in the background.
+  let _wasOffline = isOffline();
+  async function _updateOnlineStatus() {
     const banner = document.getElementById('offline-banner');
-    if (!banner) return;
-    if (navigator.onLine) {
-      banner.classList.remove('visible');
-    } else {
-      banner.classList.add('visible');
+    const nowOffline = isOffline();
+    if (banner) {
+      if (nowOffline) {
+        const ageText = _offlineDataAgeText();
+        banner.textContent = '📵 You\'re offline' + (ageText ? ' — ' + ageText : ' — data cannot be loaded or saved');
+        banner.classList.add('visible');
+      } else {
+        banner.classList.remove('visible');
+      }
     }
+    // Reconnecting (was offline, now online): sync anything created/edited
+    // on this device while offline FIRST — awaited, so those rows are for
+    // real in the database before the full reload just below runs. Doing it
+    // the other way round would let the reload's fresh (offline-item-free)
+    // data silently wipe out not-yet-synced local items still sitting in
+    // A.events/A.notes. Then quietly re-fetch everything else so the app has
+    // fully current data again — same as the very first load, just running
+    // in the background instead of blocking the UI.
+    if (_wasOffline && !nowOffline && A._appInitialized) {
+      await syncPendingItems();
+      if (A.family && !isSampleMode()) {
+        loadNotifications();
+        clearInterval(A._notifInterval);
+        A._notifInterval = setInterval(loadNotifications, 60000);
+      }
+      try {
+        await loadAll();
+        if (typeof renderHome==='function') renderHome();
+        if (typeof renderCal==='function') renderCal();
+      } catch(e) { console.warn('Background refresh after reconnect failed', e); }
+    }
+    _wasOffline = nowOffline;
   }
   window.addEventListener('online',  _updateOnlineStatus);
   window.addEventListener('offline', _updateOnlineStatus);

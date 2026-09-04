@@ -1,18 +1,26 @@
-// ── Seamly Service Worker — v22 ───────────────────────────────────────────────
+// ── Seamly Service Worker — v23 ───────────────────────────────────────────────
 //
 // Strategy: Approach A — App shell caching only.
 //
 // What this does:
 //   • Caches the HTML/JS app shell and the Supabase CDN script on first visit.
 //   • Serves the cached shell when the user is offline, so the app loads.
-//   • Does NOT cache any Supabase data — all family data still requires internet.
-//   • When offline, the app detects the lack of connection and shows a banner
-//     ("You're offline") — all data operations are visually disabled.
+//   • Does NOT cache any Supabase data itself — that's handled entirely at
+//     the app level now (see below), not by this service worker.
+//   • When offline, the app shows a banner with how old its data is, still
+//     lets you create new notes/events (saved on-device, synced automatically
+//     once you're back online), and blocks edits to anything already saved
+//     to the database until the connection returns.
 //
-// What this does NOT do (Approach B — planned for a future version):
-//   • Cache family data locally for offline reading.
-//   • Allow offline writes with sync-on-reconnect.
-//   See project summary roadmap for Approach B details.
+// v23 Pass D update: "Approach B" (offline reading of family data, plus
+// offline creation of new items) is now implemented — but entirely at the
+// APP level (see index.html's saveSnapshotToLocalStorage() /
+// loadSnapshotFromLocalStorage() / the pending-sync helpers near sbWrite()),
+// not here in the service worker. This file's job stays exactly what it was
+// in v22: cache the app shell itself (the HTML/JS/CSS that makes up Seamly)
+// so the app can even LOAD while offline. What loads once it's open — your
+// family's actual data — is a separate localStorage snapshot the app
+// manages on its own, refreshed every time a full load succeeds online.
 //
 // ── UPDATING BETWEEN VERSIONS ────────────────────────────────────────────────
 // Increment CACHE_VERSION on every new Seamly release (v9, v10, …).
@@ -22,7 +30,7 @@
 // it on every future release, per this file's own original instruction.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const CACHE_VERSION = 'seamly-v22';
+const CACHE_VERSION = 'seamly-v23';
 
 // Resources to pre-cache on install (app shell only)
 const APP_SHELL = [
@@ -91,6 +99,9 @@ self.addEventListener('fetch', event => {
 
   // 2. Supabase API calls — network only, no caching of family data.
   //    If offline, return a structured error so the app can handle it gracefully.
+  //    (v23: the app itself now checks navigator.onLine before ever attempting
+  //    one of these calls — see sbWrite()'s offline guard — so this fallback
+  //    mainly covers a request already in flight when the connection drops.)
   if (url.hostname.includes('supabase.co')) {
     event.respondWith(
       fetch(event.request).catch(() =>
