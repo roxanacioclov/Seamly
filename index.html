@@ -1,4 +1,4 @@
-<!-- Seamly v23 (Pass A+B+C+D+E) | STAGING | 03 Sep 2026 -->
+<!-- Seamly v23 (Pass A+B+C+D+E + hotfix F) | STAGING | 17 Sep 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -189,7 +189,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div class="auth-card">
     <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">Seamly</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v23 (Pass A+B+C+D+E) — 03 Sep 2026</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v23 (Pass A+B+C+D+E + hotfix F) — 17 Sep 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -240,7 +240,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v23·E</span>
+      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v23·F</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sample-btn" onclick="A.family?toggleSampleMode():goTo('settings')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:var(--honey-light);color:var(--honey);border:1px solid var(--honey)44;cursor:pointer;display:none">📋 Sample</button>
@@ -283,7 +283,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v23·E</span>
+      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v23·F</span>
     </div>
     <button class="nav-btn" data-page="home" onclick="goTo('home')">
       <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0">
@@ -1146,35 +1146,50 @@ async function initApp(user){
   // silent initApp() re-run. Family-scoped, so only runs once a family
   // context actually exists.
   const _pendingShareRaw = localStorage.getItem('ks_pending_share');
+  // v23 hotfix F — TEMPORARY diagnostic logging (share-link bug investigation).
+  // Remove this whole console.log('[ShareDebug] ...') block once the cause is
+  // confirmed — it changes nothing about app behavior, it only prints.
+  console.log('[ShareDebug] consume check — raw:', _pendingShareRaw, '| A.family:', !!A.family, '| isSampleMode:', isSampleMode(), '| A.notes.length:', A.notes?.length, '| A.events.length:', A.events?.length);
   if (_pendingShareRaw && A.family && !isSampleMode()) {
     localStorage.removeItem('ks_pending_share');
     try {
       const _share = JSON.parse(_pendingShareRaw);
+      console.log('[ShareDebug] parsed share object:', _share);
       if (_share.type === 'event') {
         const _ev = A.events.find(e => e.id === _share.id);
+        console.log('[ShareDebug] event lookup result:', _ev);
         // Privacy re-check: a link valid when shared can point to an item
         // marked private since — never let this path bypass the same
         // is_private filter getEvents() applies everywhere else. Treated
         // identically to "not found".
         if (_ev && (!_ev.is_private || _ev.created_by_user_id === A.user?.id)) {
+          console.log('[ShareDebug] navigating to calendar + opening event');
           goTo('calendar');
           setTimeout(() => viewEv(_ev.id), 100);
         } else {
+          console.log('[ShareDebug] event not found or blocked by privacy check — showing toast');
           toast("That item isn't available.", true);
         }
       } else if (_share.type === 'note') {
         const _note = A.notes.find(n => n.id === _share.id);
+        console.log('[ShareDebug] note lookup result:', _note);
         if (_note && (!_note.is_private || _note.created_by_user_id === A.user?.id)) {
+          console.log('[ShareDebug] navigating to notebook + opening note');
           goTo('notebook');
           // openNote() already branches internally to the read-only
           // curated view when the note is curated — no special-casing
           // needed here.
           setTimeout(() => openNote(_note.id), 100);
         } else {
+          console.log('[ShareDebug] note not found or blocked by privacy check — showing toast');
           toast("That item isn't available.", true);
         }
+      } else {
+        console.log('[ShareDebug] share.type matched neither "note" nor "event" — silent no-op. Full object was:', _share);
       }
-    } catch(e) { console.error('Share link consume error', e); }
+    } catch(e) { console.error('[ShareDebug] Share link consume error', e); }
+  } else {
+    console.log('[ShareDebug] consume block skipped entirely — condition was false.');
   }
 
   if(A.showOB)renderOB();
@@ -4654,7 +4669,11 @@ function viewEv(id) {
     // item is completed (nothing left to ignore at that point).
     if ((ev.type === 'task' || (ev.actions && ev.actions.length > 0)) && !ev.completed_at) {
       const isIgnored = !!ev.ignored_at;
-      body += `<button class="btn btn-full" ${_offlineLockedItem?'disabled':''} style="margin-bottom:10px;background:${isIgnored?T.sageLight:'#f5f2ed'};color:${isIgnored?T.sage:'#7a7060'};border:1.5px solid ${isIgnored?T.sageMid:'#e0d8cc'};font-size:13px;font-weight:700${_offlineLockedItem?';opacity:0.5;cursor:not-allowed':''}" onclick="ignoreEv('${ev.id}')">
+      // v23 hotfix F: once ignored, this button now uses the same muted
+      // "already done" grey as the Mark-as-incomplete button above (instead
+      // of green) — an ignored item reads as dismissed/inactive, not as an
+      // active positive state.
+      body += `<button class="btn btn-full" ${_offlineLockedItem?'disabled':''} style="margin-bottom:10px;background:${isIgnored?T.parchment:'#f5f2ed'};color:${isIgnored?T.muted:'#7a7060'};border:1.5px solid ${isIgnored?T.border:'#e0d8cc'};font-size:13px;font-weight:700${_offlineLockedItem?';opacity:0.5;cursor:not-allowed':''}" onclick="ignoreEv('${ev.id}')">
         ${isIgnored ? '↩ Un-ignore' : '🙈 Ignore — stop showing on Home'}${_offlineLockedItem?' (needs connection)':''}
       </button>`;
     }
@@ -6862,10 +6881,14 @@ function renderHome(){
       ${todoNotes.map(n => {
         const grp = getGroups().find(g=>g.id===n.group_id);
         const openCount = n.checklist.filter(c=>!c.done).length;
+        // v23 hotfix F (Locker icon consistency): this note card was the one
+        // spot on Home still missing the 🔒 private-item prefix that every
+        // other Home card (Today/Coming Up events, Other Actions calendar
+        // items) already has — flagged during staging testing.
         return `<div onclick="openNote('${n.id}')" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:10px;background:#fff;border-left:3px solid ${T.sage};margin-bottom:6px;cursor:pointer">
           <span style="font-size:16px">📓</span>
           <div style="flex:1;min-width:0">
-            <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${n.title||'Untitled Note'}</div>
+            <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${n.is_private?'🔒 ':''}${n.title||'Untitled Note'}</div>
             <div style="font-size:11px;color:${T.muted}">${grp?grp.name+' · ':''}${openCount} open item${openCount!==1?'s':''}</div>
           </div>
         </div>`;
@@ -9779,20 +9802,28 @@ async function boot(){
   // signup confirmation-email redirect or Google OAuth redirect, both of
   // which reload the page fresh. Consumed once notes/events have loaded,
   // near the end of initApp() below.
+  // v23 hotfix F — TEMPORARY diagnostic logging (share-link bug investigation).
+  // Remove this whole console.log('[ShareDebug] ...') block once the cause is
+  // confirmed — it changes nothing about app behavior, it only prints.
+  console.log('[ShareDebug] boot() start — location.href:', window.location.href, '| location.search:', window.location.search);
   try {
     const _shareParams = new URLSearchParams(window.location.search);
     const _shareNoteId = _shareParams.get('note');
     const _shareEventId = _shareParams.get('event');
+    console.log('[ShareDebug] parsed from URL — note:', _shareNoteId, '| event:', _shareEventId);
     if (_shareNoteId || _shareEventId) {
-      localStorage.setItem('ks_pending_share', JSON.stringify(
-        _shareNoteId ? {type:'note', id:_shareNoteId} : {type:'event', id:_shareEventId}
-      ));
+      const _shareValue = _shareNoteId ? {type:'note', id:_shareNoteId} : {type:'event', id:_shareEventId};
+      localStorage.setItem('ks_pending_share', JSON.stringify(_shareValue));
+      console.log('[ShareDebug] wrote ks_pending_share:', JSON.stringify(_shareValue), '| readback:', localStorage.getItem('ks_pending_share'));
       _shareParams.delete('note'); _shareParams.delete('event');
       const _newSearch2 = _shareParams.toString();
       const _newUrl2 = window.location.pathname + (_newSearch2 ? '?'+_newSearch2 : '') + window.location.hash;
       window.history.replaceState({}, '', _newUrl2);
+      console.log('[ShareDebug] URL after replaceState:', window.location.href);
+    } else {
+      console.log('[ShareDebug] no note/event param found — nothing captured this load.');
     }
-  } catch(e) { console.error('Share link capture error', e); }
+  } catch(e) { console.error('[ShareDebug] Share link capture error', e); }
 
   // ── PWA: service worker registration (v8) ────────────────────────────────
   if ('serviceWorker' in navigator) {
