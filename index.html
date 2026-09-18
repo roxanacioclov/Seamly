@@ -1,4 +1,4 @@
-<!-- Seamly v23 (Pass A+B+C+D+E + hotfix F) | STAGING | 17 Sep 2026 -->
+<!-- Seamly v23 (Pass A+B+C+D+E + hotfix F+G) | STAGING | 18 Sep 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -189,7 +189,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
   <div class="auth-card">
     <div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--sage);text-align:center;margin-bottom:4px">Seamly</div>
     <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px">Your family's all-in-one hub</div>
-    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v23 (Pass A+B+C+D+E + hotfix F) — 17 Sep 2026</div>
+    <div style="text-align:center;color:var(--muted);font-size:10px;margin-bottom:10px;opacity:0.5">v23 (Pass A+B+C+D+E + hotfix F+G) — 18 Sep 2026</div>
     <div id="auth-login">
       <div class="form-row"><label class="lbl">Email</label><input class="inp" type="email" id="a-email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="form-row"><label class="lbl">Password</label><input class="inp" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password"></div>
@@ -240,7 +240,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v23·F</span>
+      <span id="app-version-tag" style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v23·G</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sample-btn" onclick="A.family?toggleSampleMode():goTo('settings')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;background:var(--honey-light);color:var(--honey);border:1px solid var(--honey)44;cursor:pointer;display:none">📋 Sample</button>
@@ -283,7 +283,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--sage);outline-of
         <path transform="translate(394,148)" fill="#ffffff" d="M0,-48 C10,-10 10,-10 48,0 C10,10 10,10 0,48 C-10,10 -10,10 -48,0 C-10,-10 -10,-10 0,-48 Z"/>
       </svg>
       <span>Seamly</span>
-      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v23·F</span>
+      <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:0.55;margin-left:5px;letter-spacing:0.3px">v23·G</span>
     </div>
     <button class="nav-btn" data-page="home" onclick="goTo('home')">
       <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="flex-shrink:0">
@@ -657,9 +657,26 @@ async function doSignup(){
   // Supabase's confirmation-email redirect so it's still in the URL when
   // they click through and land back here — boot() re-captures it and
   // initApp() runs accept_family_invite() once they're signed in.
-  const _pendingInvite = localStorage.getItem('ks_pending_invite');
+  // v23 hotfix G: a pending shared note/event link is now carried through
+  // the same way. This didn't matter before while shares used localStorage
+  // (shared across tabs, it would already have been visible in whatever
+  // new tab the confirmation email opens) — but now that both use
+  // sessionStorage (fixing the cross-tab race — see boot()), a brand-new
+  // tab opened by the confirmation link starts with empty sessionStorage
+  // of its own, so the id has to travel in the redirect URL itself instead.
+  const _pendingInvite = sessionStorage.getItem('ks_pending_invite');
+  const _pendingShareRaw = sessionStorage.getItem('ks_pending_share');
   const _redirectBase = window.location.origin + window.location.pathname;
-  const emailRedirectTo = _pendingInvite ? `${_redirectBase}?invite=${_pendingInvite}` : _redirectBase;
+  const _redirectParams = new URLSearchParams();
+  if (_pendingInvite) _redirectParams.set('invite', _pendingInvite);
+  if (_pendingShareRaw) {
+    try {
+      const _pendingShare = JSON.parse(_pendingShareRaw);
+      if (_pendingShare?.type && _pendingShare?.id) _redirectParams.set(_pendingShare.type, _pendingShare.id);
+    } catch(_) {}
+  }
+  const _redirectQS = _redirectParams.toString();
+  const emailRedirectTo = _redirectQS ? `${_redirectBase}?${_redirectQS}` : _redirectBase;
   const{error}=await sb.auth.signUp({email,password:pass,options:{data:{name},emailRedirectTo}});
   if(error){msg.textContent=error.message;return;}
   msg.style.color=T.sage;
@@ -682,9 +699,23 @@ window.doForgot=doForgot;
 async function doGoogleAuth(){
   // v21: same invite-token carry-through as doSignup(), for the OAuth
   // redirect — Google sends the user back to this exact URL after auth.
-  const _pendingInvite = localStorage.getItem('ks_pending_invite');
+  // v23 hotfix G: same pending-share carry-through as doSignup() too — see
+  // the comment there for why this is now needed (sessionStorage tab-safety
+  // fix means a fresh tab from the OAuth redirect starts with nothing of
+  // its own to fall back on).
+  const _pendingInvite = sessionStorage.getItem('ks_pending_invite');
+  const _pendingShareRaw = sessionStorage.getItem('ks_pending_share');
   const _redirectBase = window.location.origin + window.location.pathname;
-  const redirectTo = _pendingInvite ? `${_redirectBase}?invite=${_pendingInvite}` : _redirectBase;
+  const _redirectParams = new URLSearchParams();
+  if (_pendingInvite) _redirectParams.set('invite', _pendingInvite);
+  if (_pendingShareRaw) {
+    try {
+      const _pendingShare = JSON.parse(_pendingShareRaw);
+      if (_pendingShare?.type && _pendingShare?.id) _redirectParams.set(_pendingShare.type, _pendingShare.id);
+    } catch(_) {}
+  }
+  const _redirectQS = _redirectParams.toString();
+  const redirectTo = _redirectQS ? `${_redirectBase}?${_redirectQS}` : _redirectBase;
   const{error}=await sb.auth.signInWithOAuth({
     provider:'google',
     options:{ redirectTo }
@@ -1025,11 +1056,14 @@ async function initApp(user){
   // the primary source of truth for linking an invited user to a family.
   // The email-match fallback further down stays exactly as-is, for members
   // added without ever generating an invite link.
-  const _pendingInvite = localStorage.getItem('ks_pending_invite');
+  // v23 hotfix G: sessionStorage, not localStorage — see the tab-safety
+  // note in boot() above (this token has the same cross-tab risk the
+  // share-link one did, even though it wasn't the one caught by testing).
+  const _pendingInvite = sessionStorage.getItem('ks_pending_invite');
   if (_pendingInvite) {
     try {
       const { data: acceptResult, error: acceptErr } = await sb.rpc('accept_family_invite', { invite_token: _pendingInvite });
-      localStorage.removeItem('ks_pending_invite');
+      sessionStorage.removeItem('ks_pending_invite');
       if (acceptErr) {
         console.error('Invite acceptance error', acceptErr);
         toast('There was a problem with that invite link — please try again or ask the family owner for a new one.', true);
@@ -1043,7 +1077,7 @@ async function initApp(user){
       }
     } catch (e) {
       console.error('Invite acceptance error', e);
-      localStorage.removeItem('ks_pending_invite');
+      sessionStorage.removeItem('ks_pending_invite');
       toast('There was a problem with that invite link — please try again.', true);
     }
   }
@@ -1141,55 +1175,49 @@ async function initApp(user){
   // v23 (Shareable links): resolve a pending ?note=/?event= deep link now
   // that notes/events have loaded, overriding wherever the block above
   // just navigated to. Mirrors the invite-consumption pattern earlier in
-  // this function — read once, always clear from localStorage right away
-  // (success or failure) so it can never re-fire on a later reload or a
-  // silent initApp() re-run. Family-scoped, so only runs once a family
-  // context actually exists.
-  const _pendingShareRaw = localStorage.getItem('ks_pending_share');
-  // v23 hotfix F — TEMPORARY diagnostic logging (share-link bug investigation).
-  // Remove this whole console.log('[ShareDebug] ...') block once the cause is
-  // confirmed — it changes nothing about app behavior, it only prints.
-  console.log('[ShareDebug] consume check — raw:', _pendingShareRaw, '| A.family:', !!A.family, '| isSampleMode:', isSampleMode(), '| A.notes.length:', A.notes?.length, '| A.events.length:', A.events?.length);
+  // this function — read once, always clear right away (success or
+  // failure) so it can never re-fire on a later reload or a silent
+  // initApp() re-run. Family-scoped, so only runs once a family context
+  // actually exists.
+  // v23 hotfix G: sessionStorage, not localStorage — confirmed root cause
+  // of shared links intermittently landing on plain Home instead of
+  // opening the item. localStorage is shared across every open tab of the
+  // site; if a second Seamly tab happened to be open at the same time (a
+  // very real scenario — e.g. the app is already open when a shared link
+  // is tapped elsewhere), that other tab's own background reconnect could
+  // silently consume this value before the tab that actually had the link
+  // got a chance to. sessionStorage is private to one tab, which removes
+  // that race entirely. See the matching note in boot() above.
+  const _pendingShareRaw = sessionStorage.getItem('ks_pending_share');
   if (_pendingShareRaw && A.family && !isSampleMode()) {
-    localStorage.removeItem('ks_pending_share');
+    sessionStorage.removeItem('ks_pending_share');
     try {
       const _share = JSON.parse(_pendingShareRaw);
-      console.log('[ShareDebug] parsed share object:', _share);
       if (_share.type === 'event') {
         const _ev = A.events.find(e => e.id === _share.id);
-        console.log('[ShareDebug] event lookup result:', _ev);
         // Privacy re-check: a link valid when shared can point to an item
         // marked private since — never let this path bypass the same
         // is_private filter getEvents() applies everywhere else. Treated
         // identically to "not found".
         if (_ev && (!_ev.is_private || _ev.created_by_user_id === A.user?.id)) {
-          console.log('[ShareDebug] navigating to calendar + opening event');
           goTo('calendar');
           setTimeout(() => viewEv(_ev.id), 100);
         } else {
-          console.log('[ShareDebug] event not found or blocked by privacy check — showing toast');
           toast("That item isn't available.", true);
         }
       } else if (_share.type === 'note') {
         const _note = A.notes.find(n => n.id === _share.id);
-        console.log('[ShareDebug] note lookup result:', _note);
         if (_note && (!_note.is_private || _note.created_by_user_id === A.user?.id)) {
-          console.log('[ShareDebug] navigating to notebook + opening note');
           goTo('notebook');
           // openNote() already branches internally to the read-only
           // curated view when the note is curated — no special-casing
           // needed here.
           setTimeout(() => openNote(_note.id), 100);
         } else {
-          console.log('[ShareDebug] note not found or blocked by privacy check — showing toast');
           toast("That item isn't available.", true);
         }
-      } else {
-        console.log('[ShareDebug] share.type matched neither "note" nor "event" — silent no-op. Full object was:', _share);
       }
-    } catch(e) { console.error('[ShareDebug] Share link consume error', e); }
-  } else {
-    console.log('[ShareDebug] consume block skipped entirely — condition was false.');
+    } catch(e) { console.error('Share link consume error', e); }
   }
 
   if(A.showOB)renderOB();
@@ -9779,17 +9807,32 @@ async function handleSession(session){
 }
 
 async function boot(){
-  // v21: capture ?invite=token from the URL into localStorage BEFORE any
-  // auth/session logic runs, so it survives a signup confirmation-email
-  // redirect or a Google OAuth redirect (both reload the page fresh,
-  // losing any in-memory state). Cleans the param out of the visible URL
-  // immediately after capturing it. See accept_family_invite() (schema)
-  // and the new step in initApp() below for where this gets consumed.
+  // v21: capture ?invite=token from the URL BEFORE any auth/session logic
+  // runs, so it survives a signup confirmation-email redirect or a Google
+  // OAuth redirect (both reload the page fresh, losing any in-memory
+  // state). Cleans the param out of the visible URL immediately after
+  // capturing it. See accept_family_invite() (schema) and the new step in
+  // initApp() below for where this gets consumed.
+  // v23 hotfix G (tab-safety fix): switched from localStorage to
+  // sessionStorage. localStorage is shared by every tab/window open to the
+  // site, so if a second Seamly tab happened to be open at the same time
+  // (very plausible — e.g. someone already has the app open when they tap
+  // a shared link elsewhere), that OTHER tab could silently "steal" and
+  // consume this value the next time its own connection quietly refreshes
+  // in the background, leaving the tab that actually has the link with
+  // nothing to find. sessionStorage belongs privately to one tab, which
+  // removes that risk entirely — it still survives a same-tab redirect
+  // (a plain reload or an OAuth/email-confirmation round trip back to this
+  // same tab), which is the only thing this ever needed to survive. See
+  // doSignup()/doGoogleAuth() for the confirmation-email/OAuth case, which
+  // also carries the pending invite/share through the redirect URL itself
+  // so a NEW tab opened by that email link (which starts with empty
+  // sessionStorage of its own) still picks it up correctly.
   try {
     const _inviteParams = new URLSearchParams(window.location.search);
     const _inviteToken = _inviteParams.get('invite');
     if (_inviteToken) {
-      localStorage.setItem('ks_pending_invite', _inviteToken);
+      sessionStorage.setItem('ks_pending_invite', _inviteToken);
       _inviteParams.delete('invite');
       const _newSearch = _inviteParams.toString();
       const _newUrl = window.location.pathname + (_newSearch ? '?'+_newSearch : '') + window.location.hash;
@@ -9798,32 +9841,25 @@ async function boot(){
   } catch(e) { console.error('Invite token capture error', e); }
 
   // v23 (Shareable links): capture ?note=id or ?event=id the same way as
-  // ?invite= just above, and for the same reason — it must survive a
-  // signup confirmation-email redirect or Google OAuth redirect, both of
-  // which reload the page fresh. Consumed once notes/events have loaded,
-  // near the end of initApp() below.
-  // v23 hotfix F — TEMPORARY diagnostic logging (share-link bug investigation).
-  // Remove this whole console.log('[ShareDebug] ...') block once the cause is
-  // confirmed — it changes nothing about app behavior, it only prints.
-  console.log('[ShareDebug] boot() start — location.href:', window.location.href, '| location.search:', window.location.search);
+  // ?invite= just above, and for the same reason. Consumed once
+  // notes/events have loaded, near the end of initApp() below.
+  // v23 hotfix G: sessionStorage, not localStorage — see the tab-safety
+  // note above (this was the confirmed root cause of shared links
+  // intermittently landing on plain Home instead of opening the item).
   try {
     const _shareParams = new URLSearchParams(window.location.search);
     const _shareNoteId = _shareParams.get('note');
     const _shareEventId = _shareParams.get('event');
-    console.log('[ShareDebug] parsed from URL — note:', _shareNoteId, '| event:', _shareEventId);
     if (_shareNoteId || _shareEventId) {
-      const _shareValue = _shareNoteId ? {type:'note', id:_shareNoteId} : {type:'event', id:_shareEventId};
-      localStorage.setItem('ks_pending_share', JSON.stringify(_shareValue));
-      console.log('[ShareDebug] wrote ks_pending_share:', JSON.stringify(_shareValue), '| readback:', localStorage.getItem('ks_pending_share'));
+      sessionStorage.setItem('ks_pending_share', JSON.stringify(
+        _shareNoteId ? {type:'note', id:_shareNoteId} : {type:'event', id:_shareEventId}
+      ));
       _shareParams.delete('note'); _shareParams.delete('event');
       const _newSearch2 = _shareParams.toString();
       const _newUrl2 = window.location.pathname + (_newSearch2 ? '?'+_newSearch2 : '') + window.location.hash;
       window.history.replaceState({}, '', _newUrl2);
-      console.log('[ShareDebug] URL after replaceState:', window.location.href);
-    } else {
-      console.log('[ShareDebug] no note/event param found — nothing captured this load.');
     }
-  } catch(e) { console.error('[ShareDebug] Share link capture error', e); }
+  } catch(e) { console.error('Share link capture error', e); }
 
   // ── PWA: service worker registration (v8) ────────────────────────────────
   if ('serviceWorker' in navigator) {
